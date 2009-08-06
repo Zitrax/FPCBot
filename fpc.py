@@ -8,59 +8,69 @@ import wikipedia
 
 candPrefix = "Commons:Featured picture candidates/"
 
-def main():
+class Candidate():
+    """This is one feature picture candidate"""
 
-    fpcTitle = 'Commons:Featured picture candidates/candidate list';
-    fpcPage = wikipedia.Page(wikipedia.getSite(), fpcTitle)
+    def __init__(self, page):
+        """page is a wikipedia.Page object"""
+        self.page = page
+        self._oppose  = 0
+        self._support = 0
+        self._neutral = 0
+        self._unknown = 0
 
-    for candidate in findCandidates(fpcPage):
-        countVotes(candidate)
-            
+    def countVotes(self):
+        #wikipedia.output(candidate.title(), toStdout = True)
+
+
+        # TODO: templatesWithParams() was _much_ slower
+        #       than using getTemplates(), could be optimized.
+        templates = self.page.templatesWithParams()
+        for template in templates:
+            title = template[0]
+            #wikipedia.output(title, toStdout = True)
+            if title == "Oppose":
+                self._oppose += 1
+            elif title == "Support":
+                self._support += 1
+            elif title == "Neutral":
+                self._neutral += 1
+            else:
+                self._unknown += 1
+
+        wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d (%s)" % 
+                         ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
+                           self._support,self._oppose,self._neutral,self._unknown,
+                           "Featured" if self.isFeatured() else "Not featured"), 
+                         toStdout = True)
+
+    def isFeatured(self):
+        return (self._support >= 2*self._oppose) and self._support >= 5
+    
+    
 
 def findCandidates(page):
+    """This finds all candidates on the main FPC page"""
     candidates = []
     templates = page.getTemplates()
     for template in templates:
         title = template.title()
         if title.startswith(candPrefix):
-            candidates.append(template)
+            #wikipedia.output("Adding '%s'" % title, toStdout = True)
+            candidates.append(Candidate(template))
         else:
             pass
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
     return candidates
 
 
-def countVotes(candidate):
-    #wikipedia.output(candidate.title(), toStdout = True)
+def main():
 
-    oppose  = 0
-    support = 0
-    neutral = 0
-    unknown = 0
+    fpcTitle = 'Commons:Featured picture candidates/candidate list';
+    fpcPage = wikipedia.Page(wikipedia.getSite(), fpcTitle)
 
-    # TODO: templatesWithParams() was _much_ slower
-    #       than using getTemplates(), could be optimized.
-    templates = candidate.templatesWithParams()
-    for template in templates:
-        title = template[0]
-        #wikipedia.output(title, toStdout = True)
-        if title == "Oppose":
-            oppose += 1
-        elif title == "Support":
-            support += 1
-        elif title == "Neutral":
-            neutral += 1
-        else:
-            unknown += 1
-
-    wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d (%s)" % 
-                     ( candidate.title().replace(candPrefix,'')[0:40].ljust(40),
-                       support,oppose,neutral,unknown,
-                       "Featured" if isFeatured(support,oppose) else "Not featured"), 
-                     toStdout = True)
-
-def isFeatured(support,oppose):
-    return (support >= 2*oppose) and support >= 5
+    for candidate in findCandidates(fpcPage):
+        candidate.countVotes()
 
 if __name__ == "__main__":
     try:
