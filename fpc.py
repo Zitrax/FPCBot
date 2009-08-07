@@ -29,10 +29,27 @@ class Candidate():
         self._featured = False
         self._daysOld = -1
         self._creationTime = None
+        self._striked = None
+
+    def printAllInfo(self):
+        """
+        Console output of all information sought after
+        """
+        self.countVotes()
+        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d U:%02d D:%02d Se:%d Im:%02d W:%s (%s)" % 
+                         ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
+                           self._support,self._striked[0],self._oppose,self._striked[1],
+                           self._neutral,self._unknown,
+                           self.daysOld(),self.sectionCount(),
+                           self.imageCount(),self.isWithdrawn(),
+                           self.statusString()),
+                         toStdout = True)
+
 
     def countVotes(self):
         """
         Counts all the votes for this nomnination
+        and subtracts eventual striked out votes
         """
 
         if self._votesCounted:
@@ -53,13 +70,33 @@ class Candidate():
             else:
                 self._unknown += 1
 
+        self.findStrikedOutVotes()
+        self._support -= self._striked[0]
+        self._oppose  -= self._striked[1]
+
         self._votesCounted = True
 
-        wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d D:%02d Se:%d (%s)" % 
-                         ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
-                           self._support,self._oppose,self._neutral,self._unknown,
-                           self.daysOld(),self.sectionCount(),self.statusString()),
-                         toStdout = True)
+    def findStrikedOutVotes(self):
+        """
+        We should not count striked out votes so 
+        find them and reduce the counts.
+        """
+        
+        if self._striked:
+            return self._striked
+
+        text = self.page.get()
+        s_support = len(re.findall(StrikedOutSupportR,text))
+        s_oppose  = len(re.findall(StrikedOutOpposeR,text))
+        self._striked = (s_support,s_oppose)
+        return self._striked
+        
+
+    def isWithdrawn(self):
+        """
+        Withdrawn nominations should not be counted
+        """
+        return len(re.findall(WithdrawnR,self.page.get()))
 
     def closePage(self):
         """
@@ -69,8 +106,8 @@ class Candidate():
         if not self.isDone():
             return False
 
-        if self.sectionCount() > 1:
-            wikipedia.output("%s contains multiple sections, ignoring" % self.page.title(),toStdout=True)
+        if self.imageCount() > 1:
+            wikipedia.output("%s contains multiple images, ignoring" % self.page.title(),toStdout=True)
             return False
 
         self.countVotes()
@@ -139,6 +176,9 @@ class Candidate():
         checked using isDone()
         """
         
+        if self.isWithdrawn():
+            return False
+
         if not self._votesCounted:
             self.countVotes()
 
@@ -150,6 +190,11 @@ class Candidate():
         """Count the number of sections in this candidate"""
         text = self.page.get()
         return len(re.findall(SectionR,text))
+
+    def imageCount(self):
+        """Count the number of images that are displayed"""
+        text = self.page.get()
+        return len(re.findall(ImagesR,text))
 
 def findCandidates(page):
     """This finds all candidates on the main FPC page"""
@@ -171,6 +216,14 @@ Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, '
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
+# Striked out support votes
+StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]upport\s*}}.*</s>',re.MULTILINE)
+# Striked out oppose votes
+StrikedOutOpposeR = re.compile('<s>.*{{\s*[oO]ppose\s*}}.*</s>',re.MULTILINE)
+# Finds if a withdraw template is used
+WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*}}',re.MULTILINE)
+# Counts the number of displayed images
+ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
 def main():
 
@@ -178,7 +231,8 @@ def main():
     fpcPage = wikipedia.Page(wikipedia.getSite(), fpcTitle)
 
     for candidate in findCandidates(fpcPage):
-        candidate.closePage()
+        #candidate.closePage()
+        candidate.printAllInfo()
 
 if __name__ == "__main__":
     try:
