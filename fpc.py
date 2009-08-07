@@ -31,8 +31,12 @@ class Candidate():
         self._creationTime = None
 
     def countVotes(self):
-        #wikipedia.output(candidate.title(), toStdout = True)
+        """
+        Counts all the votes for this nomnination
+        """
 
+        if self._votesCounted:
+            return
 
         # TODO: templatesWithParams() was _much_ slower
         #       than using getTemplates(), could be optimized.
@@ -57,9 +61,34 @@ class Candidate():
                            self.daysOld(),self.sectionCount(),self.statusString()),
                          toStdout = True)
 
-    def closePage():
-        pass
+    def closePage(self):
+        """
+        Will add the voting results to the page if it is finished.
+        If it was, True is returned else False
+        """
+        if not self.isDone():
+            return False
 
+        if self.sectionCount() > 1:
+            wikipedia.output("%s contains multiple sections, ignoring" % self.page.title(),toStdout=True)
+            return False
+
+        self.countVotes()
+
+        result = "\n\n '''result:''' %d support, %d oppose, %d neutral => %s. /~~~~" % \
+            (self._support,self._oppose,self._neutral,self.statusString())
+            
+        old_text = self.page.get()
+        new_text = old_text + result
+        
+        # Show the diff
+        wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
+                         % self.page.title())
+        wikipedia.showDiff(old_text, new_text)
+
+        return True
+
+        
     def creationTime(self):
         """Find the time that this candidate were created"""
         if self._creationTime:
@@ -76,6 +105,12 @@ class Candidate():
         
 
     def statusString(self):
+        """
+        A nomination can have three statuses:
+         * Featured
+         * Not featured
+         * Active  ( not old enough )
+        """
         if not self.isDone():
             return "Active"
         else:
@@ -143,7 +178,7 @@ def main():
     fpcPage = wikipedia.Page(wikipedia.getSite(), fpcTitle)
 
     for candidate in findCandidates(fpcPage):
-        candidate.countVotes()
+        candidate.closePage()
 
 if __name__ == "__main__":
     try:
