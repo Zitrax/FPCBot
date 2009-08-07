@@ -25,6 +25,10 @@ class Candidate():
         self._support = 0
         self._neutral = 0
         self._unknown = 0
+        self._votesCounted = False
+        self._featured = False
+        self._daysOld = -1
+        self._creationTime = None
 
     def countVotes(self):
         #wikipedia.output(candidate.title(), toStdout = True)
@@ -45,40 +49,66 @@ class Candidate():
             else:
                 self._unknown += 1
 
+        self._votesCounted = True
+
         wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d D:%02d Se:%d (%s)" % 
                          ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
                            self._support,self._oppose,self._neutral,self._unknown,
-                           self.daysOld(),self.sectionCount(),
-                           "Featured" if self.isFeatured() else "Not featured"), 
+                           self.daysOld(),self.sectionCount(),self.statusString()),
                          toStdout = True)
+
+    def closePage():
+        pass
 
     def creationTime(self):
         """Find the time that this candidate were created"""
+        if self._creationTime:
+            return self._creationTime
+
         history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
         m = re.match(DateR,history[0][1].lower())
-        return  datetime.datetime(int(m.group(5)),
-                                  Month[m.group(4)],
-                                  int(m.group(3)),
-                                  int(m.group(1)),
-                                  int(m.group(2)))
-    
+        self._creationTime = datetime.datetime(int(m.group(5)),
+                                               Month[m.group(4)],
+                                               int(m.group(3)),
+                                               int(m.group(1)),
+                                               int(m.group(2)))
+        return self._creationTime
+        
+
+    def statusString(self):
+        if not self.isDone():
+            return "Active"
+        else:
+            return "Featured" if self.isFeatured() else "Not featured"
+
     def daysOld(self):
         """Find the number of days this nomination has existed"""
-        old = datetime.datetime.now() - self.creationTime()
-        return old.days
+
+        if self._daysOld != -1:
+            return self._daysOld
+
+        delta = datetime.datetime.now() - self.creationTime()
+        self._daysOld = delta.days
+        return self._daysOld
+
+    def isDone(self):
+        """
+        Checks if a nomination can be closed
+        """
+        return self.daysOld() >= 9
 
     def isFeatured(self):
         """
-        Find if an image can be featured or not.
-
-        An image can be featured if all of this is true:
-        * There are 5 or more support votes
-        * The ratio of support/oppose >= 2/1
-        * 9 days has passed since nomination
+        Find if an image can be featured.
+        Does not check the age, it needs to be
+        checked using isDone()
         """
         
-        return (self._support >= 2*self._oppose) and \
-            self._support >= 5 and self.daysOld() >= 9
+        if not self._votesCounted:
+            self.countVotes()
+
+        return self._support >= 5 and \
+            (self._support >= 2*self._oppose)
     
 
     def sectionCount(self):
