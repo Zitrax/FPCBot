@@ -45,19 +45,17 @@ class Candidate():
             else:
                 self._unknown += 1
 
-        wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d D:%02d (%s)" % 
+        wikipedia.output("%s: S:%02d O:%02d N:%02d U:%02d D:%02d Se:%d (%s)" % 
                          ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
                            self._support,self._oppose,self._neutral,self._unknown,
-                           self.daysOld(),
+                           self.daysOld(),self.sectionCount(),
                            "Featured" if self.isFeatured() else "Not featured"), 
                          toStdout = True)
 
     def creationTime(self):
         """Find the time that this candidate were created"""
         history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
-        
-        # Could be compiled
-        m = re.search('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})',history[0][1].lower())
+        m = re.match(DateR,history[0][1].lower())
         return  datetime.datetime(int(m.group(5)),
                                   Month[m.group(4)],
                                   int(m.group(3)),
@@ -79,8 +77,14 @@ class Candidate():
         * 9 days has passed since nomination
         """
         
-        return (self._support >= 2*self._oppose) and self._support >= 5 and self.daysOld() >= 9
+        return (self._support >= 2*self._oppose) and \
+            self._support >= 5 and self.daysOld() >= 9
     
+
+    def sectionCount(self):
+        """Count the number of sections in this candidate"""
+        text = self.page.get()
+        return len(re.findall(SectionR,text))
 
 def findCandidates(page):
     """This finds all candidates on the main FPC page"""
@@ -97,7 +101,11 @@ def findCandidates(page):
     return candidates
 
 
+# Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
+DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
+# Is whitespace allowed at the end ?
+SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
 
 def main():
 
