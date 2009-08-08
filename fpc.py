@@ -38,7 +38,7 @@ class Candidate():
         """
         self.countVotes()
         wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d U:%02d D:%02d Se:%d Im:%02d W:%s (%s)" % 
-                         ( self.page.title().replace(candPrefix,'')[0:40].ljust(40),
+                         ( self.cutTitle(),
                            self._support,self._striked[0],self._oppose,self._striked[1],
                            self._neutral,self._unknown,
                            self.daysOld(),self.sectionCount(),
@@ -222,11 +222,11 @@ class Candidate():
         res = self.existingResult()
 
         if not res:
-            wikipedia.output("%s (ignoring, has no results)" % self.page.title(),toStdout=True)
+            wikipedia.output("%s (ignoring, has no results)" % self.cutTitle(),toStdout=True)
             return
 
         if len(res) > 1:
-            wikipedia.output("%s (ignoring, has several results)" % self.page.title(),toStdout=True)
+            wikipedia.output("%s (ignoring, has several results)" % self.cutTitle(),toStdout=True)
             return
 
         # We have one result, so make a vote count and compare
@@ -243,12 +243,16 @@ class Candidate():
             status = "Inconsistant results, FAIL"
 
         # List info to console
-        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d:%02d F%d/%d (%s)" % (self.page.title().replace(candPrefix,'')[0:40].ljust(40),
+        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d:%02d F%d/%d (%s)" % (self.cutTitle(),
                                                                                 self._support,ws,
                                                                                 self._oppose ,wo,
                                                                                 self._neutral,wn,
                                                                                 self.isFeatured(),was_featured,
                                                                                 status),toStdout=True)
+
+    def cutTitle(self):
+        """Returns a fixed with title"""
+        return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
 
 def findCandidates(page_url):
@@ -288,6 +292,8 @@ neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'×
 # Compiled regular expressions follows
 #
 
+PrefixR = re.compile("%s(File|Image):" % candPrefix)
+
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
 #
@@ -311,8 +317,6 @@ WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
 ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
 def main():
-
-    print "{{\s*(?:%s)\s*}}" % "|".join(neutral_templates)
 
     fpcTitle = 'Commons:Featured picture candidates/candidate list'
     testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
