@@ -87,10 +87,12 @@ class Candidate():
         
 
     def isWithdrawn(self):
-        """
-        Withdrawn nominations should not be counted
-        """
+        """Withdrawn nominations should not be counted"""
         return len(re.findall(WithdrawnR,self.page.get()))
+
+    def isFPX(self):
+        """Page marked with FPX template"""
+        return len(re.findall(FpxR,self.page.get()))
 
     def closePage(self):
         """
@@ -221,11 +223,19 @@ class Candidate():
         text = self.page.get()
         res = self.existingResult()
 
-        if not res:
+        if self.isWithdrawn():
+            wikipedia.output("%s: (ignoring, was withdrawn)" % self.cutTitle(),toStdout=True)
+            return
+
+        elif self.isFPX():
+            wikipedia.output("%s: (ignoring, was FPXed)" % self.cutTitle(),toStdout=True)
+            return
+
+        elif not res:
             wikipedia.output("%s: (ignoring, has no results)" % self.cutTitle(),toStdout=True)
             return
 
-        if len(res) > 1:
+        elif len(res) > 1:
             wikipedia.output("%s: (ignoring, has several results)" % self.cutTitle(),toStdout=True)
             return
 
@@ -238,12 +248,12 @@ class Candidate():
         self.countVotes()
 
         if self._support == ws and self._oppose == wo and self._neutral == wn and was_featured == self.isFeatured():
-            status = "Matching results, OK"
+            status = "OK"
         else:
-            status = "Inconsistant results, FAIL"
+            status = "FAIL"
 
         # List info to console
-        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d:%02d F%d/%d (%s)" % (self.cutTitle(),
+        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)" % (self.cutTitle(),
                                                                                 self._support,ws,
                                                                                 self._oppose ,wo,
                                                                                 self._neutral,wn,
@@ -297,7 +307,7 @@ PrefixR = re.compile("%s(File|Image):" % candPrefix)
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
 #
-PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s+=>\s+((?:not )?featured)',re.MULTILINE)
+PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)',re.MULTILINE)
 
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
@@ -313,6 +323,8 @@ StrikedOutNeutralR = re.compile('<s>.*{{\s*(?:%s)\s*}}.*</s>' % "|".join(neutral
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
 WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
+# Nomination that contain the fpx template
+FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
 ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
