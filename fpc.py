@@ -55,21 +55,10 @@ class Candidate():
         if self._votesCounted:
             return
 
-        # TODO: templatesWithParams() was _much_ slower
-        #       than using getTemplates(), could probably be 
-        #       optimized using regexps instead.
-        templates = self.page.templatesWithParams()
-        for template in templates:
-            title = template[0]
-            #wikipedia.output(title, toStdout = True)
-            if title.lower() == "oppose" or title.lower() == "opp":
-                self._oppose += 1
-            elif title.lower() == "support" or title.lower() == "sup":
-                self._support += 1
-            elif title.lower() == "neutral":
-                self._neutral += 1
-            else:
-                self._unknown += 1
+        text = self.page.get()
+        self._support = len(re.findall(SupportR,text)) 
+        self._oppose  = len(re.findall(OpposeR,text))
+        self._neutral = len(re.findall(NeutralR,text))
 
         self.findStrikedOutVotes()
         self._support -= self._striked[0]
@@ -205,8 +194,64 @@ class Candidate():
         text = self.page.get()
         return len(re.findall(ImagesR,text))
 
-def findCandidates(page):
+    def existingResult(self):
+        """
+        Will scan this nomination and check whether it has
+        already been closed, and if so parses for the existing
+        result.
+        The reuturn value is a list of tuples, and normally
+        there should only be one such tuple. The tuple
+        contains four values:
+        support,oppose,neutral,(featured|not featured)
+        """
+        text = self.page.get()
+        return re.findall(PreviousResultR,text)
+
+    def compareResultToCount(self):
+        """
+        If there is an existing result we will compare
+        it to a new vote count made by this bot and 
+        see if they match. This is for testing purposes
+        of the bot and to find any incorrect old results.
+        """
+        text = self.page.get()
+        res = self.existingResult()
+
+        if not res:
+            wikipedia.output("%s (ignoring, has no results)" % self.page.title(),toStdout=True)
+            return
+
+        if len(res) > 1:
+            wikipedia.output("%s (ignoring, has several results)" % self.page.title(),toStdout=True)
+            return
+
+        # We have one result, so make a vote count and compare
+        old_res = res[0]
+        was_featured = (old_res[3] == u'featured')
+        ws = int(old_res[0])
+        wo = int(old_res[1])
+        wn = int(old_res[2])
+        self.countVotes()
+
+        if self._support == ws and self._oppose == wo and self._neutral == wn and was_featured == self.isFeatured():
+            status = "Matching results, OK"
+        else:
+            status = "Inconsistant results, FAIL"
+
+        # List info to console
+        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d:%02d F%d/%d (%s)" % (self.page.title().replace(candPrefix,'')[0:40].ljust(40),
+                                                                                self._support,ws,
+                                                                                self._oppose ,wo,
+                                                                                self._neutral,wn,
+                                                                                self.isFeatured(),was_featured,
+                                                                                status),toStdout=True)
+
+
+def findCandidates(page_url):
     """This finds all candidates on the main FPC page"""
+
+    page = wikipedia.Page(wikipedia.getSite(), page_url)
+
     candidates = []
     templates = page.getTemplates()
     for template in templates:
@@ -223,12 +268,29 @@ def findCandidates(page):
 # Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
+
+# List of valid templates
+support_templates = ('[Ss]upport','[Ss]up','[Pp]ro')
+oppose_templates  = ('[Oo]ppose','[Oo]pp')  
+neutral_templates = ('[Nn]eutral')
+#
+# Compiled regular expressions follows
+#
+
+# Looks for result counts, an example of such a line is:
+# '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
+#
+PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d)+\s+support,\s+(\d)+\s+oppose,\s+(\d)+\s+neutral\s+=>\s+((?:not )?featured)',re.MULTILINE)
+
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
-# Striked out support votes 
+# Voting templates
+SupportR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(support_templates),re.MULTILINE)
+OpposeR  = re.compile("{{\s*(?:%s)\s*}}" % "|".join(oppose_templates),re.MULTILINE)
+NeutralR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(neutral_templates),re.MULTILINE)
+# Striked out votes 
 StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]up(port)?\s*}}.*</s>',re.MULTILINE)
-# Striked out oppose votes
-StrikedOutOpposeR = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>',re.MULTILINE)
+StrikedOutOpposeR  = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>',re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
@@ -238,12 +300,15 @@ ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
 def main():
 
-    fpcTitle = 'Commons:Featured picture candidates/candidate list';
-    fpcPage = wikipedia.Page(wikipedia.getSite(), fpcTitle)
+    print "{{\s*(?:%s)\s*}}" % "|".join(support_templates)
 
-    for candidate in findCandidates(fpcPage):
+    fpcTitle = 'Commons:Featured picture candidates/candidate list'
+    testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
+
+    for candidate in findCandidates(testLog):
         #candidate.closePage()
-        candidate.printAllInfo()
+        #candidate.printAllInfo()
+        candidate.compareResultToCount()
 
 if __name__ == "__main__":
     try:
