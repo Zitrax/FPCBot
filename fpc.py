@@ -273,7 +273,8 @@ DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 support_templates = ('[Ss]upport','[Ss]up','[Pp]ro')
 oppose_templates  = ('[Oo]ppose','[Oo]pp')  
 neutral_templates = ('[Nn]eutral')
-#
+
+# 
 # Compiled regular expressions follows
 #
 
@@ -286,11 +287,11 @@ PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d)+\s+support,\s+(\d)+\s+o
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
 # Voting templates
 SupportR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(support_templates),re.MULTILINE)
-OpposeR  = re.compile("{{\s*(?:%s)\s*}}" % "|".join(oppose_templates),re.MULTILINE)
+OpposeR  = re.compile("{{\s*(?:%s)\s*}}" % "|".join( oppose_templates),re.MULTILINE)
 NeutralR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(neutral_templates),re.MULTILINE)
 # Striked out votes 
 StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]up(port)?\s*}}.*</s>',re.MULTILINE)
-StrikedOutOpposeR  = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>',re.MULTILINE)
+StrikedOutOpposeR  = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>' ,re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
@@ -300,7 +301,7 @@ ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
 def main():
 
-    print "{{\s*(?:%s)\s*}}" % "|".join(support_templates)
+    print "{{\s*(?:%s)\s*}}" % "|".join(neutral_templates)
 
     fpcTitle = 'Commons:Featured picture candidates/candidate list'
     testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
