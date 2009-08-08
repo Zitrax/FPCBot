@@ -56,16 +56,17 @@ class Candidate():
             return
 
         # TODO: templatesWithParams() was _much_ slower
-        #       than using getTemplates(), could be optimized.
+        #       than using getTemplates(), could probably be 
+        #       optimized using regexps instead.
         templates = self.page.templatesWithParams()
         for template in templates:
             title = template[0]
             #wikipedia.output(title, toStdout = True)
-            if title == "Oppose":
+            if title.lower() == "oppose" or title.lower() == "opp":
                 self._oppose += 1
-            elif title == "Support":
+            elif title.lower() == "support" or title.lower() == "sup":
                 self._support += 1
-            elif title == "Neutral":
+            elif title.lower() == "neutral":
                 self._neutral += 1
             else:
                 self._unknown += 1
@@ -107,7 +108,7 @@ class Candidate():
             return False
 
         if self.imageCount() > 1:
-            wikipedia.output("%s contains multiple images, ignoring" % self.page.title(),toStdout=True)
+            wikipedia.output("\"%s\" contains multiple images, ignoring" % self.page.title(),toStdout=True)
             return False
 
         self.countVotes()
@@ -148,7 +149,11 @@ class Candidate():
          * Not featured
          * Active  ( not old enough )
         """
-        if not self.isDone():
+        if self.isIgnored():
+            return "Ignored"
+        elif self.isWithdrawn():
+            return "Withdrawn"
+        elif not self.isDone():
             return "Active"
         else:
             return "Featured" if self.isFeatured() else "Not featured"
@@ -186,6 +191,10 @@ class Candidate():
             (self._support >= 2*self._oppose)
     
 
+    def isIgnored(self):
+        """Some nominations currently require manual check"""
+        return self.imageCount() > 1
+
     def sectionCount(self):
         """Count the number of sections in this candidate"""
         text = self.page.get()
@@ -221,7 +230,9 @@ StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]upport\s*}}.*</s>',re.MULTILINE)
 # Striked out oppose votes
 StrikedOutOpposeR = re.compile('<s>.*{{\s*[oO]ppose\s*}}.*</s>',re.MULTILINE)
 # Finds if a withdraw template is used
-WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*}}',re.MULTILINE)
+# This template has an optional string which we
+# must be able to detect after the pipe symbol
+WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
 ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
