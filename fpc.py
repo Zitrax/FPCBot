@@ -222,11 +222,11 @@ class Candidate():
         res = self.existingResult()
 
         if not res:
-            wikipedia.output("%s (ignoring, has no results)" % self.cutTitle(),toStdout=True)
+            wikipedia.output("%s: (ignoring, has no results)" % self.cutTitle(),toStdout=True)
             return
 
         if len(res) > 1:
-            wikipedia.output("%s (ignoring, has several results)" % self.cutTitle(),toStdout=True)
+            wikipedia.output("%s: (ignoring, has several results)" % self.cutTitle(),toStdout=True)
             return
 
         # We have one result, so make a vote count and compare
