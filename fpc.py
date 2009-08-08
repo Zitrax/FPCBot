@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Testing FPC
 #
@@ -63,6 +64,7 @@ class Candidate():
         self.findStrikedOutVotes()
         self._support -= self._striked[0]
         self._oppose  -= self._striked[1]
+        self._neutral -= self._striked[2]
 
         self._votesCounted = True
 
@@ -78,7 +80,9 @@ class Candidate():
         text = self.page.get()
         s_support = len(re.findall(StrikedOutSupportR,text))
         s_oppose  = len(re.findall(StrikedOutOpposeR,text))
-        self._striked = (s_support,s_oppose)
+        s_neutral = len(re.findall(StrikedOutNeutralR,text))
+
+        self._striked = (s_support,s_oppose,s_neutral)
         return self._striked
         
 
@@ -270,9 +274,15 @@ Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, '
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 
 # List of valid templates
-support_templates = ('[Ss]upport','[Ss]up','[Pp]ro')
-oppose_templates  = ('[Oo]ppose','[Oo]pp')  
-neutral_templates = ('[Nn]eutral')
+# They are taken from the page Commons:Polling_templates and some common redirects
+support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
+                     u'падтрымліваю',u'[Aa] favour',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'בעד', 
+                     u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek')
+oppose_templates  = (u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
+                     u'[Cс]упраць',u'[Ee]n contra',u'[Cc]ontre',u'[Ii] gcoinne',u'[Dd]íliostaigh',u'[Dd]iscordo',u'נגד',u'á móti',u'反対',u'除外',u'반대',
+                     u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi')
+neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'נמנע',u'[Nn]øytral',u'中立',u'Нэўтральна',u'[Tt]arafsız',u'Воздерживаюсь',
+                     u'[Hh]lutlaus',u'중립',u'[Nn]eodrach',u'เป็นกลาง')
 
 # 
 # Compiled regular expressions follows
@@ -281,7 +291,7 @@ neutral_templates = ('[Nn]eutral')
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
 #
-PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d)+\s+support,\s+(\d)+\s+oppose,\s+(\d)+\s+neutral\s+=>\s+((?:not )?featured)',re.MULTILINE)
+PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s+=>\s+((?:not )?featured)',re.MULTILINE)
 
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
@@ -290,8 +300,9 @@ SupportR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(support_templates),re.MULTIL
 OpposeR  = re.compile("{{\s*(?:%s)\s*}}" % "|".join( oppose_templates),re.MULTILINE)
 NeutralR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(neutral_templates),re.MULTILINE)
 # Striked out votes 
-StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]up(port)?\s*}}.*</s>',re.MULTILINE)
-StrikedOutOpposeR  = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>' ,re.MULTILINE)
+StrikedOutSupportR = re.compile("<s>.*{{\s*(?:%s)\s*}}.*</s>" % "|".join(support_templates),re.MULTILINE)
+StrikedOutOpposeR  = re.compile('<s>.*{{\s*(?:%s)\s*}}.*</s>' % "|".join( oppose_templates),re.MULTILINE)
+StrikedOutNeutralR = re.compile('<s>.*{{\s*(?:%s)\s*}}.*</s>' % "|".join(neutral_templates),re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
