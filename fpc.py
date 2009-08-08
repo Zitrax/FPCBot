@@ -225,10 +225,10 @@ Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, '
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
-# Striked out support votes
-StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]upport\s*}}.*</s>',re.MULTILINE)
+# Striked out support votes 
+StrikedOutSupportR = re.compile('<s>.*{{\s*[sS]up(port)?\s*}}.*</s>',re.MULTILINE)
 # Striked out oppose votes
-StrikedOutOpposeR = re.compile('<s>.*{{\s*[oO]ppose\s*}}.*</s>',re.MULTILINE)
+StrikedOutOpposeR = re.compile('<s>.*{{\s*[oO]pp(ose)?\s*}}.*</s>',re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
