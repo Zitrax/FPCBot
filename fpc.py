@@ -9,6 +9,8 @@ import wikipedia, re, datetime
 
 candPrefix = "Commons:Featured picture candidates/"
 
+Throttle = False
+
 class Candidate():
     """
     This is one feature picture candidate.
@@ -294,15 +296,15 @@ support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp
                      u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek')
 oppose_templates  = (u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
                      u'[Cс]упраць',u'[Ee]n contra',u'[Cc]ontre',u'[Ii] gcoinne',u'[Dd]íliostaigh',u'[Dd]iscordo',u'נגד',u'á móti',u'反対',u'除外',u'반대',
-                     u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi')
+                     u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi',u'FPX contested')
 neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'נמנע',u'[Nn]øytral',u'中立',u'Нэўтральна',u'[Tt]arafsız',u'Воздерживаюсь',
-                     u'[Hh]lutlaus',u'중립',u'[Nn]eodrach',u'เป็นกลาง')
+                     u'[Hh]lutlaus',u'중립',u'[Nn]eodrach',u'เป็นกลาง','[Vv]n')
 
 # 
 # Compiled regular expressions follows
 #
 
-PrefixR = re.compile("%s(File|Image):" % candPrefix)
+PrefixR = re.compile("%s([Ff]ile|[Ii]mage)?:" % candPrefix)
 
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
@@ -312,13 +314,13 @@ PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+o
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
 # Voting templates
-SupportR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(support_templates),re.MULTILINE)
-OpposeR  = re.compile("{{\s*(?:%s)\s*}}" % "|".join( oppose_templates),re.MULTILINE)
-NeutralR = re.compile("{{\s*(?:%s)\s*}}" % "|".join(neutral_templates),re.MULTILINE)
+SupportR = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(support_templates),re.MULTILINE)
+OpposeR  = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join( oppose_templates),re.MULTILINE)
+NeutralR = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(neutral_templates),re.MULTILINE)
 # Striked out votes 
-StrikedOutSupportR = re.compile("<s>.*{{\s*(?:%s)\s*}}.*</s>" % "|".join(support_templates),re.MULTILINE)
-StrikedOutOpposeR  = re.compile('<s>.*{{\s*(?:%s)\s*}}.*</s>' % "|".join( oppose_templates),re.MULTILINE)
-StrikedOutNeutralR = re.compile('<s>.*{{\s*(?:%s)\s*}}.*</s>' % "|".join(neutral_templates),re.MULTILINE)
+StrikedOutSupportR = re.compile("<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>" % "|".join(support_templates),re.MULTILINE)
+StrikedOutOpposeR  = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join( oppose_templates),re.MULTILINE)
+StrikedOutNeutralR = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join(neutral_templates),re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
@@ -336,7 +338,11 @@ def main():
     for candidate in findCandidates(testLog):
         #candidate.closePage()
         #candidate.printAllInfo()
-        candidate.compareResultToCount()
+        try:
+            candidate.compareResultToCount()
+        except wikipedia.IsRedirectPage:
+            pass
+            
 
 if __name__ == "__main__":
     try:
