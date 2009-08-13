@@ -12,6 +12,8 @@ It adds the following commandline arguments:
 
 -close            Close and add result to the nominations
 
+-info             Just print the vote count info about the current nominations
+
 """
 
 # TODO: catch exceptions
@@ -116,6 +118,14 @@ class Candidate():
 
         if self.imageCount() > 1:
             wikipedia.output("\"%s\" contains multiple images, ignoring" % self.page.title(),toStdout=True)
+            return False
+
+        if self.isWithdrawn():
+            wikipedia.output("\"%s\" withdrawn, currently ignoring" % self.page.title(),toStdout=True)
+            return False
+
+        if self.isFPX():
+            wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.page.title(),toStdout=True)
             return False
 
         self.countVotes()
@@ -395,6 +405,13 @@ def main(*args):
         elif arg == '-close':
             for candidate in findCandidates(fpcTitle):
                 candidate.closePage()
+        elif arg == '-info':
+            for candidate in findCandidates(fpcTitle):
+                try:
+                    candidate.printAllInfo()
+                except wikipedia.NoPage:
+                    wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
+                    pass
         else:
             wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
 
