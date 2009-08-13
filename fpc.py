@@ -10,6 +10,7 @@ It adds the following commandline arguments:
 
 -test             Perform a testrun against an old log
 
+-close            Close and add result to the nominations
 
 """
 
@@ -119,8 +120,8 @@ class Candidate():
 
         self.countVotes()
 
-        result = "\n\n '''result:''' %d support, %d oppose, %d neutral => %s. /~~~~" % \
-            (self._support,self._oppose,self._neutral,self.statusString())
+        result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|sig=~~~~}}" % \
+            (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no")
             
         old_text = self.page.get()
         new_text = old_text + result
