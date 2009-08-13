@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-#
-# Testing FPC
-#
+"""
+This bot runs as FPCBot on wikimedia commons
+It implements vote counting and supports
+moving the finished nomination to the archive.
+
+Programmed by Daniel78 at Commons.
+"""
 
 # TODO: catch exceptions
 
@@ -9,7 +13,6 @@ import wikipedia, re, datetime
 
 candPrefix = "Commons:Featured picture candidates/"
 
-Throttle = False
 
 class Candidate():
     """
@@ -285,6 +288,19 @@ def findCandidates(page_url):
     return candidates
 
 
+# Exact description about what needs to be done with a closed nomination
+#
+# 1. Check whether the count is verified or not
+# 2. If verified and featured:
+#    * Add page to 'Commons:Featured pictures, list'
+#    * Add to subpage of 'Commons:Featured pictures, list'
+#    * Add {{Assessments|com=1}} or just the parameter if the template is already there 
+#        to the picture page (should also handle subpages)
+#    * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
+#    * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
+# 3. If featured or not move it from 'Commons:Featured picture candidates/candidate list'
+#    to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
+
 # Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
@@ -304,7 +320,9 @@ neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'×
 # Compiled regular expressions follows
 #
 
-PrefixR = re.compile("%s([Ff]ile|[Ii]mage)?:" % candPrefix)
+# Used to remove the prefix and just print the file names
+# of the candidate titles.
+PrefixR = re.compile("%s(removal/)?([Ff]ile|[Ii]mage)?:" % candPrefix)
 
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
@@ -330,10 +348,13 @@ FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
 ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
 
-def main():
+def main(*args):
 
     fpcTitle = 'Commons:Featured picture candidates/candidate list'
     testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
+
+    for arg in wikipedia.handleArgs(*args):
+        pass
 
     for candidate in findCandidates(testLog):
         #candidate.closePage()
