@@ -35,16 +35,16 @@ class Candidate():
 
     def __init__(self, page):
         """page is a wikipedia.Page object"""
-        self.page = page
-        self._oppose  = 0
-        self._support = 0
-        self._neutral = 0
-        self._unknown = 0
+        self.page          = page
+        self._oppose       = 0
+        self._support      = 0
+        self._neutral      = 0
+        self._unknown      = 0
         self._votesCounted = False
-        self._featured = False
-        self._daysOld = -1
+        self._featured     = False
+        self._daysOld      = -1
         self._creationTime = None
-        self._striked = None
+        self._striked      = None
 
     def printAllInfo(self):
         """
