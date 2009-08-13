@@ -5,11 +5,17 @@ It implements vote counting and supports
 moving the finished nomination to the archive.
 
 Programmed by Daniel78 at Commons.
+
+It adds the following commandline arguments:
+
+-test             Perform a testrun against an old log
+
+
 """
 
 # TODO: catch exceptions
 
-import wikipedia, re, datetime
+import wikipedia, re, datetime, sys
 
 candPrefix = "Commons:Featured picture candidates/"
 
@@ -124,15 +130,37 @@ class Candidate():
                          % self.page.title())
         wikipedia.showDiff(old_text, new_text)
 
+        choice = wikipedia.inputChoice(
+            u'Do you want to accept these changes?',
+            ['Yes', 'No', "Quit"],
+            ['y', 'N', 'q'], 'N')
+
+        if choice == 'y':
+            wikipedia.output("Would have commited, but not implemented",toStdout=True)
+        elif choice == 'q':
+            wikipedia.output("Aborting.",toStdout=True)
+            sys.exit(0)
+        else:
+            wikipedia.output("Changes ignored",toStdout=True)
+        
         return True
 
         
     def creationTime(self):
-        """Find the time that this candidate were created"""
+        """
+        Find the time that this candidate were created
+        If we can't find the creation date, for example due to 
+        the page not existing we return now() such that we
+        will ifgnore this nomination as too young.
+        """
         if self._creationTime:
             return self._creationTime
 
         history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
+        if not history:
+            wikipedia.output("Could not retrieve history for '%s', returning now()" % self.page.title(),toStdout=True)
+            return datetime.datetime.now()
+
         m = re.match(DateR,history[0][1].lower())
         self._creationTime = datetime.datetime(int(m.group(5)),
                                                Month[m.group(4)],
@@ -353,16 +381,24 @@ def main(*args):
     fpcTitle = 'Commons:Featured picture candidates/candidate list'
     testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
 
-    for arg in wikipedia.handleArgs(*args):
-        pass
+    worked = False
 
-    for candidate in findCandidates(testLog):
-        #candidate.closePage()
-        #candidate.printAllInfo()
-        try:
-            candidate.compareResultToCount()
-        except wikipedia.IsRedirectPage:
-            pass
+    for arg in wikipedia.handleArgs(*args):
+        worked = True
+        if arg == '-test':
+            for candidate in findCandidates(testLog):
+                try:
+                    candidate.compareResultToCount()
+                except wikipedia.IsRedirectPage:
+                    pass
+        elif arg == '-close':
+            for candidate in findCandidates(fpcTitle):
+                candidate.closePage()
+        else:
+            wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
+
+    if not worked:
+        wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
             
 
 if __name__ == "__main__":
