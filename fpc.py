@@ -18,7 +18,7 @@ It adds the following commandline arguments:
 
 # TODO: catch exceptions
 
-import wikipedia, re, datetime, sys
+import wikipedia, re, datetime, sys, difflib
 
 candPrefix = "Commons:Featured picture candidates/"
 
@@ -300,8 +300,12 @@ class Candidate():
 
     def addToFeaturedList(self,category):
         """
-        Will add this page to the list of featured images
+        Will add this page to the list of featured images.
+        This uses just the base of the category, like 'Animals'.
         Should only be called on closed and verified candidates
+        
+        This is ==STEP 1== of the parking procedure
+
         @param category The categorization category
         """
         # This function first needs to find the main category
@@ -319,12 +323,36 @@ class Candidate():
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
         self.commit(old_text,new_text)
 
+    def addToCategorizedFeaturedList(self,category):
+        """
+        Adds the candidate to the page with categorized featured
+        pictures. This is the full category.
+        """
+        catpage = "Commons:Featured pictures/" + category
+        page = wikipedia.Page(wikipedia.getSite(), catpage)
+        old_text = page.get()
+        
+        # We just need to append to the bottom of the gallery
+        # with an added title
+        new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName(), old_text)
+        self.commit(old_text,new_text);
+        
 
     def commit(self,old_text,new_text):
         # Show the diff
-        wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
-                         % self.page.title())
-        wikipedia.showDiff(old_text, new_text)
+
+        #wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
+        #                 % self.page.title())
+        #wikipedia.showDiff(old_text, new_text)
+
+        for line in difflib.context_diff(old_text.splitlines(1), new_text.splitlines(1)):
+            if line.startswith('+ '):
+                wikipedia.output(u"\03{lightgreen}%s\03{default}" % line,newline=False,toStdout=True)
+            elif line.startswith('- '):
+                wikipedia.output(u"\03{lightred}%s\03{default}" % line,newline=False,toStdout=True)
+            else:
+                wikipedia.output(line,newline=False,toStdout=True)
+        wikipedia.output("\n",toStdout=True)
 
         choice = wikipedia.inputChoice(
             u'Do you want to accept these changes?',
@@ -445,7 +473,8 @@ def main(*args):
                     pass
         elif arg == '-ugh':
             for candidate in findCandidates(fpcTitle):
-                candidate.addToFeaturedList("Animals");
+                #candidate.addToFeaturedList("Animals");
+                candidate.addToCategorizedFeaturedList("Animals/Mammals");
         else:
             wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
 
