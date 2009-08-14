@@ -136,23 +136,7 @@ class Candidate():
         old_text = self.page.get()
         new_text = old_text + result
         
-        # Show the diff
-        wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
-                         % self.page.title())
-        wikipedia.showDiff(old_text, new_text)
-
-        choice = wikipedia.inputChoice(
-            u'Do you want to accept these changes?',
-            ['Yes', 'No', "Quit"],
-            ['y', 'N', 'q'], 'N')
-
-        if choice == 'y':
-            wikipedia.output("Would have commited, but not implemented",toStdout=True)
-        elif choice == 'q':
-            wikipedia.output("Aborting.",toStdout=True)
-            sys.exit(0)
-        else:
-            wikipedia.output("Changes ignored",toStdout=True)
+        self.commit(old_text,new_text)
         
         return True
 
@@ -308,6 +292,53 @@ class Candidate():
         """Returns a fixed with title"""
         return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
+    def fileName(self):
+        """Return only the filename of this candidate"""
+        # The regexp here also removes any possible crap between the prefix
+        # and the actual start of the filename.
+        return re.sub("(%s.*?)([File|Image])" % candPrefix,r'\2',self.page.title())
+
+    def addToFeaturedList(self,category):
+        """
+        Will add this page to the list of featured images
+        Should only be called on closed and verified candidates
+        @param category The categorization category
+        """
+        # This function first needs to find the main category
+        # then inside the gallery tags remove the last line and
+        # add this candidate to the top
+
+        listpage = 'Commons:Featured pictures, list'
+        page = wikipedia.Page(wikipedia.getSite(), listpage)
+        old_text = page.get()
+        
+        # Thanks KODOS for a nice regexp gui
+        # This adds ourself first in the list of length 4 and removes the last
+        # all in the chosen category
+        ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % category, re.MULTILINE)
+        new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
+        self.commit(old_text,new_text)
+
+
+    def commit(self,old_text,new_text):
+        # Show the diff
+        wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
+                         % self.page.title())
+        wikipedia.showDiff(old_text, new_text)
+
+        choice = wikipedia.inputChoice(
+            u'Do you want to accept these changes?',
+            ['Yes', 'No', "Quit"],
+            ['y', 'N', 'q'], 'N')
+        
+        if choice == 'y':
+            wikipedia.output("Would have commited, but not implemented",toStdout=True)
+        elif choice == 'q':
+            wikipedia.output("Aborting.",toStdout=True)
+            sys.exit(0)
+        else:
+            wikipedia.output("Changes ignored",toStdout=True)
+        
 
 def findCandidates(page_url):
     """This finds all candidates on the main FPC page"""
@@ -412,6 +443,9 @@ def main(*args):
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
+        elif arg == '-ugh':
+            for candidate in findCandidates(fpcTitle):
+                candidate.addToFeaturedList("Animals");
         else:
             wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
 
