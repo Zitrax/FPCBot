@@ -61,12 +61,15 @@ class Candidate():
                          toStdout = True)
 
 
-    def nominator(self):
+    def nominator(self,link=True):
         """Return the link to the user that nominated this candidate"""
         history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
         if not history:
             return "Unknown"
-        return "[[User:%s|%s]]" % (history[0][2],history[0][2])
+        if link:
+            return "[[User:%s|%s]]" % (history[0][2],history[0][2])
+        else:
+            return history[0][2]
 
     def uploader(self):
         """Return the link to the user that uploaded the nominated image"""
@@ -398,6 +401,8 @@ class Candidate():
     def addToCurrentMonth(self):
         """
         Adds the candidate to the list of featured picture this month
+
+        This is ==STEP 4== of the parking procedure
         """
         monthpage = 'Commons:Featured_pictures/chronological/current_month'
         page = wikipedia.Page(wikipedia.getSite(), monthpage)
@@ -413,6 +418,13 @@ class Candidate():
                           (self.fileName(), count, self.cleanTitle(), self.creator(), self.uploader(), self.nominator()) , old_text)
         self.commit(old_text,new_text,page);
         
+    def notifyNominator(self):
+        """Add a template to the nominators talk page"""
+        talk_link = "User_talk:%s" % self.nominator(link=False)
+        talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
+        old_text = talk_page.get()
+        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
+        self.commit(old_text,new_text,talk_page)
 
     def commit(self,old_text,new_text,page):
         """This will commit new_text to the page"""
@@ -585,6 +597,7 @@ def main(*args):
                     #candidate.addToCategorizedFeaturedList("Animals/Mammals")
                     #candidate.addAssessments()
                     candidate.addToCurrentMonth()
+                    candidate.notifyNominator()
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
