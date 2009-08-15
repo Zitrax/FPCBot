@@ -192,12 +192,7 @@ class Candidate():
         
 
     def statusString(self):
-        """
-        A nomination can have three statuses:
-         * Featured
-         * Not featured
-         * Active  ( not old enough )
-        """
+        """Short status string about the candidate"""
         if self.isIgnored():
             return "Ignored"
         elif self.isWithdrawn():
@@ -266,9 +261,6 @@ class Candidate():
         """
         text = self.page.get()
         return re.findall(PreviousResultR,text)
-
-    def verifiedResult(self):
-        xxx
 
     def compareResultToCount(self):
         """
