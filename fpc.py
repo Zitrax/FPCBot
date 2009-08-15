@@ -14,6 +14,8 @@ It adds the following commandline arguments:
 
 -info             Just print the vote count info about the current nominations
 
+-park             Park closed and verified candidates
+
 """
 
 # TODO: catch exceptions
@@ -136,18 +138,19 @@ class Candidate():
         If it was, True is returned else False
         """
         if not self.isDone():
+            wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         if self.imageCount() > 1:
-            wikipedia.output("\"%s\" contains multiple images, ignoring" % self.page.title(),toStdout=True)
+            wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         if self.isWithdrawn():
-            wikipedia.output("\"%s\" withdrawn, currently ignoring" % self.page.title(),toStdout=True)
+            wikipedia.output("\"%s\" withdrawn, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         if self.isFPX():
-            wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.page.title(),toStdout=True)
+            wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         self.countVotes()
@@ -158,7 +161,8 @@ class Candidate():
         old_text = self.page.get()
         new_text = old_text + result
         
-        self.commit(old_text,new_text,self.page)
+        self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % 
+                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no"))
         
         return True
 
@@ -351,7 +355,7 @@ class Candidate():
         # all in the chosen category
         ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % category, re.MULTILINE)
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
-        self.commit(old_text,new_text,page)
+        self.commit(old_text,new_text,page,"Added %s" % self.fileName() )
 
     def addToCategorizedFeaturedList(self,category):
         """
@@ -369,7 +373,7 @@ class Candidate():
         # We just need to append to the bottom of the gallery
         # with an added title
         new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName() , old_text)
-        self.commit(old_text,new_text,page);
+        self.commit(old_text,new_text,page,"Added %s" % self.FileName());
 
     def addAssessments(self):
         """
@@ -399,7 +403,7 @@ class Candidate():
             new_text = old_text[:end] + "\n{{Assessments|com=1}}\n" + old_text[end:]
             #new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
 
-        self.commit(old_text,new_text,page)
+        self.commit(old_text,new_text,page,"FPC promotion")
 
     def addToCurrentMonth(self):
         """
@@ -420,7 +424,7 @@ class Candidate():
         # TODO: We lack a good way to find the creator, so it is left out at the moment
         new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> uploaded by %s, nominated by %s\n</gallery>" % 
                           (self.fileName(), count, self.cleanTitle(), self.uploader(), self.nominator()) , old_text)
-        self.commit(old_text,new_text,page);
+        self.commit(old_text,new_text,page,"Added %s" % self.fileName() );
         
     def notifyNominator(self):
         """
@@ -432,7 +436,7 @@ class Candidate():
         talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
         old_text = talk_page.get()
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
-        self.commit(old_text,new_text,talk_page)
+        self.commit(old_text,new_text,talk_page,"FPC promotion of %s" % self.fileName() )
 
     def moveToLog(self):
         """
@@ -445,7 +449,7 @@ class Candidate():
         candidate_page = wikipedia.Page(wikipedia.getSite(), "Commons:Featured picture candidates/candidate list")
         old_cand_text = candidate_page.get()
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % self.page.title(),'', old_cand_text)
-        self.commit(old_cand_text,new_cand_text,candidate_page)
+        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s" % self.fileName() )
         
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
@@ -455,7 +459,7 @@ class Candidate():
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
         old_log_text = log_page.get()
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-        self.commit(old_log_text,new_log_text,log_page)
+        self.commit(old_log_text,new_log_text,log_page,"Adding %s" % self.fileName() )
 
     def park(self):
         """This will do everything that is needed to park a closed candidate"""
@@ -527,15 +531,13 @@ class Candidate():
         wikipedia.output("\n",toStdout=True)
 
         choice = wikipedia.inputChoice(
-            u"Do you want to accept these changes to '%s' ?" % page.title(),
+            u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
             ['Yes', 'No', "Quit"],
             ['y', 'N', 'q'], 'N')
         
-        #choice = 'n'
-
         if choice == 'y':
             wikipedia.output("Would have commited, but not implemented",toStdout=True)
-            #page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
+            page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
         elif choice == 'q':
             wikipedia.output("Aborting.",toStdout=True)
             sys.exit(0)
