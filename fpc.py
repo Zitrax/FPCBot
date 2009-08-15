@@ -621,11 +621,11 @@ def main(*args):
         elif arg == '-ugh':
             for candidate in findCandidates(fpcTitle):
                 try:
-                    #candidate.addToFeaturedList("Animals")
-                    #candidate.addToCategorizedFeaturedList("Animals/Mammals")
-                    #candidate.addAssessments()
-                    #candidate.addToCurrentMonth()
-                    #candidate.notifyNominator()
+                    candidate.addToFeaturedList("Animals")
+                    candidate.addToCategorizedFeaturedList("Animals/Mammals")
+                    candidate.addAssessments()
+                    candidate.addToCurrentMonth()
+                    candidate.notifyNominator()
                     candidate.moveToLog()
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
