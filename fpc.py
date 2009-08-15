@@ -208,7 +208,7 @@ class Candidate():
         if self._daysOld != -1:
             return self._daysOld
 
-        delta = datetime.datetime.now() - self.creationTime()
+        delta = datetime.datetime.utcnow() - self.creationTime()
         self._daysOld = delta.days
         return self._daysOld
 
