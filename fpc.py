@@ -365,7 +365,9 @@ class Candidate():
             new_text = re.sub(AssR,new_ass,old_text)
         else:
             # There is no assessments template so just add it
-            new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
+            end = findEndOfTemplate(old_text,"[Ii]nformation")
+            new_text = old_text[:end] + "\n{{Assessments|com=1}}\n" + old_text[end:]
+            #new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
 
         self.commit(old_text,new_text,page)
 
@@ -418,6 +420,35 @@ def findCandidates(page_url):
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
     return candidates
 
+def findEndOfTemplate(text,template):
+    """
+    As regexps can't properly deal with nested parantheses this
+    function will manually scan for where a template ends
+    such that we can insert new text after it.
+    Will return the position or 0 if not found.
+    """
+    m = re.search(r"{{\s*%s" % template,text) 
+    if not m:
+        return 0
+    
+    lvl = 0
+    cp = m.start()+2
+
+    while cp < len(text):
+        ns = text.find("{{",cp)
+        ne = text.find("}}",cp)
+        if not lvl and ne < ns:
+            return ne+2
+        elif ne < ns:
+            lvl -= 1
+            cp = ne+2 
+        else:
+            lvl += 1
+            cp = ns+2
+    # Apparently we never found it
+    return 0
+        
+    
 
 # Exact description about what needs to be done with a closed nomination
 #
