@@ -158,7 +158,7 @@ class Candidate():
         old_text = self.page.get()
         new_text = old_text + result
         
-        self.commit(old_text,new_text,page)
+        self.commit(old_text,new_text,self.page)
         
         return True
 
@@ -255,13 +255,16 @@ class Candidate():
         Will scan this nomination and check whether it has
         already been closed, and if so parses for the existing
         result.
-        The reuturn value is a list of tuples, and normally
+        The return value is a list of tuples, and normally
         there should only be one such tuple. The tuple
         contains four values:
         support,oppose,neutral,(featured|not featured)
         """
         text = self.page.get()
         return re.findall(PreviousResultR,text)
+
+    def verifiedResult(self):
+        xxx
 
     def compareResultToCount(self):
         """
@@ -414,8 +417,9 @@ class Candidate():
 
         # We just need to append to the bottom of the gallery
         # with an added title
-        new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> created by %s, uploaded by %s, nominated by %s\n</gallery>" % 
-                          (self.fileName(), count, self.cleanTitle(), self.creator(), self.uploader(), self.nominator()) , old_text)
+        # TODO: We lack a good way to find the creator, so it is left out at the moment
+        new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> uploaded by %s, nominated by %s\n</gallery>" % 
+                          (self.fileName(), count, self.cleanTitle(), self.uploader(), self.nominator()) , old_text)
         self.commit(old_text,new_text,page);
         
     def notifyNominator(self):
@@ -453,8 +457,62 @@ class Candidate():
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
         self.commit(old_log_text,new_log_text,log_page)
 
-    def commit(self,old_text,new_text,page):
-        """This will commit new_text to the page"""
+    def park(self):
+        """This will do everything that is needed to park a closed candidate"""
+
+        # First look for verified results
+        text = self.page.get()
+        results = re.findall(VerifiedResultR,text)
+        
+        if self.imageCount() > 1:
+            wikipedia.output("%s: (ignoring, is multiimage)" % self.cutTitle(),toStdout=True)
+            return
+
+        if not results:
+            wikipedia.output("%s: (ignoring, no verified results)" % self.cutTitle(),toStdout=True)
+            return
+
+        if len(results) > 1:
+            wikipedia.output("%s: (ignoring, several verified results ?)" % self.cutTitle(),toStdout=True)
+            return
+        
+        if self.isWithdrawn():
+            wikipedia.output("%s: (ignoring, was withdrawn)" % self.cutTitle(),toStdout=True)
+            return
+
+        if self.isFPX():
+            wikipedia.output("%s: (ignoring, was FPXed)" % self.cutTitle(),toStdout=True)
+            return
+
+        # Ok we should now have a candidate with verified results that we can park
+        vres = results[0]
+        if vres[3] == "yes":
+            # Featured picture
+            self.addToFeaturedList(re.sub(r'(.*?)/.*',r'\1',vres[4]))
+            self.addToCategorizedFeaturedList(vres[4])
+            self.addAssessments()
+            self.addToCurrentMonth()
+            self.notifyNominator()
+            self.moveToLog()
+        elif  vres[3] == "no":
+            # Non Featured picure
+            self.moveToLog()
+        else:
+            wikipedia.output("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]),toStdout=True)
+            return
+
+
+    def commit(self,old_text,new_text,page,comment):
+        """
+        This will commit new_text to the page
+        and unless running in automatic mode it
+        will show you the diff and ask you to accept it.
+
+        @param old_text Used to show the diff
+        @param new_text Text to be submitted as the new page
+        @param page Page to submit the new text to
+        @param comment The edit comment
+        """
 
         # Show the diff
         for line in difflib.context_diff(old_text.splitlines(1), new_text.splitlines(1)):
@@ -477,7 +535,7 @@ class Candidate():
 
         if choice == 'y':
             wikipedia.output("Would have commited, but not implemented",toStdout=True)
-            #page.put(new_text);
+            #page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
         elif choice == 'q':
             wikipedia.output("Aborting.",toStdout=True)
             sys.exit(0)
@@ -574,6 +632,9 @@ PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 #
 PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)',re.MULTILINE)
 
+# Looks for verified results
+VerifiedResultR = re.compile(r'{{\s*FPC-results-reviewed\s*\|\s*support\s*=\s*(\d+)\s*\|\s*oppose\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*featured\s*=\s*(\w+)\s*\|\s*category\s*=\s*([^|]*).*}}',re.MULTILINE)
+
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
 # Voting templates
@@ -618,15 +679,10 @@ def main(*args):
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
-        elif arg == '-ugh':
+        elif arg == '-park':
             for candidate in findCandidates(fpcTitle):
                 try:
-                    candidate.addToFeaturedList("Animals")
-                    candidate.addToCategorizedFeaturedList("Animals/Mammals")
-                    candidate.addAssessments()
-                    candidate.addToCurrentMonth()
-                    candidate.notifyNominator()
-                    candidate.moveToLog()
+                    candidate.park()
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
