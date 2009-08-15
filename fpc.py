@@ -536,7 +536,6 @@ class Candidate():
             ['y', 'N', 'q'], 'N')
         
         if choice == 'y':
-            wikipedia.output("Would have commited, but not implemented",toStdout=True)
             page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
         elif choice == 'q':
             wikipedia.output("Aborting.",toStdout=True)
