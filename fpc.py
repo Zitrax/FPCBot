@@ -419,12 +419,39 @@ class Candidate():
         self.commit(old_text,new_text,page);
         
     def notifyNominator(self):
-        """Add a template to the nominators talk page"""
+        """
+        Add a template to the nominators talk page
+
+        This is ==STEP 5== of the parking procedure
+        """
         talk_link = "User_talk:%s" % self.nominator(link=False)
         talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
         old_text = talk_page.get()
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
         self.commit(old_text,new_text,talk_page)
+
+    def moveToLog(self):
+        """
+        Remove this candidate from the current list 
+        and add it to the log of the current month
+
+        This is ==STEP 6== of the parking procedure
+        """
+        # Remove from current list
+        candidate_page = wikipedia.Page(wikipedia.getSite(), "Commons:Featured picture candidates/candidate list")
+        old_cand_text = candidate_page.get()
+        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % self.page.title(),'', old_cand_text)
+        self.commit(old_cand_text,new_cand_text,candidate_page)
+        
+        # Add to log
+        # (Note FIXME, we must probably create this page if it does not exist)
+        today = datetime.date.today()
+        current_month = Month2[today.month]
+        log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
+        log_page = wikipedia.Page(wikipedia.getSite(), log_link)
+        old_log_text = log_page.get()
+        new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
+        self.commit(old_log_text,new_log_text,log_page)
 
     def commit(self,old_text,new_text,page):
         """This will commit new_text to the page"""
@@ -520,6 +547,7 @@ def findEndOfTemplate(text,template):
 
 # Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
+Month2  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7:'July', 8:'August', 9:'September', 10:'October', 11:'November', 12:'December' }
 DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 
 # List of valid templates
@@ -596,8 +624,9 @@ def main(*args):
                     #candidate.addToFeaturedList("Animals")
                     #candidate.addToCategorizedFeaturedList("Animals/Mammals")
                     #candidate.addAssessments()
-                    candidate.addToCurrentMonth()
-                    candidate.notifyNominator()
+                    #candidate.addToCurrentMonth()
+                    #candidate.notifyNominator()
+                    candidate.moveToLog()
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
