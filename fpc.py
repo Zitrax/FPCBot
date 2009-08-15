@@ -136,17 +136,17 @@ class Candidate():
         old_text = self.page.get()
         new_text = old_text + result
         
-        self.commit(old_text,new_text)
+        self.commit(old_text,new_text,page)
         
         return True
 
         
     def creationTime(self):
         """
-        Find the time that this candidate were created
+        Find the time that this candidate was created
         If we can't find the creation date, for example due to 
         the page not existing we return now() such that we
-        will ifgnore this nomination as too young.
+        will ignore this nomination as too young.
         """
         if self._creationTime:
             return self._creationTime
@@ -321,12 +321,16 @@ class Candidate():
         # all in the chosen category
         ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % category, re.MULTILINE)
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
-        self.commit(old_text,new_text)
+        self.commit(old_text,new_text,page)
 
     def addToCategorizedFeaturedList(self,category):
         """
         Adds the candidate to the page with categorized featured
         pictures. This is the full category.
+
+        This is ==STEP 2== of the parking procedure
+
+        @param category The categorization category
         """
         catpage = "Commons:Featured pictures/" + category
         page = wikipedia.Page(wikipedia.getSite(), catpage)
@@ -335,32 +339,61 @@ class Candidate():
         # We just need to append to the bottom of the gallery
         # with an added title
         new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName(), old_text)
-        self.commit(old_text,new_text);
+        self.commit(old_text,new_text,page);
+
+    def addAssessments(self):
+        """
+        Adds the the assessments template to a featured
+        pictures descripion page.
+
+        This is ==STEP 3== of the parking procedure
+
+        """
+        asspage = self.fileName()
+        page = wikipedia.Page(wikipedia.getSite(), asspage)
+        old_text = page.get()
         
+        AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
 
-    def commit(self,old_text,new_text):
+        # First check if there already is an assessments template on the page
+        params = re.search(AssR,old_text)
+        if params:
+            # Make sure to remove any existing com param
+            params = re.sub(r"com\s*=\s*\d+\|?",'',params.group(1))
+            params += "|com=1"
+            new_ass = "{{Assessments|%s}}" % params
+            new_text = re.sub(AssR,new_ass,old_text)
+        else:
+            # There is no assessments template so just add it
+            new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
+
+        self.commit(old_text,new_text,page)
+
+    def commit(self,old_text,new_text,page):
+        """This will commit new_text to the page"""
+
         # Show the diff
-
-        #wikipedia.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
-        #                 % self.page.title())
-        #wikipedia.showDiff(old_text, new_text)
-
         for line in difflib.context_diff(old_text.splitlines(1), new_text.splitlines(1)):
             if line.startswith('+ '):
                 wikipedia.output(u"\03{lightgreen}%s\03{default}" % line,newline=False,toStdout=True)
             elif line.startswith('- '):
                 wikipedia.output(u"\03{lightred}%s\03{default}" % line,newline=False,toStdout=True)
+            elif line.startswith('! '):
+                wikipedia.output(u"\03{lightyellow}%s\03{default}" % line,newline=False,toStdout=True)
             else:
                 wikipedia.output(line,newline=False,toStdout=True)
         wikipedia.output("\n",toStdout=True)
 
-        choice = wikipedia.inputChoice(
-            u'Do you want to accept these changes?',
-            ['Yes', 'No', "Quit"],
-            ['y', 'N', 'q'], 'N')
+        #choice = wikipedia.inputChoice(
+        #    u'Do you want to accept these changes?',
+        #    ['Yes', 'No', "Quit"],
+        #    ['y', 'N', 'q'], 'N')
         
+        choice = 'n'
+
         if choice == 'y':
             wikipedia.output("Would have commited, but not implemented",toStdout=True)
+            #page.put(new_text);
         elif choice == 'q':
             wikipedia.output("Aborting.",toStdout=True)
             sys.exit(0)
@@ -473,8 +506,14 @@ def main(*args):
                     pass
         elif arg == '-ugh':
             for candidate in findCandidates(fpcTitle):
-                #candidate.addToFeaturedList("Animals");
-                candidate.addToCategorizedFeaturedList("Animals/Mammals");
+                try:
+                    #candidate.addToFeaturedList("Animals");
+                    #candidate.addToCategorizedFeaturedList("Animals/Mammals");
+                    candidate.addAssessments();
+                except wikipedia.NoPage:
+                    wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
+                    pass
+                    
         else:
             wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
 
