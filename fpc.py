@@ -61,6 +61,25 @@ class Candidate():
                          toStdout = True)
 
 
+    def nominator(self):
+        """Return the link to the user that nominated this candidate"""
+        history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
+        if not history:
+            return "Unknown"
+        return "[[User:%s|%s]]" % (history[0][2],history[0][2])
+
+    def uploader(self):
+        """Return the link to the user that uploaded the nominated image"""
+        page = wikipedia.Page(wikipedia.getSite(), self.fileName())
+        history = page.getVersionHistory(reverseOrder=True,revCount=1)
+        if not history:
+            return "Unknown"
+        return "[[User:%s|%s]]" % (history[0][2],history[0][2])        
+
+    def creator(self):
+        """Return the link to the user that created the image"""
+        return self.uploader()
+
     def countVotes(self):
         """
         Counts all the votes for this nomnination
@@ -292,6 +311,11 @@ class Candidate():
         """Returns a fixed with title"""
         return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
+    def cleanTitle(self):
+        """Returns a title string without prefix and extension"""
+        noprefix =  re.sub(PrefixR,'',self.page.title())
+        return re.sub(r'\.\w{1,3}$\s*','',noprefix)
+
     def fileName(self):
         """Return only the filename of this candidate"""
         # The regexp here also removes any possible crap between the prefix
@@ -338,7 +362,7 @@ class Candidate():
         
         # We just need to append to the bottom of the gallery
         # with an added title
-        new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName(), old_text)
+        new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName() , old_text)
         self.commit(old_text,new_text,page);
 
     def addAssessments(self):
@@ -371,6 +395,25 @@ class Candidate():
 
         self.commit(old_text,new_text,page)
 
+    def addToCurrentMonth(self):
+        """
+        Adds the candidate to the list of featured picture this month
+        """
+        monthpage = 'Commons:Featured_pictures/chronological/current_month'
+        page = wikipedia.Page(wikipedia.getSite(), monthpage)
+        old_text = page.get()
+
+        #Find the number of lines in the gallery
+        m = re.search(r"(?ms)<gallery>(.*)</gallery>",old_text)
+        count = m.group(0).count("\n")
+
+        # We just need to append to the bottom of the gallery
+        # with an added title
+        new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> created by %s, uploaded by %s, nominated by %s\n</gallery>" % 
+                          (self.fileName(), count, self.cleanTitle(), self.creator(), self.uploader(), self.nominator()) , old_text)
+        self.commit(old_text,new_text,page);
+        
+
     def commit(self,old_text,new_text,page):
         """This will commit new_text to the page"""
 
@@ -386,12 +429,12 @@ class Candidate():
                 wikipedia.output(line,newline=False,toStdout=True)
         wikipedia.output("\n",toStdout=True)
 
-        #choice = wikipedia.inputChoice(
-        #    u'Do you want to accept these changes?',
-        #    ['Yes', 'No', "Quit"],
-        #    ['y', 'N', 'q'], 'N')
+        choice = wikipedia.inputChoice(
+            u"Do you want to accept these changes to '%s' ?" % page.title(),
+            ['Yes', 'No', "Quit"],
+            ['y', 'N', 'q'], 'N')
         
-        choice = 'n'
+        #choice = 'n'
 
         if choice == 'y':
             wikipedia.output("Would have commited, but not implemented",toStdout=True)
@@ -484,7 +527,7 @@ neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'×
 
 # Used to remove the prefix and just print the file names
 # of the candidate titles.
-PrefixR = re.compile("%s(removal/)?([Ff]ile|[Ii]mage)?:" % candPrefix)
+PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
@@ -538,9 +581,10 @@ def main(*args):
         elif arg == '-ugh':
             for candidate in findCandidates(fpcTitle):
                 try:
-                    #candidate.addToFeaturedList("Animals");
-                    #candidate.addToCategorizedFeaturedList("Animals/Mammals");
-                    candidate.addAssessments();
+                    #candidate.addToFeaturedList("Animals")
+                    #candidate.addToCategorizedFeaturedList("Animals/Mammals")
+                    #candidate.addAssessments()
+                    candidate.addToCurrentMonth()
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
