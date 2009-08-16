@@ -374,6 +374,7 @@ class Candidate():
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
         # all in the chosen category
+        print "%s %s" % (category,self.fileName())
         ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % category, re.MULTILINE)
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
         self.commit(old_text,new_text,page,"Added %s" % self.fileName() )
@@ -391,9 +392,10 @@ class Candidate():
         page = wikipedia.Page(wikipedia.getSite(), catpage)
         old_text = page.get()
         
-        # We just need to append to the bottom of the gallery
-        # with an added title
-        new_text = re.sub('</gallery>',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text)
+        # We just need to append to the bottom of the gallery with an added title
+        # The regexp uses negative lookahead such that we place the candidate in the
+        # last gallery on the page.
+        new_text = re.sub('(?s)</gallery>(?!.*</gallery>)',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text, 1)
         self.commit(old_text,new_text,page,"Added %s" % self.fileName());
 
     def addAssessments(self):
@@ -516,7 +518,7 @@ class Candidate():
             if not len(vres[4]):
                 wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
                 return
-            self.addToFeaturedList(re.sub(r'(.*?)(?=/|$)',r'\1',vres[4])) # Uses 'lookahead' to match either '/' or '$' 
+            self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',vres[4]).group(1))
             self.addToCategorizedFeaturedList(vres[4])
             self.addAssessments()
             self.addToCurrentMonth()
