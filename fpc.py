@@ -372,8 +372,8 @@ class Candidate():
         
         # We just need to append to the bottom of the gallery
         # with an added title
-        new_text = re.sub('</gallery>',"%s\n</gallery>" % self.fileName() , old_text)
-        self.commit(old_text,new_text,page,"Added %s" % self.FileName());
+        new_text = re.sub('</gallery>',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text)
+        self.commit(old_text,new_text,page,"Added %s" % self.fileName());
 
     def addAssessments(self):
         """
@@ -492,7 +492,7 @@ class Candidate():
         vres = results[0]
         if vres[3] == "yes":
             # Featured picture
-            self.addToFeaturedList(re.sub(r'(.*?)/.*',r'\1',vres[4]))
+            self.addToFeaturedList(re.sub(r'(.*?)(?=/|$)',r'\1',vres[4])) # Uses 'lookahead' to match either '/' or '$' 
             self.addToCategorizedFeaturedList(vres[4])
             self.addAssessments()
             self.addToCurrentMonth()
