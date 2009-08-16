@@ -47,6 +47,7 @@ class Candidate():
         self._daysOld      = -1
         self._creationTime = None
         self._striked      = None
+        self._imgCount     = None
 
     def printAllInfo(self):
         """
@@ -161,7 +162,7 @@ class Candidate():
 
         self.countVotes()
 
-        result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|sig=~~~~}}" % \
+        result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
             (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no")
             
         new_text = old_text + result
@@ -253,9 +254,29 @@ class Candidate():
         return len(re.findall(SectionR,text))
 
     def imageCount(self):
-        """Count the number of images that are displayed"""
+        """
+        Count the number of images that are displayed
+
+        Does not count images that are below a certain threshold
+        as they probably are just inline icons and not separate
+        edits of this candidate.
+        """
+        if self._imgCount:
+            return self._imgCount
+
         text = self.page.get()
-        return len(re.findall(ImagesR,text))
+        matches = re.findall(ImagesR,text)
+        count = len(matches)
+
+        if count >= 2:
+            # We have several images, check if they are too small to be counted
+            for img in matches:
+                s = re.search(ImagesSizeR,img)
+                if s and int(s.group(1)) < 150:
+                    count -= 1
+
+        self._imgCount = count
+        return count
 
     def existingResult(self):
         """
@@ -492,6 +513,9 @@ class Candidate():
         vres = results[0]
         if vres[3] == "yes":
             # Featured picture
+            if not len(vres[4]):
+                wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
+                return
             self.addToFeaturedList(re.sub(r'(.*?)(?=/|$)',r'\1',vres[4])) # Uses 'lookahead' to match either '/' or '$' 
             self.addToCategorizedFeaturedList(vres[4])
             self.addAssessments()
@@ -653,7 +677,9 @@ WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
 # Nomination that contain the fpx template
 FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
-ImagesR = re.compile('\[\[(File|Image):.+\]\]',re.MULTILINE)
+ImagesR = re.compile('\[\[(?:File|Image):.+?\]\]')
+# Look for a size specification of the image link
+ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
 
 def main(*args):
 
