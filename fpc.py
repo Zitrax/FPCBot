@@ -153,14 +153,22 @@ class Candidate():
             wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
+        old_text = self.page.get()
+
+        if re.search(r'{{\s*FPC-results-ready-for-review.*}}',old_text):
+            wikipedia.output("\"%s\" already closed, ignoring" % self.cutTitle(),toStdout=True)
+            return False            
+
         self.countVotes()
 
         result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|sig=~~~~}}" % \
             (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no")
             
-        old_text = self.page.get()
         new_text = old_text + result
         
+        # Add the featured status to the header
+        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isFeatured() else ", not featured"), new_text)
+
         self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % 
                     (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no"))
         
