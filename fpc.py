@@ -351,7 +351,7 @@ class Candidate():
         """Return only the filename of this candidate"""
         # The regexp here also removes any possible crap between the prefix
         # and the actual start of the filename.
-        return re.sub("(%s.*?)([File|Image])" % candPrefix,r'\2',self.page.title())
+        return re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
 
     def addToFeaturedList(self,category):
         """
@@ -677,7 +677,7 @@ WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
 # Nomination that contain the fpx template
 FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
-ImagesR = re.compile('\[\[(?:File|Image):.+?\]\]')
+ImagesR = re.compile('\[\[(?:[Ff]ile|[Ii]mage):.+?\]\]')
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
 
