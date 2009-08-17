@@ -470,7 +470,7 @@ class Candidate():
         # Remove from current list
         candidate_page = wikipedia.Page(wikipedia.getSite(), "Commons:Featured picture candidates/candidate list")
         old_cand_text = candidate_page.get()
-        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % re.sub('[ _]','[ _]',self.page.title()),'', old_cand_text)
+        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
         self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s" % self.fileName() )
         
         # Add to log
@@ -568,6 +568,16 @@ class Candidate():
         else:
             wikipedia.output("Changes ignored",toStdout=True)
         
+
+def wikipattern(s):
+    """Return a string that can be matched against different way of writing it on wikimedia projects"""
+    def rep(m):
+        if m.group(0) == ' ' or m.group(0) == '_':
+            return "[ _]";
+        elif m.group(0) == '(' or m.group(0) == ')':
+            return '\\' + m.group(0)
+        
+    return re.sub('[ _\()]',rep,s)
 
 def findCandidates(page_url):
     """This finds all candidates on the main FPC page"""
