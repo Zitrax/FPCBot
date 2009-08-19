@@ -16,6 +16,8 @@ It adds the following commandline arguments:
 
 -park             Park closed and verified candidates
 
+-auto             Do not ask before commiting edits to articles
+
 """
 
 # TODO: catch exceptions
@@ -157,7 +159,11 @@ class Candidate():
         old_text = self.page.get()
 
         if re.search(r'{{\s*FPC-results-ready-for-review.*}}',old_text):
-            wikipedia.output("\"%s\" already closed, ignoring" % self.cutTitle(),toStdout=True)
+            wikipedia.output("\"%s\" needs review, ignoring" % self.cutTitle(),toStdout=True)
+            return False            
+
+        if re.search(r'{{\s*FPC-results-reviewed.*}}',old_text):
+            wikipedia.output("\"%s\" already closed and reviewed, ignoring" % self.cutTitle(),toStdout=True)
             return False            
 
         self.countVotes()
@@ -197,6 +203,9 @@ class Candidate():
                                                int(m.group(3)),
                                                int(m.group(1)),
                                                int(m.group(2)))
+
+        #print "C:" + self._creationTime.isoformat()
+        #print "N:" + datetime.datetime.utcnow().isoformat()
         return self._creationTime
         
 
@@ -390,11 +399,16 @@ class Candidate():
         catpage = "Commons:Featured pictures/" + category
         page = wikipedia.Page(wikipedia.getSite(), catpage)
         old_text = page.get()
-        
-        # We just need to append to the bottom of the gallery with an added title
-        # The regexp uses negative lookahead such that we place the candidate in the
-        # last gallery on the page.
-        new_text = re.sub('(?s)</gallery>(?!.*</gallery>)',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text, 1)
+
+        if category == "Places/Panoramas":
+            # The panoramas are treadted specially
+            new_text = re.sub('(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)',r'\1\n[[%s|thumb|627px|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
+        else:
+            # We just need to append to the bottom of the gallery with an added title
+            # The regexp uses negative lookahead such that we place the candidate in the
+            # last gallery on the page.
+            new_text = re.sub('(?s)</gallery>(?!.*</gallery>)',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text, 1)
+
         self.commit(old_text,new_text,page,"Added %s" % self.fileName());
 
     def addAssessments(self):
@@ -555,10 +569,13 @@ class Candidate():
                 wikipedia.output(line,newline=False,toStdout=True)
         wikipedia.output("\n",toStdout=True)
 
-        choice = wikipedia.inputChoice(
-            u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
-            ['Yes', 'No', "Quit"],
-            ['y', 'N', 'q'], 'N')
+        if G_Auto:
+            choice = 'y'
+        else:
+            choice = wikipedia.inputChoice(
+                u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
+                ['Yes', 'No', "Quit"],
+                ['y', 'N', 'q'], 'N')
         
         if choice == 'y':
             page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
@@ -692,12 +709,22 @@ ImagesR = re.compile('\[\[(?:[Ff]ile|[Ii]mage):.+?\]\]')
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
 
+# Auto reply yes to all questions
+G_Auto = False
+
 def main(*args):
 
     fpcTitle = 'Commons:Featured picture candidates/candidate list'
     testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
 
     worked = False
+    global G_Auto
+
+    # First look for arguments that should be set for all operationss
+    for arg in sys.argv[1:]:
+        if arg == '-auto':
+            G_Auto = True
+            sys.argv.remove(arg)
 
     for arg in wikipedia.handleArgs(*args):
         worked = True
