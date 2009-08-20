@@ -18,6 +18,8 @@ It adds the following commandline arguments:
 
 -auto             Do not ask before commiting edits to articles
 
+-dry              Do not submit any edits, just print them
+
 """
 
 # TODO: catch exceptions
@@ -569,7 +571,9 @@ class Candidate():
                 wikipedia.output(line,newline=False,toStdout=True)
         wikipedia.output("\n",toStdout=True)
 
-        if G_Auto:
+        if G_Dry:
+            choice = 'n'
+        elif G_Auto:
             choice = 'y'
         else:
             choice = wikipedia.inputChoice(
@@ -583,7 +587,7 @@ class Candidate():
             wikipedia.output("Aborting.",toStdout=True)
             sys.exit(0)
         else:
-            wikipedia.output("Changes ignored",toStdout=True)
+            wikipedia.output("Changes to '%s' ignored" % self.fileName(), toStdout=True)
         
 
 def wikipattern(s):
@@ -711,6 +715,8 @@ ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
 
 # Auto reply yes to all questions
 G_Auto = False
+# Auto answer no
+G_Dry = False
 
 def main(*args):
 
@@ -719,12 +725,22 @@ def main(*args):
 
     worked = False
     global G_Auto
+    global G_Dry
 
     # First look for arguments that should be set for all operationss
     for arg in sys.argv[1:]:
         if arg == '-auto':
             G_Auto = True
             sys.argv.remove(arg)
+        elif arg == '-dry':
+            G_Dry = True
+            sys.argv.remove(arg)
+
+    # Abort on unknown arguments
+    for arg in sys.argv[1:]:
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park':
+            wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
+            sys.exit(0)            
 
     for arg in wikipedia.handleArgs(*args):
         worked = True
@@ -751,9 +767,6 @@ def main(*args):
                 except wikipedia.NoPage:
                     wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
                     pass
-                    
-        else:
-            wikipedia.output("Warning - unknown argument '%s', see -help." % arg, toStdout = True)
 
     if not worked:
         wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
