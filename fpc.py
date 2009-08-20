@@ -146,8 +146,16 @@ class Candidate():
             wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
             return False
 
+        old_text = self.page.get()
+
+        if re.search(r'{{\s*FPC-closed-ignored.*}}',old_text):
+            wikipedia.output("\"%s\" is marked as ignored, so ignoring" % self.cutTitle(),toStdout=True)
+            return False            
+
         if self.imageCount() > 1:
             wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
+            new_text = old_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
+            self.commit(old_text,new_text,self.page,"Marking as ignored")
             return False
 
         if self.isWithdrawn():
@@ -157,8 +165,6 @@ class Candidate():
         if self.isFPX():
             wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
-
-        old_text = self.page.get()
 
         if re.search(r'{{\s*FPC-results-ready-for-review.*}}',old_text):
             wikipedia.output("\"%s\" needs review, ignoring" % self.cutTitle(),toStdout=True)
