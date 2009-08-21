@@ -478,7 +478,13 @@ class Candidate():
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
         talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
-        old_text = talk_page.get()
+
+        try:
+            old_text = talk_page.get()
+        except wikipedia.NoPage:
+            wikipedia.output("notifyNominator: No such page '%s' but ignoring..." % talk_link, toStdout=True)
+            return
+
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
         self.commit(old_text,new_text,talk_page,"FPC promotion of %s" % self.fileName() )
 
@@ -593,7 +599,7 @@ class Candidate():
             wikipedia.output("Aborting.",toStdout=True)
             sys.exit(0)
         else:
-            wikipedia.output("Changes to '%s' ignored" % self.fileName(), toStdout=True)
+            wikipedia.output("Changes to '%s' ignored" % page.title(), toStdout=True)
         
 
 def wikipattern(s):
@@ -640,7 +646,20 @@ def findEndOfTemplate(text,template):
     while cp < len(text):
         ns = text.find("{{",cp)
         ne = text.find("}}",cp)
-        if not lvl and ne < ns:
+
+        # If we see no end tag, we give up
+        if ne==-1: 
+            return 0
+
+        # Handle case when there are no more start tags
+        if ns==-1:
+            if not lvl:
+                return ne+2
+            else:
+                lvl -= 1
+                cp = ne+2
+
+        elif not lvl and ne < ns:
             return ne+2
         elif ne < ns:
             lvl -= 1
@@ -650,7 +669,6 @@ def findEndOfTemplate(text,template):
             cp = ns+2
     # Apparently we never found it
     return 0
-        
     
 
 # Exact description about what needs to be done with a closed nomination
@@ -763,15 +781,15 @@ def main(*args):
             for candidate in findCandidates(fpcTitle):
                 try:
                     candidate.printAllInfo()
-                except wikipedia.NoPage:
-                    wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
+                except wikipedia.NoPage, error:
+                    wikipedia.output("No such page '%s'" % error, toStdout = True)
                     pass
         elif arg == '-park':
             for candidate in findCandidates(fpcTitle):
                 try:
                     candidate.park()
-                except wikipedia.NoPage:
-                    wikipedia.output("No such page '%s'" % candidate.page.title(), toStdout = True)
+                except wikipedia.NoPage, error:
+                    wikipedia.output("No such page '%s'" % error, toStdout = True)
                     pass
 
     if not worked:
