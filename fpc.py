@@ -408,9 +408,11 @@ class Candidate():
         page = wikipedia.Page(wikipedia.getSite(), catpage)
         old_text = page.get()
 
+        # A few categories are treated specially, the rest is appended to the last gallery
         if category == "Places/Panoramas":
-            # The panoramas are treadted specially
-            new_text = re.sub('(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)',r'\1\n[[%s|thumb|627px|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
+            new_text = re.sub(LastImageR,r'\1\n[[%s|thumb|627px|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
+        elif category == "Animated":
+            new_text = re.sub(LastImageR,r'\1\n[[%s|frame|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
         else:
             # We just need to append to the bottom of the gallery with an added title
             # The regexp uses negative lookahead such that we place the candidate in the
@@ -736,6 +738,8 @@ FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 ImagesR = re.compile('\[\[(?:[Ff]ile|[Ii]mage):.+?\]\]')
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
+# Finds the last image link on a page
+LastImageR = re.compile(r'(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)')
 
 # Auto reply yes to all questions
 G_Auto = False
