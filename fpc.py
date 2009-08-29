@@ -20,9 +20,25 @@ It adds the following commandline arguments:
 
 -dry              Do not submit any edits, just print them
 
+-threads          Use threads to speed things up, can't be used in interactive mode
+
 """
 
 import wikipedia, re, datetime, sys, difflib
+
+# Imports needed for threading
+import threading, time, config
+
+class ThreadCheckCandidate(threading.Thread):
+
+    def __init__(self, candidate, check):
+        threading.Thread.__init__(self)
+        self.candidate = candidate
+        self.check = check
+
+    def run(self):
+        self.check(self.candidate)
+
 
 class Candidate():
     """This is one feature picture candidate"""
@@ -678,10 +694,17 @@ def checkCandidates(check,page):
     i = 1
     for candidate in candidates:
 
-        wikipedia.output("(%03d/%03d) " %(i,tot), newline=False, toStdout=True)
+        if not G_Threads:
+            wikipedia.output("(%03d/%03d) " %(i,tot), newline=False, toStdout=True)
 
         try:
-            check(candidate)
+            if G_Threads:
+                while threading.activeCount() >= config.max_external_links:
+                    time.sleep(0.1)
+                thread = ThreadCheckCandidate(candidate,check)
+                thread.start()
+            else:
+                check(candidate)
         except wikipedia.NoPage, error:
             wikipedia.output("No such page '%s'" % error, toStdout = True)
 
@@ -788,6 +811,8 @@ LastImageR = re.compile(r'(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[
 G_Auto = False
 # Auto answer no
 G_Dry = False
+# Use threads
+G_Threads = False
 
 def main(*args):
 
@@ -797,6 +822,7 @@ def main(*args):
     worked = False
     global G_Auto
     global G_Dry
+    global G_Threads
 
     # First look for arguments that should be set for all operationss
     for arg in sys.argv[1:]:
@@ -806,10 +832,17 @@ def main(*args):
         elif arg == '-dry':
             G_Dry = True
             sys.argv.remove(arg)
+        elif arg == '-threads':
+            G_Threads = True
+
+    # Can not use interactive mode with threads
+    if G_Threads and (not G_Dry and not G_Auto):
+        wikipedia.output("Warning - '-threads' must be run with '-dry' or '-auto'", toStdout = True)
+        sys.exit(0)
 
     # Abort on unknown arguments
     for arg in sys.argv[1:]:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park':
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads':
             wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
             sys.exit(0)            
 
