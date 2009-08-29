@@ -22,22 +22,12 @@ It adds the following commandline arguments:
 
 """
 
-# TODO: catch exceptions
-
 import wikipedia, re, datetime, sys, difflib
 
 candPrefix = "Commons:Featured picture candidates/"
 
-
 class Candidate():
-    """
-    This is one feature picture candidate.
-
-    TODO:
-    * How to detect edits (multi image nomination) ?
-      imagelinks() is no good it, there might be links that are not nominations
-
-    """
+    """This is one feature picture candidate"""
 
     def __init__(self, page):
         """page is a wikipedia.Page object"""
