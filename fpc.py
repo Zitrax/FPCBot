@@ -138,12 +138,30 @@ class Candidate():
         """Page marked with FPX template"""
         return len(re.findall(FpxR,self.page.get()))
 
+    def rulesOfFifthDay(self):
+        """Check if any of the rules of the fifth day can be applied"""
+        if self.daysOld() < 5:
+            return False
+
+        self.countVotes()
+
+        # First rule of the fifth day
+        if self._support <= 1:
+            return True
+
+        # Second rule of the fifth day
+        if self._support >= 10 and self._oppose == 0:
+            return True
+
+
     def closePage(self):
         """
         Will add the voting results to the page if it is finished.
         If it was, True is returned else False
         """
-        if not self.isDone():
+        fifthDay = self.rulesOfFifthDay()
+
+        if not fifthDay and not self.isDone():
             wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
             return False
 
@@ -185,8 +203,8 @@ class Candidate():
         # Add the featured status to the header
         new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isFeatured() else ", not featured"), new_text)
 
-        self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % 
-                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no"))
+        self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s) (FifthDay=%s)" % 
+                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no", fifthDay))
         
         return True
 
