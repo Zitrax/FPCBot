@@ -24,8 +24,6 @@ It adds the following commandline arguments:
 
 import wikipedia, re, datetime, sys, difflib
 
-candPrefix = "Commons:Featured picture candidates/"
-
 class Candidate():
     """This is one feature picture candidate"""
 
@@ -90,7 +88,7 @@ class Candidate():
         if self._votesCounted:
             return
 
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         self._support = len(re.findall(SupportR,text)) 
         self._oppose  = len(re.findall(OpposeR,text))
         self._neutral = len(re.findall(NeutralR,text))
@@ -111,7 +109,7 @@ class Candidate():
         if self._striked:
             return self._striked
 
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         s_support = len(re.findall(StrikedOutSupportR,text))
         s_oppose  = len(re.findall(StrikedOutOpposeR,text))
         s_neutral = len(re.findall(StrikedOutNeutralR,text))
@@ -122,11 +120,11 @@ class Candidate():
 
     def isWithdrawn(self):
         """Withdrawn nominations should not be counted"""
-        return len(re.findall(WithdrawnR,self.page.get()))
+        return len(re.findall(WithdrawnR,self.page.get(get_redirect=True)))
 
     def isFPX(self):
         """Page marked with FPX template"""
-        return len(re.findall(FpxR,self.page.get()))
+        return len(re.findall(FpxR,self.page.get(get_redirect=True)))
 
     def rulesOfFifthDay(self):
         """Check if any of the rules of the fifth day can be applied"""
@@ -155,7 +153,7 @@ class Candidate():
             wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
             return False
 
-        old_text = self.page.get()
+        old_text = self.page.get(get_redirect=True)
 
         if re.search(r'{{\s*FPC-closed-ignored.*}}',old_text):
             wikipedia.output("\"%s\" is marked as ignored, so ignoring" % self.cutTitle(),toStdout=True)
@@ -276,7 +274,7 @@ class Candidate():
 
     def sectionCount(self):
         """Count the number of sections in this candidate"""
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         return len(re.findall(SectionR,text))
 
     def imageCount(self):
@@ -290,7 +288,7 @@ class Candidate():
         if self._imgCount:
             return self._imgCount
 
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         matches = re.findall(ImagesR,text)
         count = len(matches)
 
@@ -314,7 +312,7 @@ class Candidate():
         contains four values:
         support,oppose,neutral,(featured|not featured)
         """
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         return re.findall(PreviousResultR,text)
 
     def compareResultToCount(self):
@@ -324,7 +322,7 @@ class Candidate():
         see if they match. This is for testing purposes
         of the bot and to find any incorrect old results.
         """
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         res = self.existingResult()
 
         if self.isWithdrawn():
@@ -387,7 +385,7 @@ class Candidate():
         self._fileName = re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
 
         if not wikipedia.Page(wikipedia.getSite(), self._fileName).exists():
-            match = re.search(ImagesR,self.page.get())
+            match = re.search(ImagesR,self.page.get(get_redirect=True))
             if match: self._fileName = match.group(1)
 
         return self._fileName
@@ -409,7 +407,7 @@ class Candidate():
 
         listpage = 'Commons:Featured pictures, list'
         page = wikipedia.Page(wikipedia.getSite(), listpage)
-        old_text = page.get()
+        old_text = page.get(get_redirect=True)
         
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
@@ -429,7 +427,7 @@ class Candidate():
         """
         catpage = "Commons:Featured pictures/" + category
         page = wikipedia.Page(wikipedia.getSite(), catpage)
-        old_text = page.get()
+        old_text = page.get(get_redirect=True)
 
         # A few categories are treated specially, the rest is appended to the last gallery
         if category == "Places/Panoramas":
@@ -454,7 +452,7 @@ class Candidate():
         """
         asspage = self.fileName()
         page = wikipedia.Page(wikipedia.getSite(), asspage)
-        old_text = page.get()
+        old_text = page.get(get_redirect=True)
         
         AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
 
@@ -482,7 +480,7 @@ class Candidate():
         """
         monthpage = 'Commons:Featured_pictures/chronological/current_month'
         page = wikipedia.Page(wikipedia.getSite(), monthpage)
-        old_text = page.get()
+        old_text = page.get(get_redirect=True)
 
         #Find the number of lines in the gallery
         m = re.search(r"(?ms)<gallery>(.*)</gallery>",old_text)
@@ -505,7 +503,7 @@ class Candidate():
         talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
 
         try:
-            old_text = talk_page.get()
+            old_text = talk_page.get(get_redirect=True)
         except wikipedia.NoPage:
             wikipedia.output("notifyNominator: No such page '%s' but ignoring..." % talk_link, toStdout=True)
             return
@@ -522,7 +520,7 @@ class Candidate():
         """
         # Remove from current list
         candidate_page = wikipedia.Page(wikipedia.getSite(), "Commons:Featured picture candidates/candidate list")
-        old_cand_text = candidate_page.get()
+        old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
         self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s" % self.fileName() )
         
@@ -532,15 +530,29 @@ class Candidate():
         current_month = Month2[today.month]
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
-        old_log_text = log_page.get()
+        old_log_text = log_page.get(get_redirect=True)
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
         self.commit(old_log_text,new_log_text,log_page,"Adding %s" % self.fileName() )
 
     def park(self):
-        """This will do everything that is needed to park a closed candidate"""
+        """
+        This will do everything that is needed to park a closed candidate
+
+        1. Check whether the count is verified or not
+        2. If verified and featured:
+          * Add page to 'Commons:Featured pictures, list'
+          * Add to subpage of 'Commons:Featured pictures, list'
+          * Add {{Assessments|com=1}} or just the parameter if the template is already there 
+            to the picture page (should also handle subpages)
+          * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
+          * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
+        3. If featured or not move it from 'Commons:Featured picture candidates/candidate list'
+           to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
+        
+        """
 
         # First look for verified results
-        text = self.page.get()
+        text = self.page.get(get_redirect=True)
         results = re.findall(VerifiedResultR,text)
         
         if self.imageCount() > 1:
@@ -659,6 +671,22 @@ def findCandidates(page_url):
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
     return candidates
 
+def checkCandidates(check,page):
+    """Calls a function on each candidate found on the specified page"""
+    candidates = findCandidates(page)
+    tot = len(candidates)
+    i = 1
+    for candidate in candidates:
+
+        wikipedia.output("(%03d/%03d) " %(i,tot), newline=False, toStdout=True)
+
+        try:
+            check(candidate)
+        except wikipedia.NoPage, error:
+            wikipedia.output("No such page '%s'" % error, toStdout = True)
+
+        i += 1
+
 def findEndOfTemplate(text,template):
     """
     As regexps can't properly deal with nested parantheses this
@@ -700,20 +728,6 @@ def findEndOfTemplate(text,template):
     # Apparently we never found it
     return 0
     
-
-# Exact description about what needs to be done with a closed nomination
-#
-# 1. Check whether the count is verified or not
-# 2. If verified and featured:
-#    * Add page to 'Commons:Featured pictures, list'
-#    * Add to subpage of 'Commons:Featured pictures, list'
-#    * Add {{Assessments|com=1}} or just the parameter if the template is already there 
-#        to the picture page (should also handle subpages)
-#    * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
-#    * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
-# 3. If featured or not move it from 'Commons:Featured picture candidates/candidate list'
-#    to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
-
 # Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
 Month2  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7:'July', 8:'August', 9:'September', 10:'October', 11:'November', 12:'December' }
@@ -736,6 +750,7 @@ neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'×
 
 # Used to remove the prefix and just print the file names
 # of the candidate titles.
+candPrefix = "Commons:Featured picture candidates/"
 PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 
 # Looks for result counts, an example of such a line is:
@@ -801,28 +816,13 @@ def main(*args):
     for arg in wikipedia.handleArgs(*args):
         worked = True
         if arg == '-test':
-            for candidate in findCandidates(testLog):
-                try:
-                    candidate.compareResultToCount()
-                except wikipedia.IsRedirectPage:
-                    pass
+            checkCandidates(Candidate.compareResultToCount,testLog)
         elif arg == '-close':
-            for candidate in findCandidates(fpcTitle):
-                candidate.closePage()
+            checkCandidates(Candidate.closePage,fpcTitle);
         elif arg == '-info':
-            for candidate in findCandidates(fpcTitle):
-                try:
-                    candidate.printAllInfo()
-                except wikipedia.NoPage, error:
-                    wikipedia.output("No such page '%s'" % error, toStdout = True)
-                    pass
+            checkCandidates(Candidate.printAllInfo,fpcTitle);
         elif arg == '-park':
-            for candidate in findCandidates(fpcTitle):
-                try:
-                    candidate.park()
-                except wikipedia.NoPage, error:
-                    wikipedia.output("No such page '%s'" % error, toStdout = True)
-                    pass
+            checkCandidates(Candidate.park,fpcTitle);
 
     if not worked:
         wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
