@@ -52,6 +52,7 @@ class Candidate():
         self._creationTime = None
         self._striked      = None
         self._imgCount     = None
+        self._fileName     = None
 
     def printAllInfo(self):
         """
@@ -365,10 +366,24 @@ class Candidate():
         return re.sub(r'\.\w{1,3}$\s*','',noprefix)
 
     def fileName(self):
-        """Return only the filename of this candidate"""
+        """
+        Return only the filename of this candidate
+        This is first based on the title of the page but if that page is not found
+        then the first image link in the page is used.
+        """
         # The regexp here also removes any possible crap between the prefix
         # and the actual start of the filename.
-        return re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
+        if self._fileName:
+            return self._fileName
+
+        self._fileName = re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
+
+        if not wikipedia.Page(wikipedia.getSite(), self._fileName).exists():
+            match = re.search(ImagesR,self.page.get())
+            if match: self._fileName = match.group(1)
+
+        return self._fileName
+
 
     def addToFeaturedList(self,category):
         """
@@ -538,6 +553,11 @@ class Candidate():
 
         if self.isFPX():
             wikipedia.output("%s: (ignoring, was FPXed)" % self.cutTitle(),toStdout=True)
+            return
+
+        # Check if the image page exist, if not we ignore this candidate
+        if not wikipedia.Page(wikipedia.getSite(), self.fileName()).exists():
+            wikipedia.output("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle(),toStdout=True)
             return
 
         # Ok we should now have a candidate with verified results that we can park
@@ -735,7 +755,7 @@ WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
 # Nomination that contain the fpx template
 FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
-ImagesR = re.compile('\[\[(?:[Ff]ile|[Ii]mage):.+?\]\]')
+ImagesR = re.compile('\[\[((?:[Ff]ile|[Ii]mage):[^\|]+).*?\]\]')
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
 # Finds the last image link on a page
