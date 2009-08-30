@@ -177,8 +177,12 @@ class Candidate():
 
         if self.imageCount() > 1:
             wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
-            new_text = old_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
-            self.commit(old_text,new_text,self.page,"Marking as ignored")
+            # Remove any existing FPC templates
+            new_text = re.sub(ReviewedTemplateR,'',old_text)
+            new_text = re.sub(CountedTemplateR,'',new_text)
+            not_corrected = new_text == old_text
+            new_text = new_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
+            self.commit(old_text,new_text,self.page,"Marking as ignored" if not_corrected else "Marking as ignored (needs to be closed according to the manual instructions)")
             return False
 
         if self.isWithdrawn():
@@ -189,11 +193,11 @@ class Candidate():
             wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
-        if re.search(r'{{\s*FPC-results-ready-for-review.*}}',old_text):
+        if re.search(CountedTemplateR,old_text):
             wikipedia.output("\"%s\" needs review, ignoring" % self.cutTitle(),toStdout=True)
             return False            
 
-        if re.search(r'{{\s*FPC-results-reviewed.*}}',old_text):
+        if re.search(ReviewedTemplateR,old_text):
             wikipedia.output("\"%s\" already closed and reviewed, ignoring" % self.cutTitle(),toStdout=True)
             return False            
 
@@ -783,6 +787,10 @@ PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+o
 
 # Looks for verified results
 VerifiedResultR = re.compile(r'{{\s*FPC-results-reviewed\s*\|\s*support\s*=\s*(\d+)\s*\|\s*oppose\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*featured\s*=\s*(\w+)\s*\|\s*category\s*=\s*([^|]*).*}}',re.MULTILINE)
+
+# Matches the entire line including newline so they can be stripped away
+CountedTemplateR = re.compile(r'^.*{{\s*FPC-results-ready-for-review.*}}.*$\n?',re.MULTILINE)
+ReviewedTemplateR = re.compile(r'^.*{{\s*FPC-results-reviewed.*}}.*$\n?',re.MULTILINE)
 
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
