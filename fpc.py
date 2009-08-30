@@ -603,12 +603,17 @@ class Candidate():
         # Ok we should now have a candidate with verified results that we can park
         vres = results[0]
         if vres[3] == "yes":
+
+            # Strip away any eventual section
+            # as there is not implemented support for it
+            category = re.sub(r'#.*','',vres[4])
+
             # Featured picture
-            if not len(vres[4]):
+            if not len(category):
                 wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
                 return
-            self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',vres[4]).group(1))
-            self.addToCategorizedFeaturedList(vres[4])
+            self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',category).group(1))
+            self.addToCategorizedFeaturedList(category)
             self.addAssessments()
             self.addToCurrentMonth()
             self.notifyNominator()
