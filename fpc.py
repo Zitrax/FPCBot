@@ -215,7 +215,7 @@ class Candidate():
         new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isFeatured() else ", not featured"), new_text)
 
         self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s) (FifthDay=%s)" % 
-                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no", fifthDay))
+                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no", "yes" if fifthDay else "no"))
         
         return True
 
