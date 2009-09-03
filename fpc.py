@@ -872,6 +872,9 @@ def main(*args):
         elif arg == '-info':
             checkCandidates(Candidate.printAllInfo,fpcTitle);
         elif arg == '-park':
+            if G_Threads and G_Auto:
+                wikipedia.output("Auto parking using threads is disabled for now...")
+                sys.exit(0)
             checkCandidates(Candidate.park,fpcTitle);
 
     if not worked:
