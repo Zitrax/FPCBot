@@ -41,7 +41,11 @@ class ThreadCheckCandidate(threading.Thread):
 
 
 class Candidate():
-    """This is one feature picture candidate"""
+    """
+    This is one picture candidate
+
+    This class just serves as base for the DelistCandidate and FPCandidate classes
+    """
 
     def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString ):
         """page is a wikipedia.Page object"""
@@ -900,17 +904,17 @@ def main(*args):
     for arg in wikipedia.handleArgs(*args):
         worked = True
         if arg == '-test':
-            checkCandidates(Candidate.compareResultToCount,testLog)
+            checkCandidates(Candidate.compareResultToCount,testLog,delist=False)
         elif arg == '-close':
-            checkCandidates(Candidate.closePage,fpcPage);
+            checkCandidates(Candidate.closePage,fpcPage,delist=False);
         elif arg == '-info':
-            checkCandidates(Candidate.printAllInfo,delistPage,True);
+            checkCandidates(Candidate.printAllInfo,delistPage,delist=True);
 #            checkCandidates(Candidate.printAllInfo,fpcPage);
         elif arg == '-park':
             if G_Threads and G_Auto:
                 wikipedia.output("Auto parking using threads is disabled for now...")
                 sys.exit(0)
-            checkCandidates(Candidate.park,fpcPage);
+            checkCandidates(Candidate.park,fpcPage,delist=True);
 
     if not worked:
         wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
