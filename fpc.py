@@ -46,10 +46,9 @@ class Candidate():
     def __init__(self, page):
         """page is a wikipedia.Page object"""
         self.page          = page
-        self._oppose       = 0
-        self._support      = 0
-        self._neutral      = 0
-        self._unknown      = 0
+        self._con          = 0
+        self._pro          = 0
+        self._neu          = 0
         self._votesCounted = False
         self._featured     = False
         self._daysOld      = -1
@@ -63,10 +62,10 @@ class Candidate():
         Console output of all information sought after
         """
         self.countVotes()
-        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d U:%02d D:%02d Se:%d Im:%02d W:%s (%s)" % 
+        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d D:%02d Se:%d Im:%02d W:%s (%s)" % 
                          ( self.cutTitle(),
-                           self._support,self._striked[0],self._oppose,self._striked[1],
-                           self._neutral,self._unknown,
+                           self._pro,self._striked[0],self._con,self._striked[1],
+                           self._neu,
                            self.daysOld(),self.sectionCount(),
                            self.imageCount(),self.isWithdrawn(),
                            self.statusString()),
@@ -105,14 +104,14 @@ class Candidate():
             return
 
         text = self.page.get(get_redirect=True)
-        self._support = len(re.findall(SupportR,text)) 
-        self._oppose  = len(re.findall(OpposeR,text))
-        self._neutral = len(re.findall(NeutralR,text))
+        self._pro = len(re.findall(SupportR,text)) 
+        self._con = len(re.findall(OpposeR,text))
+        self._neu = len(re.findall(NeutralR,text))
 
         self.findStrikedOutVotes()
-        self._support -= self._striked[0]
-        self._oppose  -= self._striked[1]
-        self._neutral -= self._striked[2]
+        self._pro -= self._striked[0]
+        self._con -= self._striked[1]
+        self._neu -= self._striked[2]
 
         self._votesCounted = True
 
@@ -125,12 +124,12 @@ class Candidate():
         if self._striked:
             return self._striked
 
-        text = self.page.get(get_redirect=True)
-        s_support = len(re.findall(StrikedOutSupportR,text))
-        s_oppose  = len(re.findall(StrikedOutOpposeR,text))
-        s_neutral = len(re.findall(StrikedOutNeutralR,text))
+        text  = self.page.get(get_redirect=True)
+        s_pro = len(re.findall(StrikedOutSupportR,text))
+        s_con = len(re.findall(StrikedOutOpposeR,text))
+        s_neu = len(re.findall(StrikedOutNeutralR,text))
 
-        self._striked = (s_support,s_oppose,s_neutral)
+        self._striked = (s_pro,s_con,s_neu)
         return self._striked
         
 
@@ -153,11 +152,11 @@ class Candidate():
         self.countVotes()
 
         # First rule of the fifth day
-        if self._support <= 1:
+        if self._pro <= 1:
             return True
 
         # Second rule of the fifth day
-        if self._support >= 10 and self._oppose == 0:
+        if self._pro >= 10 and self._con == 0:
             return True
 
 
@@ -207,7 +206,7 @@ class Candidate():
         self.countVotes()
 
         result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
-            (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no")
+            (self._pro,self._con,self._neu,"yes" if self.isFeatured() else "no")
             
         new_text = old_text + result
         
@@ -215,7 +214,7 @@ class Candidate():
         new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isFeatured() else ", not featured"), new_text)
 
         self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s) (FifthDay=%s)" % 
-                    (self._support,self._oppose,self._neutral,"yes" if self.isFeatured() else "no", "yes" if fifthDay else "no"))
+                    (self._pro,self._con,self._neu,"yes" if self.isFeatured() else "no", "yes" if fifthDay else "no"))
         
         return True
 
@@ -287,8 +286,8 @@ class Candidate():
         if not self._votesCounted:
             self.countVotes()
 
-        return self._support >= 5 and \
-            (self._support >= 2*self._oppose)
+        return self._pro >= 5 and \
+            (self._pro >= 2*self._con)
     
 
     def isIgnored(self):
@@ -372,16 +371,16 @@ class Candidate():
         wn = int(old_res[2])
         self.countVotes()
 
-        if self._support == ws and self._oppose == wo and self._neutral == wn and was_featured == self.isFeatured():
+        if self._pro == ws and self._con == wo and self._neu == wn and was_featured == self.isFeatured():
             status = "OK"
         else:
             status = "FAIL"
 
         # List info to console
         wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)" % (self.cutTitle(),
-                                                                                self._support,ws,
-                                                                                self._oppose ,wo,
-                                                                                self._neutral,wn,
+                                                                                self._pro,ws,
+                                                                                self._con ,wo,
+                                                                                self._neu,wn,
                                                                                 self.isFeatured(),was_featured,
                                                                                 status),toStdout=True)
 
