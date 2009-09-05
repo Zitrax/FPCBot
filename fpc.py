@@ -674,6 +674,12 @@ class Candidate():
             wikipedia.output("Changes to '%s' ignored" % page.title(), toStdout=True)
         
 
+class FPCandidate(Candidate):
+    """A candidate up for promotion"""
+
+    def __init__(self, page, ProR, ConR, NeuR):
+        Candidate.__init__(self,page,ProR,ConR,NeuR)
+
 def wikipattern(s):
     """Return a string that can be matched against different way of writing it on wikimedia projects"""
     def rep(m):
@@ -695,7 +701,7 @@ def findCandidates(page_url):
         title = template.title()
         if title.startswith(candPrefix):
             #wikipedia.output("Adding '%s'" % title, toStdout = True)
-            candidates.append(Candidate(template,SupportR,OpposeR,NeutralR))
+            candidates.append(FPCandidate(template,SupportR,OpposeR,NeutralR))
         else:
             pass
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
