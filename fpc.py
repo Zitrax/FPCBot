@@ -755,11 +755,15 @@ class DelistCandidate(Candidate):
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
-                    wikipedia.output("Will not remove from %s" % ref.title())
-                    continue
-                old_text = ref.get(get_redirect=True)
-                new_text = re.sub(r"([[)?([Ff]ile|[Ii]mage):%s.*\n" % wikipattern(self.cleanTitle(keepExtension=True)),'', old_text)
-                self.commit(old_text,new_text,ref,"Removing %s" % self.fileName() )
+                    wikipedia.output("Adding delist note to %s" % ref.title())
+                    old_text = ref.get(get_redirect=True)
+                    now = datetime.utcnow()
+                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 Delisted %d-%d-%d (%d-%d)' % (now.year,now.month,now.day,self._con,self._pro), old_text)
+                    self.commit(old_text,new_text,ref,"Delisted %s" % self.fileName() )
+                else:
+                    old_text = ref.get(get_redirect=True)
+                    new_text = re.sub(r"([[)?([Ff]ile|[Ii]mage):%s.*\n" % wikipattern(self.cleanTitle(keepExtension=True)),'', old_text)
+                    self.commit(old_text,new_text,ref,"Removing %s" % self.fileName() )
 
     def removeAssessments(self):
         """Remove FP status from an image"""
