@@ -410,10 +410,13 @@ class Candidate():
         """Returns a fixed with title"""
         return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
-    def cleanTitle(self):
+    def cleanTitle(self,keepExtension=False):
         """Returns a title string without prefix and extension"""
         noprefix =  re.sub(PrefixR,'',self.page.title())
-        return re.sub(r'\.\w{1,3}$\s*','',noprefix)
+        if keepExtension:
+            return noprefix
+        else:
+            return re.sub(r'\.\w{1,3}$\s*','',noprefix)
 
     def fileName(self):
         """
@@ -738,6 +741,7 @@ class DelistCandidate(Candidate):
         # Delistings does not care about the category
         self.moveToLog()
         self.removeFromFeaturedLists()
+        self.removeAssessments()
 
     def removeFromFeaturedLists(self):
         """Remove a candidate from all featured lists"""
@@ -749,7 +753,10 @@ class DelistCandidate(Candidate):
         
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
-            wikipedia.output("Reference = %s" % ref.title())
+            if ref.title().startswith("Commons:Featured pictures/"):
+                old_text = ref.get(get_redirect=True)
+                new_text = re.sub(r"([[)?([Ff]ile|[Ii]mage):%s.*\n" % wikipattern(self.cleanTitle(keepExtension=True)),'', old_text)
+                self.commit(old_text,new_text,ref,"Removing %s" % self.fileName() )
 
 
 def wikipattern(s):
