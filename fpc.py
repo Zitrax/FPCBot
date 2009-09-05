@@ -43,12 +43,15 @@ class ThreadCheckCandidate(threading.Thread):
 class Candidate():
     """This is one feature picture candidate"""
 
-    def __init__(self, page):
+    def __init__(self, page, ProR, ConR, NeuR ):
         """page is a wikipedia.Page object"""
         self.page          = page
-        self._con          = 0
         self._pro          = 0
+        self._con          = 0
         self._neu          = 0
+        self._proR         = ProR  # Regexp for positive votes
+        self._conR         = ConR  # Regexp for negative votes
+        self._neuR         = NeuR  # Regexp for neutral  votes
         self._votesCounted = False
         self._featured     = False
         self._daysOld      = -1
@@ -692,7 +695,7 @@ def findCandidates(page_url):
         title = template.title()
         if title.startswith(candPrefix):
             #wikipedia.output("Adding '%s'" % title, toStdout = True)
-            candidates.append(Candidate(template))
+            candidates.append(Candidate(template,SupportR,OpposeR,NeutralR))
         else:
             pass
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
