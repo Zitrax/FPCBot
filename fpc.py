@@ -225,7 +225,7 @@ class Candidate():
         new_text = old_text + result
         
         # Add the featured status to the header
-        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isPassed() else ", not featured"), new_text)
+        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", %s" % self._proString if self.isPassed() else ", %s" % self._conString), new_text)
 
         self.commit(old_text,new_text,self.page,self.getCloseCommitComment() + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")) )
         
