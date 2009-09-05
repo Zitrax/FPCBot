@@ -754,9 +754,28 @@ class DelistCandidate(Candidate):
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
+                if ref.title().startswith("Commons:Featured pictures/chronological"):
+                    wikipedia.output("Will not remove from %s" % ref.title())
+                    continue
                 old_text = ref.get(get_redirect=True)
                 new_text = re.sub(r"([[)?([Ff]ile|[Ii]mage):%s.*\n" % wikipattern(self.cleanTitle(keepExtension=True)),'', old_text)
                 self.commit(old_text,new_text,ref,"Removing %s" % self.fileName() )
+
+    def removeAssessments(self):
+        """Remove FP status from an image"""
+        
+        imagePage = self.getImagePage()
+        old_text = imagePage.get(get_redirect=True)
+
+        # First check for the old {{Featured picture}} template
+        new_text = re.sub(r'{{[Ff]eatured[ _]picture}}','{{Delisted picture}}',old_text)
+
+        # Then check for the assessments template
+        # The replacement string needs to use the octal value for the char '2' to
+        # not confuse python as '\12\2' would obviously not work
+        new_text = re.sub(r'({{[Aa]ssessments\s*\|com\|*=\s*)1(.*?}})',r'\1\062\2',new_text)
+
+        self.commit(old_text,new_text,imagePage,"Delisted")
 
 
 def wikipattern(s):
