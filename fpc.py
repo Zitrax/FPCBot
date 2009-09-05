@@ -53,7 +53,6 @@ class Candidate():
         self._conR         = ConR  # Regexp for negative votes
         self._neuR         = NeuR  # Regexp for neutral  votes
         self._votesCounted = False
-        self._featured     = False
         self._daysOld      = -1
         self._creationTime = None
         self._striked      = None
