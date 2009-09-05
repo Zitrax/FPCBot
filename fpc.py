@@ -72,6 +72,7 @@ class Candidate():
         self._striked      = None
         self._imgCount     = None
         self._fileName     = None
+        self._listPageName = None
 
     def printAllInfo(self):
         """
@@ -485,6 +486,10 @@ class Candidate():
 
         self.commit(old_text,new_text,page,"Added %s" % self.fileName());
 
+    def getImagePage(self):
+        """Get the image page itself"""
+        return wikipedia.Page(wikipedia.getSite(), self.fileName())
+
     def addAssessments(self):
         """
         Adds the the assessments template to a featured
@@ -493,8 +498,7 @@ class Candidate():
         This is ==STEP 3== of the parking procedure
 
         """
-        asspage = self.fileName()
-        page = wikipedia.Page(wikipedia.getSite(), asspage)
+        page = self.getImagePage()
         old_text = page.get(get_redirect=True)
         
         AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
@@ -562,7 +566,7 @@ class Candidate():
         This is ==STEP 6== of the parking procedure
         """
         # Remove from current list
-        candidate_page = wikipedia.Page(wikipedia.getSite(), "Commons:Featured picture candidates/candidate list")
+        candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
         self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s" % self.fileName() )
@@ -593,6 +597,8 @@ class Candidate():
            to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
         
         """
+
+        self.handlePassedCandidate("")
 
         # First look for verified results
         text = self.page.get(get_redirect=True)
@@ -687,6 +693,7 @@ class FPCandidate(Candidate):
 
     def __init__(self, page):
         Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR,VerifiedResultR)
+        self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
         return "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
@@ -718,6 +725,7 @@ class DelistCandidate(Candidate):
 
     def __init__(self, page):
         Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR,VerifiedDelistResultR)
+        self._listPageName = "Commons:Featured picture candidates/removal"
 
     def getResultString(self):
         return "\n\n{{FPC-delist-results-ready-for-review|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}" % \
@@ -729,7 +737,20 @@ class DelistCandidate(Candidate):
     def handlePassedCandidate(self,category):
         # Delistings does not care about the category
         self.moveToLog()
-        raise "Not implemented"
+        self.removeFromFeaturedLists()
+
+    def removeFromFeaturedLists(self):
+        """Remove a candidate from all featured lists"""
+        
+        # We skip checking the page with the 4 newest images
+        # the chance that we are there is very small and evenf
+        # if we are we will soon be rotated away anyway.
+        # So check and remove the candidate from any category pages
+        
+        references = self.getImagePage().getReferences(withTemplateInclusion=False)
+        for ref in references:
+            wikipedia.output("Reference = %s" % ref.title())
+
 
 def wikipattern(s):
     """Return a string that can be matched against different way of writing it on wikimedia projects"""
