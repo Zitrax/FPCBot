@@ -43,7 +43,7 @@ class ThreadCheckCandidate(threading.Thread):
 class Candidate():
     """This is one feature picture candidate"""
 
-    def __init__(self, page, ProR, ConR, NeuR ):
+    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString ):
         """page is a wikipedia.Page object"""
         self.page          = page
         self._pro          = 0
@@ -52,6 +52,11 @@ class Candidate():
         self._proR         = ProR  # Regexp for positive votes
         self._conR         = ConR  # Regexp for negative votes
         self._neuR         = NeuR  # Regexp for neutral  votes
+        self._s_proR       = SProR # Striked out positive regexp
+        self._s_conR       = SConR # Striked out negative regexp
+        self._s_neuR       = SNeuR # Striked out neutral regexp
+        self._proString    = ProString
+        self._conString    = ConString
         self._votesCounted = False
         self._daysOld      = -1
         self._creationTime = None
@@ -64,10 +69,10 @@ class Candidate():
         Console output of all information sought after
         """
         self.countVotes()
-        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d D:%02d Se:%d Im:%02d W:%s (%s)" % 
+        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d Se:%d Im:%02d W:%s (%s)" % 
                          ( self.cutTitle(),
                            self._pro,self._striked[0],self._con,self._striked[1],
-                           self._neu,
+                           self._neu,self._striked[2],
                            self.daysOld(),self.sectionCount(),
                            self.imageCount(),self.isWithdrawn(),
                            self.statusString()),
@@ -106,9 +111,9 @@ class Candidate():
             return
 
         text = self.page.get(get_redirect=True)
-        self._pro = len(re.findall(SupportR,text)) 
-        self._con = len(re.findall(OpposeR,text))
-        self._neu = len(re.findall(NeutralR,text))
+        self._pro = len(re.findall(self._proR,text)) 
+        self._con = len(re.findall(self._conR,text))
+        self._neu = len(re.findall(self._neuR,text))
 
         self.findStrikedOutVotes()
         self._pro -= self._striked[0]
@@ -127,9 +132,9 @@ class Candidate():
             return self._striked
 
         text  = self.page.get(get_redirect=True)
-        s_pro = len(re.findall(StrikedOutSupportR,text))
-        s_con = len(re.findall(StrikedOutOpposeR,text))
-        s_neu = len(re.findall(StrikedOutNeutralR,text))
+        s_pro = len(re.findall(self._s_proR,text))
+        s_con = len(re.findall(self._s_conR,text))
+        s_neu = len(re.findall(self._s_neuR,text))
 
         self._striked = (s_pro,s_con,s_neu)
         return self._striked
@@ -208,15 +213,15 @@ class Candidate():
         self.countVotes()
 
         result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
-            (self._pro,self._con,self._neu,"yes" if self.isFeatured() else "no")
+            (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
             
         new_text = old_text + result
         
         # Add the featured status to the header
-        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isFeatured() else ", not featured"), new_text)
+        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isPassed() else ", not featured"), new_text)
 
         self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s) (FifthDay=%s)" % 
-                    (self._pro,self._con,self._neu,"yes" if self.isFeatured() else "no", "yes" if fifthDay else "no"))
+                    (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no"))
         
         return True
 
@@ -257,7 +262,7 @@ class Candidate():
         elif not self.isDone():
             return "Active"
         else:
-            return "Featured" if self.isFeatured() else "Not featured"
+            return self._proString if self.isPassed() else self._conString
 
     def daysOld(self):
         """Find the number of days this nomination has existed"""
@@ -275,7 +280,7 @@ class Candidate():
         """
         return self.daysOld() >= 9
 
-    def isFeatured(self):
+    def isPassed(self):
         """
         Find if an image can be featured.
         Does not check the age, it needs to be
@@ -373,7 +378,7 @@ class Candidate():
         wn = int(old_res[2])
         self.countVotes()
 
-        if self._pro == ws and self._con == wo and self._neu == wn and was_featured == self.isFeatured():
+        if self._pro == ws and self._con == wo and self._neu == wn and was_featured == self.isPassed():
             status = "OK"
         else:
             status = "FAIL"
@@ -383,7 +388,7 @@ class Candidate():
                                                                                 self._pro,ws,
                                                                                 self._con ,wo,
                                                                                 self._neu,wn,
-                                                                                self.isFeatured(),was_featured,
+                                                                                self.isPassed(),was_featured,
                                                                                 status),toStdout=True)
 
     def cutTitle(self):
@@ -676,8 +681,14 @@ class Candidate():
 class FPCandidate(Candidate):
     """A candidate up for promotion"""
 
-    def __init__(self, page, ProR, ConR, NeuR):
-        Candidate.__init__(self,page,ProR,ConR,NeuR)
+    def __init__(self, page):
+        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured")
+
+class DelistCandidate(Candidate):
+    """A delisting candidate"""
+
+    def __init__(self, page):
+        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","kept")
 
 def wikipattern(s):
     """Return a string that can be matched against different way of writing it on wikimedia projects"""
@@ -689,7 +700,7 @@ def wikipattern(s):
         
     return re.sub('[ _\()]',rep,s)
 
-def findCandidates(page_url):
+def findCandidates(page_url, delist):
     """This finds all candidates on the main FPC page"""
 
     page = wikipedia.Page(wikipedia.getSite(), page_url)
@@ -699,16 +710,25 @@ def findCandidates(page_url):
     for template in templates:
         title = template.title()
         if title.startswith(candPrefix):
-            #wikipedia.output("Adding '%s'" % title, toStdout = True)
-            candidates.append(FPCandidate(template,SupportR,OpposeR,NeutralR))
+            # wikipedia.output("Adding '%s' (delist=%s)" % (title,delist), toStdout = True)
+            if delist:
+                candidates.append(DelistCandidate(template))
+            else:
+                candidates.append(FPCandidate(template))
         else:
             pass
             #wikipedia.output("Skipping '%s'" % title, toStdout = True)
     return candidates
 
-def checkCandidates(check,page):
-    """Calls a function on each candidate found on the specified page"""
-    candidates = findCandidates(page)
+def checkCandidates(check,page,delist):
+    """
+    Calls a function on each candidate found on the specified page
+
+    @param check  A function in Candidate to call on each candidate
+    @param page   A page containing all candidates
+    @param delist Boolean, telling whether this is delistings of fpcs
+    """
+    candidates = findCandidates(page,delist)
     tot = len(candidates)
     i = 1
     for candidate in candidates:
@@ -785,7 +805,7 @@ oppose_templates  = (u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe
                      u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi',u'FPX contested')
 neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'נמנע',u'[Nn]øytral',u'中立',u'Нэўтральна',u'[Tt]arafsız',u'Воздерживаюсь',
                      u'[Hh]lutlaus',u'중립',u'[Nn]eodrach',u'เป็นกลาง','[Vv]n')
-delist_templates  = (u'[Dd]elist') # Should the remove templates be valid here ? There seem to be no internationalized delist versions
+delist_templates  = (u'[Dd]elist',u'sdf') # Should the remove templates be valid here ? There seem to be no internationalized delist versions
 keep_templates    = (u'[Kk]eep',u'[Vv]k',u'[Mm]antener',u'[Gg]arder',u'維持',u'[Bb]ehold',u'[Mm]anter',u'[Bb]ehåll',u'เก็บ',u'保留')
 
 # 
@@ -846,8 +866,9 @@ G_Threads = False
 
 def main(*args):
 
-    fpcTitle = 'Commons:Featured picture candidates/candidate list'
-    testLog = 'Commons:Featured_picture_candidates/Log/January_2009'
+    fpcPage    = 'Commons:Featured picture candidates/candidate list'
+    delistPage = 'Commons:Featured_picture_candidates/removal'
+    testLog    = 'Commons:Featured_picture_candidates/Log/January_2009'
 
     worked = False
     global G_Auto
@@ -881,14 +902,15 @@ def main(*args):
         if arg == '-test':
             checkCandidates(Candidate.compareResultToCount,testLog)
         elif arg == '-close':
-            checkCandidates(Candidate.closePage,fpcTitle);
+            checkCandidates(Candidate.closePage,fpcPage);
         elif arg == '-info':
-            checkCandidates(Candidate.printAllInfo,fpcTitle);
+            checkCandidates(Candidate.printAllInfo,delistPage,True);
+#            checkCandidates(Candidate.printAllInfo,fpcPage);
         elif arg == '-park':
             if G_Threads and G_Auto:
                 wikipedia.output("Auto parking using threads is disabled for now...")
                 sys.exit(0)
-            checkCandidates(Candidate.park,fpcTitle);
+            checkCandidates(Candidate.park,fpcPage);
 
     if not worked:
         wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
