@@ -47,8 +47,10 @@ class Candidate():
     This class just serves as base for the DelistCandidate and FPCandidate classes
     """
 
-    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString ):
+    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString, ReviewedR, CountedR ):
         """page is a wikipedia.Page object"""
+
+        # Later perhaps this can be cleaned up by letting the subclasses keep the variables
         self.page          = page
         self._pro          = 0
         self._con          = 0
@@ -58,9 +60,11 @@ class Candidate():
         self._neuR         = NeuR  # Regexp for neutral  votes
         self._s_proR       = SProR # Striked out positive regexp
         self._s_conR       = SConR # Striked out negative regexp
-        self._s_neuR       = SNeuR # Striked out neutral regexp
+        self._s_neuR       = SNeuR # Striked out neutral  regexp
         self._proString    = ProString
         self._conString    = ConString
+        self._ReviewedR    = ReviewedR
+        self._CountedR     = CountedR
         self._votesCounted = False
         self._daysOld      = -1
         self._creationTime = None
@@ -191,8 +195,8 @@ class Candidate():
         if self.imageCount() > 1:
             wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
             # Remove any existing FPC templates
-            new_text = re.sub(ReviewedTemplateR,'',old_text)
-            new_text = re.sub(CountedTemplateR,'',new_text)
+            new_text = re.sub(self._ReviewedR,'',old_text)
+            new_text = re.sub(self._CountedR,'',new_text)
             not_corrected = new_text == old_text
             new_text = new_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
             self.commit(old_text,new_text,self.page,"Marking as ignored" if not_corrected else "Marking as ignored (needs to be closed according to the manual instructions)")
@@ -206,30 +210,35 @@ class Candidate():
             wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
-        if re.search(CountedTemplateR,old_text):
+        if re.search(self._CountedR,old_text):
             wikipedia.output("\"%s\" needs review, ignoring" % self.cutTitle(),toStdout=True)
             return False            
 
-        if re.search(ReviewedTemplateR,old_text):
+        if re.search(self._ReviewedR,old_text):
             wikipedia.output("\"%s\" already closed and reviewed, ignoring" % self.cutTitle(),toStdout=True)
             return False            
 
         self.countVotes()
 
-        result = "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
-            (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+        result = self.getResultString()
             
         new_text = old_text + result
         
         # Add the featured status to the header
         new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", featured" if self.isPassed() else ", not featured"), new_text)
 
-        self.commit(old_text,new_text,self.page,"Closing for review (%d support, %d oppose, %d neutral, featured=%s) (FifthDay=%s)" % 
-                    (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no"))
+        self.commit(old_text,new_text,self.page,self.getCloseCommitComment() + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")) )
         
         return True
 
+    def getResultString(self):
+        """Must be implemented by the subclasses"""
+        raise "Not implemented"
         
+    def getCloseCommitComment(self):
+        """Must be implemened by the subclasses"""
+        raise "Not implemented"
+
     def creationTime(self):
         """
         Find the time that this candidate was created
@@ -686,13 +695,28 @@ class FPCandidate(Candidate):
     """A candidate up for promotion"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured")
+        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR)
+
+    def getResultString(self):
+        return "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
+            (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+
+    def getCloseCommitComment(self):
+        return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no")
+
 
 class DelistCandidate(Candidate):
     """A delisting candidate"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","kept")
+        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR)
+
+    def getResultString(self):
+        return "\n\n{{FPC-delist-results-ready-for-review|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}" % \
+            (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+
+    def getCloseCommitComment(self):
+        return "Closing for review (%d delist, %d keep, %d neutral, delisted=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
 def wikipattern(s):
     """Return a string that can be matched against different way of writing it on wikimedia projects"""
@@ -828,10 +852,13 @@ PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+o
 
 # Looks for verified results
 VerifiedResultR = re.compile(r'{{\s*FPC-results-reviewed\s*\|\s*support\s*=\s*(\d+)\s*\|\s*oppose\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*featured\s*=\s*(\w+)\s*\|\s*category\s*=\s*([^|]*).*}}',re.MULTILINE)
+VerifiedDelistResultR = re.compile(r'{{\s*FPC-delist-results-reviewed\s*\|\s*delist\s*=\s*(\d+)\s*\|\s*keep\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*delisted\s*=\s*(\w+)\s*}}',re.MULTILINE)
 
 # Matches the entire line including newline so they can be stripped away
-CountedTemplateR = re.compile(r'^.*{{\s*FPC-results-ready-for-review.*}}.*$\n?',re.MULTILINE)
-ReviewedTemplateR = re.compile(r'^.*{{\s*FPC-results-reviewed.*}}.*$\n?',re.MULTILINE)
+CountedTemplateR        = re.compile(r'^.*{{\s*FPC-results-ready-for-review.*}}.*$\n?',re.MULTILINE)
+DelistCountedTemplateR  = re.compile(r'^.*{{\s*FPC-delist-results-ready-for-review.*}}.*$\n?',re.MULTILINE)
+ReviewedTemplateR       = re.compile(r'^.*{{\s*FPC-results-reviewed.*}}.*$\n?',re.MULTILINE)
+DelistReviewedTemplateR = re.compile(r'^.*{{\s*FPC-delist-results-reviewed.*}}.*$\n?',re.MULTILINE)
 
 # Is whitespace allowed at the end ?
 SectionR = re.compile('^={1,4}.+={1,4}\s*$',re.MULTILINE)
