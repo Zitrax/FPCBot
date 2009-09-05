@@ -875,6 +875,8 @@ def main(*args):
     testLog    = 'Commons:Featured_picture_candidates/Log/January_2009'
 
     worked = False
+    delist = False
+    fpc    = False
     global G_Auto
     global G_Dry
     global G_Threads
@@ -889,6 +891,14 @@ def main(*args):
             sys.argv.remove(arg)
         elif arg == '-threads':
             G_Threads = True
+        elif arg == '-delist':
+            delist = True
+        elif arg == '-fpc':
+            fpc = True
+
+    if not delist and not fpc:
+        delist = True
+        fpc = True
 
     # Can not use interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
@@ -897,24 +907,35 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in sys.argv[1:]:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads':
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist':
             wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
             sys.exit(0)            
 
     for arg in wikipedia.handleArgs(*args):
         worked = True
         if arg == '-test':
-            checkCandidates(Candidate.compareResultToCount,testLog,delist=False)
+            if delist:
+                wikipedia.output("-test not supported for delisting candidates")
+            if fpc:
+                checkCandidates(Candidate.compareResultToCount,testLog,delist=False)
         elif arg == '-close':
-            checkCandidates(Candidate.closePage,fpcPage,delist=False);
+            if delist:
+                checkCandidates(Candidate.closePage,delistPage,delist=True);
+            if fpc:
+                checkCandidates(Candidate.closePage,fpcPage,delist=False);
         elif arg == '-info':
-            checkCandidates(Candidate.printAllInfo,delistPage,delist=True);
-#            checkCandidates(Candidate.printAllInfo,fpcPage);
+            if delist:
+                checkCandidates(Candidate.printAllInfo,delistPage,delist=True);
+            if fpc:
+                checkCandidates(Candidate.printAllInfo,fpcPage,delist=False);
         elif arg == '-park':
             if G_Threads and G_Auto:
                 wikipedia.output("Auto parking using threads is disabled for now...")
                 sys.exit(0)
-            checkCandidates(Candidate.park,fpcPage,delist=True);
+            if delist:
+                checkCandidates(Candidate.park,delistPage,delist=True);
+            if fpc:
+                checkCandidates(Candidate.park,fpcPage,delist=False);
 
     if not worked:
         wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
