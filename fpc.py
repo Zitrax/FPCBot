@@ -47,7 +47,7 @@ class Candidate():
     This class just serves as base for the DelistCandidate and FPCandidate classes
     """
 
-    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString, ReviewedR, CountedR ):
+    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString, ReviewedR, CountedR, VerifiedR ):
         """page is a wikipedia.Page object"""
 
         # Later perhaps this can be cleaned up by letting the subclasses keep the variables
@@ -65,6 +65,7 @@ class Candidate():
         self._conString    = ConString
         self._ReviewedR    = ReviewedR
         self._CountedR     = CountedR
+        self._VerifiedR    = VerifiedR
         self._votesCounted = False
         self._daysOld      = -1
         self._creationTime = None
@@ -232,11 +233,11 @@ class Candidate():
         return True
 
     def getResultString(self):
-        """Must be implemented by the subclasses"""
+        """Must be implemented by the subclasses (Text to add to closed pages)"""
         raise "Not implemented"
         
     def getCloseCommitComment(self):
-        """Must be implemened by the subclasses"""
+        """Must be implemened by the subclasses (Commit comment for closed pages)"""
         raise "Not implemented"
 
     def creationTime(self):
@@ -595,7 +596,7 @@ class Candidate():
 
         # First look for verified results
         text = self.page.get(get_redirect=True)
-        results = re.findall(VerifiedResultR,text)
+        results = re.findall(self._VerifiedR,text)
         
         if self.imageCount() > 1:
             wikipedia.output("%s: (ignoring, is multiimage)" % self.cutTitle(),toStdout=True)
@@ -625,21 +626,7 @@ class Candidate():
         # Ok we should now have a candidate with verified results that we can park
         vres = results[0]
         if vres[3] == "yes":
-
-            # Strip away any eventual section
-            # as there is not implemented support for it
-            category = re.sub(r'#.*','',vres[4])
-
-            # Featured picture
-            if not len(category):
-                wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
-                return
-            self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',category).group(1))
-            self.addToCategorizedFeaturedList(category)
-            self.addAssessments()
-            self.addToCurrentMonth()
-            self.notifyNominator()
-            self.moveToLog()
+            self.handlePassedCandidate(vres[4])
         elif  vres[3] == "no":
             # Non Featured picure
             self.moveToLog()
@@ -647,6 +634,10 @@ class Candidate():
             wikipedia.output("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]),toStdout=True)
             return
 
+        
+    def handlePassedCandidate(self,category):
+        """Must be implemented by subclass (do the park procedure for passing candidate)"""
+        raise "Not implemented"""
 
     def commit(self,old_text,new_text,page,comment):
         """
@@ -695,7 +686,7 @@ class FPCandidate(Candidate):
     """A candidate up for promotion"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR)
+        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR,VerifiedResultR)
 
     def getResultString(self):
         return "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
@@ -705,11 +696,28 @@ class FPCandidate(Candidate):
         return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no")
 
 
+    def handlePassedCandidate(self,category):
+        
+        # Strip away any eventual section
+        # as there is not implemented support for it
+        fcategory = re.sub(r'#.*','',category)
+        
+        # Featured picture
+        if not len(fcategory):
+            wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
+            return
+        self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',fcategory).group(1))
+        self.addToCategorizedFeaturedList(fcategory)
+        self.addAssessments()
+        self.addToCurrentMonth()
+        self.notifyNominator()
+        self.moveToLog()
+
 class DelistCandidate(Candidate):
     """A delisting candidate"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR)
+        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR,VerifiedDelistResultR)
 
     def getResultString(self):
         return "\n\n{{FPC-delist-results-ready-for-review|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}" % \
@@ -717,6 +725,11 @@ class DelistCandidate(Candidate):
 
     def getCloseCommitComment(self):
         return "Closing for review (%d delist, %d keep, %d neutral, delisted=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+
+    def handlePassedCandidate(self,category):
+        # Delistings does not care about the category
+        self.moveToLog()
+        raise "Not implemented"
 
 def wikipattern(s):
     """Return a string that can be matched against different way of writing it on wikimedia projects"""
