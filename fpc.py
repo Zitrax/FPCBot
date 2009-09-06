@@ -601,8 +601,6 @@ class Candidate():
         
         """
 
-        self.handlePassedCandidate("")
-
         # First look for verified results
         text = self.page.get(get_redirect=True)
         results = re.findall(self._VerifiedR,text)
@@ -635,7 +633,7 @@ class Candidate():
         # Ok we should now have a candidate with verified results that we can park
         vres = results[0]
         if vres[3] == "yes":
-            self.handlePassedCandidate(vres[4])
+            self.handlePassedCandidate(vres)
         elif  vres[3] == "no":
             # Non Featured picure
             self.moveToLog()
@@ -644,7 +642,7 @@ class Candidate():
             return
 
         
-    def handlePassedCandidate(self,category):
+    def handlePassedCandidate(self,results):
         """Must be implemented by subclass (do the park procedure for passing candidate)"""
         raise "Not implemented"""
 
@@ -706,11 +704,11 @@ class FPCandidate(Candidate):
         return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no")
 
 
-    def handlePassedCandidate(self,category):
+    def handlePassedCandidate(self,results):
         
         # Strip away any eventual section
         # as there is not implemented support for it
-        fcategory = re.sub(r'#.*','',category)
+        fcategory = re.sub(r'#.*','',results[4])
         
         # Featured picture
         if not len(fcategory):
@@ -737,13 +735,13 @@ class DelistCandidate(Candidate):
     def getCloseCommitComment(self):
         return "Closing for review (%d delist, %d keep, %d neutral, delisted=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
-    def handlePassedCandidate(self,category):
+    def handlePassedCandidate(self,results):
         # Delistings does not care about the category
         self.moveToLog()
-        self.removeFromFeaturedLists()
+        self.removeFromFeaturedLists(results)
         self.removeAssessments()
 
-    def removeFromFeaturedLists(self):
+    def removeFromFeaturedLists(self,results):
         """Remove a candidate from all featured lists"""
         
         # We skip checking the page with the 4 newest images
@@ -757,8 +755,8 @@ class DelistCandidate(Candidate):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
                     wikipedia.output("Adding delist note to %s" % ref.title())
                     old_text = ref.get(get_redirect=True)
-                    now = datetime.utcnow()
-                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 Delisted %d-%d-%d (%d-%d)' % (now.year,now.month,now.day,self._con,self._pro), old_text)
+                    now = datetime.datetime.utcnow()
+                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 Delisted %d-%d-%d (%s-%s)\n' % (now.year,now.month,now.day,results[1],results[0]), old_text)
                     self.commit(old_text,new_text,ref,"Delisted %s" % self.fileName() )
                 else:
                     old_text = ref.get(get_redirect=True)
@@ -916,7 +914,7 @@ PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+o
 
 # Looks for verified results
 VerifiedResultR = re.compile(r'{{\s*FPC-results-reviewed\s*\|\s*support\s*=\s*(\d+)\s*\|\s*oppose\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*featured\s*=\s*(\w+)\s*\|\s*category\s*=\s*([^|]*).*}}',re.MULTILINE)
-VerifiedDelistResultR = re.compile(r'{{\s*FPC-delist-results-reviewed\s*\|\s*delist\s*=\s*(\d+)\s*\|\s*keep\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*delisted\s*=\s*(\w+)\s*}}',re.MULTILINE)
+VerifiedDelistResultR = re.compile(r'{{\s*FPC-delist-results-reviewed\s*\|\s*delist\s*=\s*(\d+)\s*\|\s*keep\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*delisted\s*=\s*(\w+).*?}}',re.MULTILINE)
 
 # Matches the entire line including newline so they can be stripped away
 CountedTemplateR        = re.compile(r'^.*{{\s*FPC-results-ready-for-review.*}}.*$\n?',re.MULTILINE)
