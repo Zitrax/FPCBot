@@ -701,8 +701,7 @@ class FPCandidate(Candidate):
             (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
     def getCloseCommitComment(self):
-        return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no", "yes" if fifthDay else "no")
-
+        return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
     def handlePassedCandidate(self,results):
         
