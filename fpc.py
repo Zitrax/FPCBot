@@ -22,6 +22,10 @@ It adds the following commandline arguments:
 
 -threads          Use threads to speed things up, can't be used in interactive mode
 
+-fpc              Handle the featured candidates (if neither -fpc or -delist is used all candidates are handled)
+
+-delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
+
 """
 
 import wikipedia, re, datetime, sys, difflib
@@ -995,7 +999,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in sys.argv[1:]:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist':
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help':
             wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
             sys.exit(0)            
 
