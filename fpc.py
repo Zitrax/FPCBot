@@ -463,7 +463,7 @@ class Candidate():
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
         # all in the chosen category
-        ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % category, re.MULTILINE)
+        ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % wikipattern(category), re.MULTILINE)
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
         self.commit(old_text,new_text,page,"Added %s" % self.fileName() )
 
