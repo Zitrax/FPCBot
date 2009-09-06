@@ -756,7 +756,7 @@ class DelistCandidate(Candidate):
                     wikipedia.output("Adding delist note to %s" % ref.title())
                     old_text = ref.get(get_redirect=True)
                     now = datetime.datetime.utcnow()
-                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 Delisted %d-%d-%d (%s-%s)\n' % (now.year,now.month,now.day,results[1],results[0]), old_text)
+                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 \'\'\'Delisted %d-%d-%d (%s-%s)\'\'\'\n' % (now.year,now.month,now.day,results[1],results[0]), old_text)
                     self.commit(old_text,new_text,ref,"Delisted %s" % self.fileName() )
                 else:
                     old_text = ref.get(get_redirect=True)
