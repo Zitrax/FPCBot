@@ -198,7 +198,7 @@ class Candidate():
             if not oldEnough:
                 return False
 
-            self.moveToLog()
+            self.moveToLog("withdrawn")
             return True
 
         fifthDay = self.rulesOfFifthDay()
@@ -596,7 +596,7 @@ class Candidate():
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
         self.commit(old_text,new_text,talk_page,"FPC promotion of %s" % self.fileName() )
 
-    def moveToLog(self):
+    def moveToLog(self,reason=None):
         """
         Remove this candidate from the current list 
         and add it to the log of the current month
@@ -607,7 +607,7 @@ class Candidate():
         candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
-        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s" % self.fileName() )
+        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName()," (%s)" if reason else "") )
         
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
@@ -617,7 +617,7 @@ class Candidate():
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
         old_log_text = log_page.get(get_redirect=True)
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-        self.commit(old_log_text,new_log_text,log_page,"Adding %s" % self.fileName() )
+        self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName()," (%s)" if reason else "") )
 
     def park(self):
         """
