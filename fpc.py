@@ -72,6 +72,7 @@ class Candidate():
         self._VerifiedR    = VerifiedR
         self._votesCounted = False
         self._daysOld      = -1
+        self._daysSinceLastEdit = -1
         self._creationTime = None
         self._striked      = None
         self._imgCount     = None
@@ -83,11 +84,11 @@ class Candidate():
         Console output of all information sought after
         """
         self.countVotes()
-        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d Se:%d Im:%02d W:%s (%s)" % 
+        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
                          ( self.cutTitle(),
                            self._pro,self._striked[0],self._con,self._striked[1],
                            self._neu,self._striked[2],
-                           self.daysOld(),self.sectionCount(),
+                           self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
                            self.imageCount(),self.isWithdrawn(),
                            self.statusString()),
                          toStdout = True)
@@ -186,6 +187,20 @@ class Candidate():
         Will add the voting results to the page if it is finished.
         If it was, True is returned else False
         """
+
+        if self.isWithdrawn() and self.imageCount() <= 1:
+            # Will close withdrawn nominations if there is more than one 
+            # full day since the last edit
+
+            oldEnough = self.daysSinceLastEdit() > 0
+            wikipedia.output("\"%s\" withdrawn %s" % (self.cutTitle(),"closing" if oldEnough else "but waiting a day"),toStdout=True)
+
+            if not oldEnough:
+                return False
+
+            self.moveToLog()
+            return True
+
         fifthDay = self.rulesOfFifthDay()
 
         if not fifthDay and not self.isDone():
@@ -206,10 +221,6 @@ class Candidate():
             not_corrected = new_text == old_text
             new_text = new_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
             self.commit(old_text,new_text,self.page,"Marking as ignored" if not_corrected else "Marking as ignored (needs to be closed according to the manual instructions)")
-            return False
-
-        if self.isWithdrawn():
-            wikipedia.output("\"%s\" withdrawn, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         if self.isFPX():
@@ -292,6 +303,24 @@ class Candidate():
         delta = datetime.datetime.utcnow() - self.creationTime()
         self._daysOld = delta.days
         return self._daysOld
+
+    def daysSinceLastEdit(self):
+        """
+        Number of whole days since last edit
+
+        If the value can not be found -1 is returned
+        """
+        if self._daysSinceLastEdit != -1:
+            return self._daysSinceLastEdit
+
+        try:
+            lastEdit = datetime.datetime.strptime(self.page.editTime(),"%Y%m%d%H%M%S")
+        except:
+            return -1
+        
+        delta = datetime.datetime.utcnow() - lastEdit
+        self._daysSinceLastEdit = delta.days
+        return self._daysSinceLastEdit
 
     def isDone(self):
         """
@@ -460,6 +489,8 @@ class Candidate():
         page = wikipedia.Page(wikipedia.getSite(), listpage)
         old_text = page.get(get_redirect=True)
         
+        wikipedia.output("Cat: %s" % category)
+
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
         # all in the chosen category
