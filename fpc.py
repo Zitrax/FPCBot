@@ -83,15 +83,18 @@ class Candidate():
         """
         Console output of all information sought after
         """
-        self.countVotes()
-        wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
-                         ( self.cutTitle(),
-                           self._pro,self._striked[0],self._con,self._striked[1],
-                           self._neu,self._striked[2],
-                           self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
-                           self.imageCount(),self.isWithdrawn(),
-                           self.statusString()),
-                         toStdout = True)
+        try:
+            self.countVotes()
+            wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
+                             ( self.cutTitle(),
+                               self._pro,self._striked[0],self._con,self._striked[1],
+                               self._neu,self._striked[2],
+                               self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
+                               self.imageCount(),self.isWithdrawn(),
+                               self.statusString()),
+                             toStdout = True)
+        except wikipedia.NoPage:
+            wikipedia.output("%s: -- No such page -- " % self.cutTitle(), toStdout = True)
 
 
     def nominator(self,link=True):
@@ -187,6 +190,11 @@ class Candidate():
         Will add the voting results to the page if it is finished.
         If it was, True is returned else False
         """
+
+        # First make a check that the page actually exist:
+        if not self.page.exists():
+            wikipedia.output("\"%s\" no such page?!" % self.cutTitle(), toStdout = True)
+            return
 
         if self.isWithdrawn() and self.imageCount() <= 1:
             # Will close withdrawn nominations if there is more than one 
@@ -635,6 +643,11 @@ class Candidate():
            to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
         
         """
+
+        # First make a check that the page actually exist:
+        if not self.page.exists():
+            wikipedia.output("%s: (no such page?!)" % self.cutTitle(), toStdout = True)
+            return
 
         # First look for verified results
         text = self.page.get(get_redirect=True)
