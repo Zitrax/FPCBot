@@ -684,7 +684,7 @@ class Candidate():
             self.handlePassedCandidate(vres)
         elif  vres[3] == "no":
             # Non Featured picure
-            self.moveToLog()
+            self.moveToLog(self._conString)
         else:
             wikipedia.output("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]),toStdout=True)
             return
@@ -766,7 +766,7 @@ class FPCandidate(Candidate):
         self.addAssessments()
         self.addToCurrentMonth()
         self.notifyNominator()
-        self.moveToLog()
+        self.moveToLog(self._proString)
 
 class DelistCandidate(Candidate):
     """A delisting candidate"""
@@ -784,7 +784,7 @@ class DelistCandidate(Candidate):
 
     def handlePassedCandidate(self,results):
         # Delistings does not care about the category
-        self.moveToLog()
+        self.moveToLog(self._proString)
         self.removeFromFeaturedLists(results)
         self.removeAssessments()
 
