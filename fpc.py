@@ -1051,13 +1051,15 @@ def main(*args):
         worked = True
         if arg == '-test':
             if delist:
-                wikipedia.output("-test not supported for delisting candidates")
+                wikipedia.output("-test not supported for delisting candidates", toStdout=True)
             if fpc:
                 checkCandidates(Candidate.compareResultToCount,testLog,delist=False)
         elif arg == '-close':
             if delist:
+                wikipedia.output("Closing delist candidates...", toStdout=True)
                 checkCandidates(Candidate.closePage,delistPage,delist=True);
             if fpc:
+                wikipedia.output("Closing fpc candidates...", toStdout=True)
                 checkCandidates(Candidate.closePage,fpcPage,delist=False);
         elif arg == '-info':
             if delist:
@@ -1069,8 +1071,10 @@ def main(*args):
                 wikipedia.output("Auto parking using threads is disabled for now...")
                 sys.exit(0)
             if delist:
+                wikipedia.output("Parking delist candidates...", toStdout=True)
                 checkCandidates(Candidate.park,delistPage,delist=True);
             if fpc:
+                wikipedia.output("Parking fpc candidates...", toStdout=True)
                 checkCandidates(Candidate.park,fpcPage,delist=False);
 
     if not worked:
