@@ -803,7 +803,7 @@ class DelistCandidate(Candidate):
                     wikipedia.output("Adding delist note to %s" % ref.title())
                     old_text = ref.get(get_redirect=True)
                     now = datetime.datetime.utcnow()
-                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r'\1 \'\'\'Delisted %d-%02d-%02d (%s-%s)\'\'\'\n' % (now.year,now.month,now.day,results[1],results[0]), old_text)
+                    new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r"\1 '''Delisted %d-%02d-%02d (%s-%s)'''\n" % (now.year,now.month,now.day,results[1],results[0]), old_text)
                     self.commit(old_text,new_text,ref,"Delisted %s" % self.fileName() )
                 else:
                     old_text = ref.get(get_redirect=True)
@@ -822,7 +822,7 @@ class DelistCandidate(Candidate):
         # Then check for the assessments template
         # The replacement string needs to use the octal value for the char '2' to
         # not confuse python as '\12\2' would obviously not work
-        new_text = re.sub(r'({{[Aa]ssessments\s*\|com\|*=\s*)1(.*?}})',r'\1\062\2',new_text)
+        new_text = re.sub(r'({{[Aa]ssessments\s*\|.*com\s*=\s*)1(.*?}})',r'\1\062\2',new_text)
 
         self.commit(old_text,new_text,imagePage,"Delisted")
 
