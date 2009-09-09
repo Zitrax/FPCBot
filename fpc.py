@@ -196,17 +196,19 @@ class Candidate():
             wikipedia.output("\"%s\" no such page?!" % self.cutTitle(), toStdout = True)
             return
 
-        if self.isWithdrawn() and self.imageCount() <= 1:
+        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
             # Will close withdrawn nominations if there is more than one 
             # full day since the last edit
 
+            why = "withdrawn" if self.isWithdrawn() else "FPXed"
+
             oldEnough = self.daysSinceLastEdit() > 0
-            wikipedia.output("\"%s\" withdrawn %s" % (self.cutTitle(),"closing" if oldEnough else "but waiting a day"),toStdout=True)
+            wikipedia.output("\"%s\" %s %s" % (self.cutTitle(),why,"closing" if oldEnough else "but waiting a day"),toStdout=True)
 
             if not oldEnough:
                 return False
 
-            self.moveToLog("withdrawn")
+            self.moveToLog(why)
             return True
 
         fifthDay = self.rulesOfFifthDay()
@@ -229,10 +231,6 @@ class Candidate():
             not_corrected = new_text == old_text
             new_text = new_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
             self.commit(old_text,new_text,self.page,"Marking as ignored" if not_corrected else "Marking as ignored (needs to be closed according to the manual instructions)")
-            return False
-
-        if self.isFPX():
-            wikipedia.output("\"%s\" contains FPX, currently ignoring" % self.cutTitle(),toStdout=True)
             return False
 
         if re.search(self._CountedR,old_text):
@@ -611,11 +609,14 @@ class Candidate():
 
         This is ==STEP 6== of the parking procedure
         """
+
+        why = (" (%s)" % reason) if reason else ""
+
         # Remove from current list
         candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
-        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName()," (%s)" if reason else "") )
+        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
         
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
@@ -625,7 +626,7 @@ class Candidate():
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
         old_log_text = log_page.get(get_redirect=True)
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-        self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName()," (%s)" if reason else "") )
+        self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
 
     def park(self):
         """
