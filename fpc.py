@@ -486,16 +486,25 @@ class Candidate():
         This is ==STEP 1== of the parking procedure
 
         @param category The categorization category
-        """
-        # This function first needs to find the main category
-        # then inside the gallery tags remove the last line and
-        # add this candidate to the top
+        """        
+
 
         listpage = 'Commons:Featured pictures, list'
         page = wikipedia.Page(wikipedia.getSite(), listpage)
         old_text = page.get(get_redirect=True)
         
+        # First check if we are already on the page,
+        # in that case skip. Can happen if the process
+        # have been previously interrupted.
+        if re.search(wikipattern(self.fileName()),old_text):
+            wikipedia.output("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            return
+
         wikipedia.output("Cat: %s" % category)
+
+        # This function first needs to find the main category
+        # then inside the gallery tags remove the last line and
+        # add this candidate to the top
 
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
@@ -516,6 +525,13 @@ class Candidate():
         catpage = "Commons:Featured pictures/" + category
         page = wikipedia.Page(wikipedia.getSite(), catpage)
         old_text = page.get(get_redirect=True)
+
+        # First check if we are already on the page,
+        # in that case skip. Can happen if the process
+        # have been previously interrupted.
+        if re.search(wikipattern(self.fileName()),old_text):
+            wikipedia.output("Skipping addToCategorizedFeaturedList for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            return
 
         # A few categories are treated specially, the rest is appended to the last gallery
         if category == "Places/Panoramas":
@@ -552,9 +568,12 @@ class Candidate():
         if params:
             # Make sure to remove any existing com param
             params = re.sub(r"com\s*=\s*\d+\|?",'',params.group(1))
-            params += "|com=1"
+            params += "com=1"
             new_ass = "{{Assessments|%s}}" % params
             new_text = re.sub(AssR,new_ass,old_text)
+            if new_text == old_text:
+                wikipedia.output("No change in addAssessments, '%s' already featured." % self.cleanTitle(), toStdout=True)
+                return
         else:
             # There is no assessments template so just add it
             end = findEndOfTemplate(old_text,"[Ii]nformation")
@@ -572,6 +591,13 @@ class Candidate():
         monthpage = 'Commons:Featured_pictures/chronological/current_month'
         page = wikipedia.Page(wikipedia.getSite(), monthpage)
         old_text = page.get(get_redirect=True)
+
+        # First check if we are already on the page,
+        # in that case skip. Can happen if the process
+        # have been previously interrupted.
+        if re.search(wikipattern(self.fileName()),old_text):
+            wikipedia.output("Skipping addToCurrentMonth for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            return
 
         #Find the number of lines in the gallery
         m = re.search(r"(?ms)<gallery>(.*)</gallery>",old_text)
@@ -599,6 +625,13 @@ class Candidate():
             wikipedia.output("notifyNominator: No such page '%s' but ignoring..." % talk_link, toStdout=True)
             return
 
+        # First check if we are already on the page,
+        # in that case skip. Can happen if the process
+        # have been previously interrupted.
+        if re.search("{{FPpromotion|%s}}" % wikipattern(self.fileName()),old_text):
+            wikipedia.output("Skipping notifyNominator for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            return
+
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
         self.commit(old_text,new_text,talk_page,"FPC promotion of %s" % self.fileName() )
 
@@ -616,7 +649,11 @@ class Candidate():
         candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
-        self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
+
+        if old_cand_text == new_cand_text:
+            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(),toStdout=True)
+        else:
+            self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
         
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
@@ -625,6 +662,11 @@ class Candidate():
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
         old_log_text = log_page.get(get_redirect=True)
+
+        if re.search(wikipattern(self.fileName()),old_log_text):
+            wikipedia.output("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle(),toStdout=True)
+            return
+
         new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
         self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
 
@@ -1042,13 +1084,15 @@ def main(*args):
         wikipedia.output("Warning - '-threads' must be run with '-dry' or '-auto'", toStdout = True)
         sys.exit(0)
 
+    args = wikipedia.handleArgs(*args)
+
     # Abort on unknown arguments
-    for arg in sys.argv[1:]:
+    for arg in args:
         if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help':
             wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
             sys.exit(0)            
 
-    for arg in wikipedia.handleArgs(*args):
+    for arg in args:
         worked = True
         if arg == '-test':
             if delist:
