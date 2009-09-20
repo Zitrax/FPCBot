@@ -628,8 +628,8 @@ class Candidate():
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
-        if re.search("{{FPpromotion|%s}}" % wikipattern(self.fileName()),old_text):
-            wikipedia.output("Skipping notifyNominator for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+        if re.search("{{FPpromotion\|%s}}" % wikipattern(self.fileName()),old_text):
+            wikipedia.output("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link),toStdout=True)
             return
 
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
@@ -644,16 +644,6 @@ class Candidate():
         """
 
         why = (" (%s)" % reason) if reason else ""
-
-        # Remove from current list
-        candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
-        old_cand_text = candidate_page.get(get_redirect=True)
-        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
-
-        if old_cand_text == new_cand_text:
-            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(),toStdout=True)
-        else:
-            self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
         
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
@@ -665,10 +655,19 @@ class Candidate():
 
         if re.search(wikipattern(self.fileName()),old_log_text):
             wikipedia.output("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle(),toStdout=True)
-            return
+        else:
+            new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
+            self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
 
-        new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-        self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
+        # Remove from current list
+        candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
+        old_cand_text = candidate_page.get(get_redirect=True)
+        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
+
+        if old_cand_text == new_cand_text:
+            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(),toStdout=True)
+        else:
+            self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
 
     def park(self):
         """
