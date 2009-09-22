@@ -224,6 +224,10 @@ class Candidate():
             return False            
 
         if self.imageCount() > 1:
+            # Do not add the template until the full period is over
+            if not self.isDone():
+                wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
+                return False
             wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
             # Remove any existing FPC templates
             new_text = re.sub(self._ReviewedR,'',old_text)
