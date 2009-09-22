@@ -571,8 +571,8 @@ class Candidate():
         params = re.search(AssR,old_text)
         if params:
             # Make sure to remove any existing com param
-            params = re.sub(r"com\s*=\s*\d+\|?",'',params.group(1))
-            params += "com=1"
+            params = re.sub(r"\|\s*com\s*=\s*\d+\|?",'',params.group(1))
+            params += "|com=1"
             new_ass = "{{Assessments|%s}}" % params
             new_text = re.sub(AssR,new_ass,old_text)
             if new_text == old_text:
