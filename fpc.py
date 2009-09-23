@@ -376,13 +376,18 @@ class Candidate():
             return self._imgCount
 
         text = self.page.get(get_redirect=True)
-        matches = re.findall(ImagesR,text)
+
+        matches = []
+        for m in re.finditer(ImagesR,text):
+            matches.append(m)
+
         count = len(matches)
 
         if count >= 2:
             # We have several images, check if they are too small to be counted
             for img in matches:
-                s = re.search(ImagesSizeR,img)
+                s = re.search(ImagesSizeR,img.group(0))
+                #print s.group(1)
                 if s and int(s.group(1)) < 150:
                     count -= 1
 
