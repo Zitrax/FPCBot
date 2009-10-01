@@ -835,9 +835,9 @@ class DelistCandidate(Candidate):
 
     def handlePassedCandidate(self,results):
         # Delistings does not care about the category
-        self.moveToLog(self._proString)
         self.removeFromFeaturedLists(results)
         self.removeAssessments()
+        self.moveToLog(self._proString)
 
     def removeFromFeaturedLists(self,results):
         """Remove a candidate from all featured lists"""
