@@ -519,7 +519,7 @@ class Candidate():
         # all in the chosen category
         ListPageR = re.compile(r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)" % wikipattern(category), re.MULTILINE)
         new_text = re.sub(ListPageR,r"\1%s\n\2\3\5" % self.fileName(), old_text)
-        self.commit(old_text,new_text,page,"Added %s" % self.fileName() )
+        self.commit(old_text,new_text,page,"Added [[%s]]" % self.fileName() )
 
     def addToCategorizedFeaturedList(self,category):
         """
@@ -552,7 +552,7 @@ class Candidate():
             # last gallery on the page.
             new_text = re.sub('(?s)</gallery>(?!.*</gallery>)',"%s|%s\n</gallery>" % (self.fileName(),self.cleanTitle()) , old_text, 1)
 
-        self.commit(old_text,new_text,page,"Added %s" % self.fileName());
+        self.commit(old_text,new_text,page,"Added [[%s]]" % self.fileName());
 
     def getImagePage(self):
         """Get the image page itself"""
@@ -616,7 +616,7 @@ class Candidate():
         # TODO: We lack a good way to find the creator, so it is left out at the moment
         new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> uploaded by %s, nominated by %s\n</gallery>" % 
                           (self.fileName(), count, self.cleanTitle(), self.uploader(), self.nominator()) , old_text)
-        self.commit(old_text,new_text,page,"Added %s" % self.fileName() );
+        self.commit(old_text,new_text,page,"Added [[%s]]" % self.fileName() );
         
     def notifyNominator(self):
         """
@@ -641,7 +641,7 @@ class Candidate():
             return
 
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
-        self.commit(old_text,new_text,talk_page,"FPC promotion of %s" % self.fileName() )
+        self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % self.fileName() )
 
     def moveToLog(self,reason=None):
         """
@@ -665,7 +665,7 @@ class Candidate():
             out("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle())
         else:
             new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-            self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
+            self.commit(old_log_text,new_log_text,log_page,"Adding [[%s]]%s" % (self.fileName(),why) )
 
         # Remove from current list
         candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
@@ -675,7 +675,7 @@ class Candidate():
         if old_cand_text == new_cand_text:
             wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
         else:
-            self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
+            self.commit(old_cand_text,new_cand_text,candidate_page,"Removing [[%s]]%s" % (self.fileName(),why) )
 
     def park(self):
         """
@@ -854,11 +854,11 @@ class DelistCandidate(Candidate):
                     old_text = ref.get(get_redirect=True)
                     now = datetime.datetime.utcnow()
                     new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r"\1 '''Delisted %d-%02d-%02d (%s-%s)'''\n" % (now.year,now.month,now.day,results[1],results[0]), old_text)
-                    self.commit(old_text,new_text,ref,"Delisted %s" % self.fileName() )
+                    self.commit(old_text,new_text,ref,"Delisted [[%s]]" % self.fileName() )
                 else:
                     old_text = ref.get(get_redirect=True)
                     new_text = re.sub(r"([[)?([Ff]ile|[Ii]mage):%s.*\n" % wikipattern(self.cleanTitle(keepExtension=True)),'', old_text)
-                    self.commit(old_text,new_text,ref,"Removing %s" % self.fileName() )
+                    self.commit(old_text,new_text,ref,"Removing [[%s]]" % self.fileName() )
 
     def removeAssessments(self):
         """Remove FP status from an image"""
