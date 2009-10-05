@@ -85,16 +85,15 @@ class Candidate():
         """
         try:
             self.countVotes()
-            wikipedia.output("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
+            out("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
                              ( self.cutTitle(),
                                self._pro,self._striked[0],self._con,self._striked[1],
                                self._neu,self._striked[2],
                                self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
                                self.imageCount(),self.isWithdrawn(),
-                               self.statusString()),
-                             toStdout = True)
+                               self.statusString()))
         except wikipedia.NoPage:
-            wikipedia.output("%s: -- No such page -- " % self.cutTitle(), toStdout = True)
+            out("%s: -- No such page -- " % self.cutTitle(), color="lightred")
 
 
     def nominator(self,link=True):
@@ -193,7 +192,7 @@ class Candidate():
 
         # First make a check that the page actually exist:
         if not self.page.exists():
-            wikipedia.output("\"%s\" no such page?!" % self.cutTitle(), toStdout = True)
+            out("\"%s\" no such page?!" % self.cutTitle() )
             return
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
@@ -203,7 +202,7 @@ class Candidate():
             why = "withdrawn" if self.isWithdrawn() else "FPXed"
 
             oldEnough = self.daysSinceLastEdit() > 0
-            wikipedia.output("\"%s\" %s %s" % (self.cutTitle(),why,"closing" if oldEnough else "but waiting a day"),toStdout=True)
+            out("\"%s\" %s %s" % (self.cutTitle(),why,"closing" if oldEnough else "but waiting a day"))
 
             if not oldEnough:
                 return False
@@ -214,21 +213,21 @@ class Candidate():
         fifthDay = self.rulesOfFifthDay()
 
         if not fifthDay and not self.isDone():
-            wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
+            out("\"%s\" is still active, ignoring" % self.cutTitle())
             return False
 
         old_text = self.page.get(get_redirect=True)
 
         if re.search(r'{{\s*FPC-closed-ignored.*}}',old_text):
-            wikipedia.output("\"%s\" is marked as ignored, so ignoring" % self.cutTitle(),toStdout=True)
+            out("\"%s\" is marked as ignored, so ignoring" % self.cutTitle())
             return False            
 
         if self.imageCount() > 1:
             # Do not add the template until the full period is over
             if not self.isDone():
-                wikipedia.output("\"%s\" is still active, ignoring" % self.cutTitle(),toStdout=True)
+                out("\"%s\" is still active, ignoring" % self.cutTitle())
                 return False
-            wikipedia.output("\"%s\" contains multiple images, ignoring" % self.cutTitle(),toStdout=True)
+            out("\"%s\" contains multiple images, ignoring" % self.cutTitle())
             # Remove any existing FPC templates
             new_text = re.sub(self._ReviewedR,'',old_text)
             new_text = re.sub(self._CountedR,'',new_text)
@@ -238,11 +237,11 @@ class Candidate():
             return False
 
         if re.search(self._CountedR,old_text):
-            wikipedia.output("\"%s\" needs review, ignoring" % self.cutTitle(),toStdout=True)
+            out("\"%s\" needs review, ignoring" % self.cutTitle())
             return False            
 
         if re.search(self._ReviewedR,old_text):
-            wikipedia.output("\"%s\" already closed and reviewed, ignoring" % self.cutTitle(),toStdout=True)
+            out("\"%s\" already closed and reviewed, ignoring" % self.cutTitle())
             return False            
 
         self.countVotes()
@@ -278,7 +277,7 @@ class Candidate():
 
         history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
         if not history:
-            wikipedia.output("Could not retrieve history for '%s', returning now()" % self.page.title(),toStdout=True)
+            out("Could not retrieve history for '%s', returning now()" % self.page.title())
             return datetime.datetime.now()
 
         m = re.match(DateR,history[0][1].lower())
@@ -418,19 +417,19 @@ class Candidate():
         res = self.existingResult()
 
         if self.isWithdrawn():
-            wikipedia.output("%s: (ignoring, was withdrawn)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
 
         elif self.isFPX():
-            wikipedia.output("%s: (ignoring, was FPXed)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, was FPXed)" % self.cutTitle())
             return
 
         elif not res:
-            wikipedia.output("%s: (ignoring, has no results)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, has no results)" % self.cutTitle())
             return
 
         elif len(res) > 1:
-            wikipedia.output("%s: (ignoring, has several results)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, has several results)" % self.cutTitle())
             return
 
         # We have one result, so make a vote count and compare
@@ -447,12 +446,12 @@ class Candidate():
             status = "FAIL"
 
         # List info to console
-        wikipedia.output("%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)" % (self.cutTitle(),
+        out("%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)" % (self.cutTitle(),
                                                                                 self._pro,ws,
                                                                                 self._con ,wo,
                                                                                 self._neu,wn,
                                                                                 self.isPassed(),was_featured,
-                                                                                status),toStdout=True)
+                                                                                status))
 
     def cutTitle(self):
         """Returns a fixed with title"""
@@ -506,10 +505,10 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            wikipedia.output("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            out("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle())
             return
 
-        wikipedia.output("Cat: %s" % category)
+        out("Cat: %s" % category)
 
         # This function first needs to find the main category
         # then inside the gallery tags remove the last line and
@@ -539,7 +538,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            wikipedia.output("Skipping addToCategorizedFeaturedList for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            out("Skipping addToCategorizedFeaturedList for '%s', page already listed." % self.cleanTitle())
             return
 
         # A few categories are treated specially, the rest is appended to the last gallery
@@ -581,7 +580,7 @@ class Candidate():
             new_ass = "{{Assessments|%s}}" % params
             new_text = re.sub(AssR,new_ass,old_text)
             if new_text == old_text:
-                wikipedia.output("No change in addAssessments, '%s' already featured." % self.cleanTitle(), toStdout=True)
+                out("No change in addAssessments, '%s' already featured." % self.cleanTitle())
                 return
         else:
             # There is no assessments template so just add it
@@ -605,7 +604,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            wikipedia.output("Skipping addToCurrentMonth for '%s', page already listed." % self.cleanTitle(),toStdout=True)
+            out("Skipping addToCurrentMonth for '%s', page already listed." % self.cleanTitle())
             return
 
         #Find the number of lines in the gallery
@@ -631,14 +630,14 @@ class Candidate():
         try:
             old_text = talk_page.get(get_redirect=True)
         except wikipedia.NoPage:
-            wikipedia.output("notifyNominator: No such page '%s' but ignoring..." % talk_link, toStdout=True)
+            out("notifyNominator: No such page '%s' but ignoring..." % talk_link, color="lightred")
             return
 
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search("{{FPpromotion\|%s}}" % wikipattern(self.fileName()),old_text):
-            wikipedia.output("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link),toStdout=True)
+            out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link))
             return
 
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
@@ -663,7 +662,7 @@ class Candidate():
         old_log_text = log_page.get(get_redirect=True)
 
         if re.search(wikipattern(self.fileName()),old_log_text):
-            wikipedia.output("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle(),toStdout=True)
+            out("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle())
         else:
             new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
             self.commit(old_log_text,new_log_text,log_page,"Adding %s%s" % (self.fileName(),why) )
@@ -674,7 +673,7 @@ class Candidate():
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
 
         if old_cand_text == new_cand_text:
-            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(),toStdout=True)
+            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
         else:
             self.commit(old_cand_text,new_cand_text,candidate_page,"Removing %s%s" % (self.fileName(),why) )
 
@@ -697,7 +696,7 @@ class Candidate():
 
         # First make a check that the page actually exist:
         if not self.page.exists():
-            wikipedia.output("%s: (no such page?!)" % self.cutTitle(), toStdout = True)
+            out("%s: (no such page?!)" % self.cutTitle())
             return
 
         # First look for verified results
@@ -705,28 +704,28 @@ class Candidate():
         results = re.findall(self._VerifiedR,text)
         
         if self.imageCount() > 1:
-            wikipedia.output("%s: (ignoring, is multiimage)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, is multiimage)" % self.cutTitle())
             return
 
         if not results:
-            wikipedia.output("%s: (ignoring, no verified results)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, no verified results)" % self.cutTitle())
             return
 
         if len(results) > 1:
-            wikipedia.output("%s: (ignoring, several verified results ?)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, several verified results ?)" % self.cutTitle())
             return
         
         if self.isWithdrawn():
-            wikipedia.output("%s: (ignoring, was withdrawn)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
 
         if self.isFPX():
-            wikipedia.output("%s: (ignoring, was FPXed)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, was FPXed)" % self.cutTitle())
             return
 
         # Check if the image page exist, if not we ignore this candidate
         if not wikipedia.Page(wikipedia.getSite(), self.fileName()).exists():
-            wikipedia.output("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle(),toStdout=True)
+            out("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle())
             return
 
         # Ok we should now have a candidate with verified results that we can park
@@ -737,7 +736,7 @@ class Candidate():
             # Non Featured picure
             self.moveToLog(self._conString)
         else:
-            wikipedia.output("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]),toStdout=True)
+            out("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]))
             return
 
         
@@ -760,14 +759,14 @@ class Candidate():
         # Show the diff
         for line in difflib.context_diff(old_text.splitlines(1), new_text.splitlines(1)):
             if line.startswith('+ '):
-                wikipedia.output(u"\03{lightgreen}%s\03{default}" % line,newline=False,toStdout=True)
+                out(line,newline=False, color="lightgreen")
             elif line.startswith('- '):
-                wikipedia.output(u"\03{lightred}%s\03{default}" % line,newline=False,toStdout=True)
+                out(line,newline=False, color="lightred")
             elif line.startswith('! '):
-                wikipedia.output(u"\03{lightyellow}%s\03{default}" % line,newline=False,toStdout=True)
+                out(line,newline=False, color="lightyellow")
             else:
-                wikipedia.output(line,newline=False,toStdout=True)
-        wikipedia.output("\n",toStdout=True)
+                out(line,newline=False)
+        out("\n")
 
         if G_Dry:
             choice = 'n'
@@ -782,10 +781,10 @@ class Candidate():
         if choice == 'y':
             page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
         elif choice == 'q':
-            wikipedia.output("Aborting.",toStdout=True)
+            out("Aborting.")
             sys.exit(0)
         else:
-            wikipedia.output("Changes to '%s' ignored" % page.title(), toStdout=True)
+            out("Changes to '%s' ignored" % page.title())
         
 
 class FPCandidate(Candidate):
@@ -810,7 +809,7 @@ class FPCandidate(Candidate):
         
         # Featured picture
         if not len(fcategory):
-            wikipedia.output("%s: (ignoring, category not set)" % self.cutTitle(),toStdout=True)
+            out("%s: (ignoring, category not set)" % self.cutTitle())
             return
         self.addToFeaturedList(re.search(r'(.*?)(?:/|$)',fcategory).group(1))
         self.addToCategorizedFeaturedList(fcategory)
@@ -851,7 +850,7 @@ class DelistCandidate(Candidate):
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
-                    wikipedia.output("Adding delist note to %s" % ref.title())
+                    out("Adding delist note to %s" % ref.title())
                     old_text = ref.get(get_redirect=True)
                     now = datetime.datetime.utcnow()
                     new_text = re.sub(r"(([Ff]ile|[Ii]mage):%s.*)\n" % wikipattern(self.cleanTitle(keepExtension=True)),r"\1 '''Delisted %d-%02d-%02d (%s-%s)'''\n" % (now.year,now.month,now.day,results[1],results[0]), old_text)
@@ -888,6 +887,13 @@ def wikipattern(s):
         
     return re.sub('[ _\()]',rep,s)
 
+def out(text, newline=True, date=False, color=None):
+    """Just output some text to the consoloe or log"""
+    if color:
+        text = "\03{%s}%s\03{default}" % (color, text)
+    dstr = "%s: " % datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if date else ""
+    wikipedia.output("%s%s" % (dstr,text) , toStdout=True, newline=newline)
+
 def findCandidates(page_url, delist):
     """This finds all candidates on the main FPC page"""
 
@@ -898,14 +904,14 @@ def findCandidates(page_url, delist):
     for template in templates:
         title = template.title()
         if title.startswith(candPrefix):
-            # wikipedia.output("Adding '%s' (delist=%s)" % (title,delist), toStdout = True)
+            # out("Adding '%s' (delist=%s)" % (title,delist))
             if delist:
                 candidates.append(DelistCandidate(template))
             else:
                 candidates.append(FPCandidate(template))
         else:
             pass
-            #wikipedia.output("Skipping '%s'" % title, toStdout = True)
+            #out("Skipping '%s'" % title)
     return candidates
 
 def checkCandidates(check,page,delist):
@@ -922,7 +928,7 @@ def checkCandidates(check,page,delist):
     for candidate in candidates:
 
         if not G_Threads:
-            wikipedia.output("(%03d/%03d) " %(i,tot), newline=False, toStdout=True)
+            out("(%03d/%03d) " %(i,tot), newline=False, date=True)
 
         try:
             if G_Threads:
@@ -933,7 +939,9 @@ def checkCandidates(check,page,delist):
             else:
                 check(candidate)
         except wikipedia.NoPage, error:
-            wikipedia.output("No such page '%s'" % error, toStdout = True)
+            out("No such page '%s'" % error, color="lightred")
+        except wikipedia.LockedPage:
+            out("Page is locked '%s'" % candidate.cleanTitle(), color="lightred")
 
         i += 1
 
@@ -1089,7 +1097,7 @@ def main(*args):
 
     # Can not use interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
-        wikipedia.output("Warning - '-threads' must be run with '-dry' or '-auto'", toStdout = True)
+        out("Warning - '-threads' must be run with '-dry' or '-auto'")
         sys.exit(0)
 
     args = wikipedia.handleArgs(*args)
@@ -1097,22 +1105,22 @@ def main(*args):
     # Abort on unknown arguments
     for arg in args:
         if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help':
-            wikipedia.output("Warning - unknown argument '%s' aborting, see -help." % arg, toStdout = True)
+            out("Warning - unknown argument '%s' aborting, see -help." % arg)
             sys.exit(0)            
 
     for arg in args:
         worked = True
         if arg == '-test':
             if delist:
-                wikipedia.output("-test not supported for delisting candidates", toStdout=True)
+                out("-test not supported for delisting candidates")
             if fpc:
                 checkCandidates(Candidate.compareResultToCount,testLog,delist=False)
         elif arg == '-close':
             if delist:
-                wikipedia.output("Closing delist candidates...", toStdout=True)
+                out("Closing delist candidates...", color="lightblue")
                 checkCandidates(Candidate.closePage,delistPage,delist=True);
             if fpc:
-                wikipedia.output("Closing fpc candidates...", toStdout=True)
+                out("Closing fpc candidates...", color="lightblue")
                 checkCandidates(Candidate.closePage,fpcPage,delist=False);
         elif arg == '-info':
             if delist:
@@ -1121,17 +1129,17 @@ def main(*args):
                 checkCandidates(Candidate.printAllInfo,fpcPage,delist=False);
         elif arg == '-park':
             if G_Threads and G_Auto:
-                wikipedia.output("Auto parking using threads is disabled for now...")
+                out("Auto parking using threads is disabled for now...")
                 sys.exit(0)
             if delist:
-                wikipedia.output("Parking delist candidates...", toStdout=True)
+                out("Parking delist candidates...", color="lightblue")
                 checkCandidates(Candidate.park,delistPage,delist=True);
             if fpc:
-                wikipedia.output("Parking fpc candidates...", toStdout=True)
+                out("Parking fpc candidates...", color="lightblue")
                 checkCandidates(Candidate.park,fpcPage,delist=False);
 
     if not worked:
-        wikipedia.output("Warning - you need to specify an argument, see -help.", toStdout = True)
+        out("Warning - you need to specify an argument, see -help.")
             
 
 if __name__ == "__main__":
