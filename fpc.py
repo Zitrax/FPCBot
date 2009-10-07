@@ -34,6 +34,9 @@ import wikipedia, re, datetime, sys, difflib
 # Imports needed for threading
 import threading, time, config
 
+class NotImplementedException(Exception):
+    """Not implemented"""
+
 class ThreadCheckCandidate(threading.Thread):
 
     def __init__(self, candidate, check):
@@ -260,11 +263,11 @@ class Candidate():
 
     def getResultString(self):
         """Must be implemented by the subclasses (Text to add to closed pages)"""
-        raise "Not implemented"
+        raise NotImplementedException()
         
     def getCloseCommitComment(self):
         """Must be implemened by the subclasses (Commit comment for closed pages)"""
-        raise "Not implemented"
+        raise NotImplementedException()
 
     def creationTime(self):
         """
@@ -414,7 +417,6 @@ class Candidate():
         see if they match. This is for testing purposes
         of the bot and to find any incorrect old results.
         """
-        text = self.page.get(get_redirect=True)
         res = self.existingResult()
 
         if self.isWithdrawn():
@@ -743,7 +745,7 @@ class Candidate():
         
     def handlePassedCandidate(self,results):
         """Must be implemented by subclass (do the park procedure for passing candidate)"""
-        raise "Not implemented"""
+        raise NotImplementedException()
 
     def commit(self,old_text,new_text,page,comment):
         """
