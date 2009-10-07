@@ -26,6 +26,7 @@ It adds the following commandline arguments:
 
 -delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
 
+-notime           Avoid displaying timestamps in log output
 """
 
 import wikipedia, re, datetime, sys, difflib
@@ -891,7 +892,7 @@ def out(text, newline=True, date=False, color=None):
     """Just output some text to the consoloe or log"""
     if color:
         text = "\03{%s}%s\03{default}" % (color, text)
-    dstr = "%s: " % datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if date else ""
+    dstr = "%s: " % datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if date and not G_LogNoTime else ""
     wikipedia.output("%s%s" % (dstr,text) , toStdout=True, newline=newline)
 
 def findCandidates(page_url, delist):
@@ -1063,6 +1064,8 @@ G_Auto = False
 G_Dry = False
 # Use threads
 G_Threads = False
+# Avoid timestamps in output
+G_LogNoTime = False
 
 def main(*args):
 
@@ -1076,8 +1079,9 @@ def main(*args):
     global G_Auto
     global G_Dry
     global G_Threads
+    global G_LogNoTime
 
-    # First look for arguments that should be set for all operationss
+    # First look for arguments that should be set for all operations
     for arg in sys.argv[1:]:
         if arg == '-auto':
             G_Auto = True
@@ -1091,6 +1095,8 @@ def main(*args):
             delist = True
         elif arg == '-fpc':
             fpc = True
+        elif arg == '-notime':
+            G_LogNoTime = True
 
     if not delist and not fpc:
         delist = True
@@ -1105,7 +1111,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help':
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime':
             out("Warning - unknown argument '%s' aborting, see -help." % arg)
             sys.exit(0)            
 
