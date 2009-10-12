@@ -997,7 +997,7 @@ DateR = re.compile('(\d\d):(\d\d), (\d{1,2}) ([a-z]+) (\d{4})')
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
 support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
-                     u'падтрымліваю',u'[Aa] favour',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב', 
+                     u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב', 
                      u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek',
                      u'[Aa] favore?',u'[Ss]trong support',u'')
 oppose_templates  = (u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
