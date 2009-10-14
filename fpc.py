@@ -27,6 +27,8 @@ It adds the following commandline arguments:
 -delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
 
 -notime           Avoid displaying timestamps in log output
+
+-match pattern    Only operate on candidates matching this pattern            
 """
 
 import wikipedia, re, datetime, sys, difflib
@@ -926,6 +928,12 @@ def checkCandidates(check,page,delist):
     @param delist Boolean, telling whether this is delistings of fpcs
     """
     candidates = findCandidates(page,delist)
+
+    def containsPattern(candidate):
+        return candidate.cleanTitle().find(G_MatchPattern) != -1
+
+    candidates = filter(containsPattern,candidates)
+
     tot = len(candidates)
     i = 1
     for candidate in candidates:
@@ -1068,6 +1076,8 @@ G_Dry = False
 G_Threads = False
 # Avoid timestamps in output
 G_LogNoTime = False
+# Pattern to match
+G_MatchPattern = ""
 
 def main(*args):
 
@@ -1082,8 +1092,10 @@ def main(*args):
     global G_Dry
     global G_Threads
     global G_LogNoTime
+    global G_MatchPattern
 
     # First look for arguments that should be set for all operations
+    i = 1
     for arg in sys.argv[1:]:
         if arg == '-auto':
             G_Auto = True
@@ -1099,6 +1111,13 @@ def main(*args):
             fpc = True
         elif arg == '-notime':
             G_LogNoTime = True
+        elif arg == '-match':
+            if i+1 < len(sys.argv):
+                G_MatchPattern = sys.argv.pop(i+1)
+            else:
+                out("Warning - '-match' need a pattern, aborting.")
+                sys.exit(0)
+        i += 1
 
     if not delist and not fpc:
         delist = True
@@ -1113,7 +1132,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime':
+        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime' and arg != '-match':
             out("Warning - unknown argument '%s' aborting, see -help." % arg)
             sys.exit(0)            
 
