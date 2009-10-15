@@ -392,9 +392,12 @@ class Candidate():
             # We have several images, check if they are too small to be counted
             for img in matches:
                 s = re.search(ImagesSizeR,img.group(0))
-                #print s.group(1)
                 if s and int(s.group(1)) < 150:
                     count -= 1
+                else:
+                    s = re.search(ImagesThumbR,img.group(0))
+                    if s:
+                        count -= 1
 
         self._imgCount = count
         return count
@@ -1065,6 +1068,8 @@ FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 ImagesR = re.compile('\[\[((?:[Ff]ile|[Ii]mage):[^\|]+).*?\]\]')
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r'\|.*?(\d+)\s*px')
+# Find if there is a thumb parameter specified
+ImagesThumbR = re.compile(r'\|\s*thumb\b')
 # Finds the last image link on a page
 LastImageR = re.compile(r'(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)')
 
