@@ -392,12 +392,13 @@ class Candidate():
             # We have several images, check if they are too small to be counted
             for img in matches:
                 s = re.search(ImagesSizeR,img.group(0))
-                if s and int(s.group(1)) < 150:
-                    count -= 1
-                else:
-                    s = re.search(ImagesThumbR,img.group(0))
-                    if s:
+                if s:
+                    if int(s.group(1)) < 150:
                         count -= 1
+                    else: continue
+
+                if re.search(ImagesThumbR,img.group(0))
+                    count -= 1
 
         self._imgCount = count
         return count
