@@ -1062,7 +1062,8 @@ StrikedOutKeepR    = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join(
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
 WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
-StrikedOutWithdrawnR = re.compile('<s>.*{{\s*[wW]ithdraw\s*(\|.*)?}}.*</s>',re.MULTILINE)
+# The </s> should match both inside and outside the ending }}
+StrikedOutWithdrawnR = re.compile('<s>.*{{\s*[wW]ithdraw\s*(\|.*</s>.*}}|(\|.*)?}}.*</s>)',re.MULTILINE) 
 # Nomination that contain the fpx template
 FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
