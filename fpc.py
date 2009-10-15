@@ -397,7 +397,7 @@ class Candidate():
                         count -= 1
                     else: continue
 
-                if re.search(ImagesThumbR,img.group(0))
+                if re.search(ImagesThumbR,img.group(0)):
                     count -= 1
 
         self._imgCount = count
