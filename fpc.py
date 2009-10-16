@@ -1039,7 +1039,7 @@ VerifiedResultR = re.compile(r"""
                               \s*oppose\s*=\s*(\d+)\s*\|            # Oppose Votes  (2)
                               \s*neutral\s*=\s*(\d+)\s*\|           # Neutral votes (3)
                               \s*featured\s*=\s*(\w+)\s*\|          # Featured, should be yes or no, but is not verified at this point (4)
-                              \|\s*category\s*=\s*([^|]*)           # A category if the image was featured (5)
+                              \s*category\s*=\s*([^|]*)             # A category if the image was featured (5)
                               (?:\|\s*alternative\s*=\s*([^|]*))?   # For candidate with alternatives this specifies the winning image (6)
                               .*}}                                  # END
                               """,re.MULTILINE|re.VERBOSE)
