@@ -932,7 +932,7 @@ def checkCandidates(check,page,delist):
     candidates = findCandidates(page,delist)
 
     def containsPattern(candidate):
-        return candidate.cleanTitle().find(G_MatchPattern) != -1
+        return candidate.cleanTitle().lower().find(G_MatchPattern) != -1
 
     candidates = filter(containsPattern,candidates)
 
