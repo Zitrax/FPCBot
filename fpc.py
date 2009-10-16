@@ -1033,7 +1033,17 @@ PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 PreviousResultR = re.compile('\'\'\'result:\'\'\'\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)',re.MULTILINE)
 
 # Looks for verified results
-VerifiedResultR = re.compile(r'{{\s*FPC-results-reviewed\s*\|\s*support\s*=\s*(\d+)\s*\|\s*oppose\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*featured\s*=\s*(\w+)\s*\|\s*category\s*=\s*([^|]*).*}}',re.MULTILINE)
+VerifiedResultR = re.compile(r"""
+                              {{\s*FPC-results-reviewed\s*\|        # Template start
+                              \s*support\s*=\s*(\d+)\s*\|           # Support votes (1)
+                              \s*oppose\s*=\s*(\d+)\s*\|            # Oppose Votes  (2)
+                              \s*neutral\s*=\s*(\d+)\s*\|           # Neutral votes (3)
+                              \s*featured\s*=\s*(\w+)\s*\|          # Featured, should be yes or no, but is not verified at this point (4)
+                              \|\s*category\s*=\s*([^|]*)           # A category if the image was featured (5)
+                              (?:\|\s*alternative\s*=\s*([^|]*))?   # For candidate with alternatives this specifies the winning image (6)
+                              .*}}                                  # END
+                              """,re.MULTILINE|re.VERBOSE)
+
 VerifiedDelistResultR = re.compile(r'{{\s*FPC-delist-results-reviewed\s*\|\s*delist\s*=\s*(\d+)\s*\|\s*keep\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*delisted\s*=\s*(\w+).*?}}',re.MULTILINE)
 
 # Matches the entire line including newline so they can be stripped away
