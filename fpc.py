@@ -1120,7 +1120,7 @@ def main(*args):
             if i+1 < len(sys.argv):
                 G_MatchPattern = sys.argv.pop(i+1)
             else:
-                out("Warning - '-match' need a pattern, aborting.")
+                out("Warning - '-match' need a pattern, aborting.", color="lightred")
                 sys.exit(0)
         i += 1
 
@@ -1130,7 +1130,7 @@ def main(*args):
 
     # Can not use interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
-        out("Warning - '-threads' must be run with '-dry' or '-auto'")
+        out("Warning - '-threads' must be run with '-dry' or '-auto'", color="lightred")
         sys.exit(0)
 
     args = wikipedia.handleArgs(*args)
@@ -1138,7 +1138,7 @@ def main(*args):
     # Abort on unknown arguments
     for arg in args:
         if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime' and arg != '-match':
-            out("Warning - unknown argument '%s' aborting, see -help." % arg)
+            out("Warning - unknown argument '%s' aborting, see -help." % arg, color="lightred")
             sys.exit(0)            
 
     for arg in args:
@@ -1157,12 +1157,14 @@ def main(*args):
                 checkCandidates(Candidate.closePage,fpcPage,delist=False);
         elif arg == '-info':
             if delist:
+                out("Gathering info about delist candidates...", color="lightblue")
                 checkCandidates(Candidate.printAllInfo,delistPage,delist=True);
             if fpc:
+                out("Gathering info about fpc candidates...", color="lightblue")
                 checkCandidates(Candidate.printAllInfo,fpcPage,delist=False);
         elif arg == '-park':
             if G_Threads and G_Auto:
-                out("Auto parking using threads is disabled for now...")
+                out("Auto parking using threads is disabled for now...", color="lightyellow")
                 sys.exit(0)
             if delist:
                 out("Parking delist candidates...", color="lightblue")
@@ -1172,7 +1174,7 @@ def main(*args):
                 checkCandidates(Candidate.park,fpcPage,delist=False);
 
     if not worked:
-        out("Warning - you need to specify an argument, see -help.")
+        out("Warning - you need to specify an argument, see -help.", color="lightred")
             
 
 if __name__ == "__main__":
