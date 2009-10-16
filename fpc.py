@@ -1115,20 +1115,32 @@ def main(*args):
         if arg == '-auto':
             G_Auto = True
             sys.argv.remove(arg)
+            continue
         elif arg == '-dry':
             G_Dry = True
             sys.argv.remove(arg)
+            continue
         elif arg == '-threads':
             G_Threads = True
+            sys.argv.remove(arg)
+            continue
         elif arg == '-delist':
             delist = True
+            sys.argv.remove(arg)
+            continue
         elif arg == '-fpc':
             fpc = True
+            sys.argv.remove(arg)
+            continue
         elif arg == '-notime':
             G_LogNoTime = True
+            sys.argv.remove(arg)
+            continue
         elif arg == '-match':
             if i+1 < len(sys.argv):
                 G_MatchPattern = sys.argv.pop(i+1)
+                sys.argv.remove(arg)
+                continue
             else:
                 out("Warning - '-match' need a pattern, aborting.", color="lightred")
                 sys.exit(0)
