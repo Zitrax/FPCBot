@@ -517,8 +517,6 @@ class Candidate():
             out("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle())
             return
 
-        out("Cat: %s" % category)
-
         # This function first needs to find the main category
         # then inside the gallery tags remove the last line and
         # add this candidate to the top
