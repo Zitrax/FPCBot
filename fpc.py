@@ -216,7 +216,8 @@ class Candidate():
             self.moveToLog(why)
             return True
 
-        fifthDay = self.rulesOfFifthDay()
+        # We skip rule of the fifth day if we have several alternatives
+        fifthDay = False if self.imageCount()>1 else self.rulesOfFifthDay()
 
         if not fifthDay and not self.isDone():
             out("\"%s\" is still active, ignoring" % self.cutTitle())
@@ -228,20 +229,6 @@ class Candidate():
             out("\"%s\" is marked as ignored, so ignoring" % self.cutTitle())
             return False            
 
-        if self.imageCount() > 1:
-            # Do not add the template until the full period is over
-            if not self.isDone():
-                out("\"%s\" is still active, ignoring" % self.cutTitle())
-                return False
-            out("\"%s\" contains multiple images, ignoring" % self.cutTitle())
-            # Remove any existing FPC templates
-            new_text = re.sub(self._ReviewedR,'',old_text)
-            new_text = re.sub(self._CountedR,'',new_text)
-            not_corrected = new_text == old_text
-            new_text = new_text + "\n\n{{FPC-closed-ignored|multiple images}}\n/~~~~"
-            self.commit(old_text,new_text,self.page,"Marking as ignored" if not_corrected else "Marking as ignored (needs to be closed according to the manual instructions)")
-            return False
-
         if re.search(self._CountedR,old_text):
             out("\"%s\" needs review, ignoring" % self.cutTitle())
             return False            
@@ -250,18 +237,44 @@ class Candidate():
             out("\"%s\" already closed and reviewed, ignoring" % self.cutTitle())
             return False            
 
-        self.countVotes()
+        if self.imageCount() <= 1:
+            self.countVotes()
 
         result = self.getResultString()
             
         new_text = old_text + result
         
         # Add the featured status to the header
-        new_text = re.sub(r'(===.*)(===)',r"\1%s\2" %  (", %s" % self._proString if self.isPassed() else ", %s" % self._conString), new_text)
+        if self.imageCount() <= 1:
+            new_text = self.fixHeader(new_text)
 
         self.commit(old_text,new_text,self.page,self.getCloseCommitComment() + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")) )
         
         return True
+
+    def fixHeader(self,text,value=None):
+        """
+        Will append the fetaured status to the header of the candidate
+        Will return the new text
+        @param value If specified ("yes" or "no" string will be based on it, otherwise isPassed() is used)
+        """
+
+        # Check if they are alredy there
+        if re.match(r'===.*(%s|%s)===' % (self._proString,self._conString),text):
+            return text
+
+        status = ""
+
+        if value:
+            if value == "yes":
+                status = ", %s" % self._proString
+            elif value == "no":
+                status = ", %s" % self._conString
+
+        if len(status) < 1:
+            status = ", %s" % self._proString if self.isPassed() else ", %s" % self._conString
+
+        return re.sub(r'(===.*)(===)',r"\1%s\2" % status, text, 1)
 
     def getResultString(self):
         """Must be implemented by the subclasses (Text to add to closed pages)"""
@@ -467,22 +480,28 @@ class Candidate():
         return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
     def cleanTitle(self,keepExtension=False):
-        """Returns a title string without prefix and extension"""
+        """
+        Returns a title string without prefix and extension
+        Note that this always operates on the original title and that
+        a possible change by the alterative parameter is not considered,
+        but maybe it should be ?
+        """
         noprefix =  re.sub(PrefixR,'',self.page.title())
         if keepExtension:
             return noprefix
         else:
             return re.sub(r'\.\w{1,3}$\s*','',noprefix)
 
-    def fileName(self):
+    def fileName(self,cache=True):
         """
         Return only the filename of this candidate
         This is first based on the title of the page but if that page is not found
         then the first image link in the page is used.
+        @param mainTitle if true disregard any cached filename that might be an alternate version
         """
         # The regexp here also removes any possible crap between the prefix
         # and the actual start of the filename.
-        if self._fileName:
+        if cache and self._fileName:
             return self._fileName
 
         self._fileName = re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
@@ -643,11 +662,11 @@ class Candidate():
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
-        if re.search("{{FPpromotion\|%s}}" % wikipattern(self.fileName()),old_text):
+        if re.search("{{FPpromotion\|%s}}" % wikipattern(self.fileName(cache=False)),old_text):
             out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link))
             return
 
-        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName()
+        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName(cache=False)
         self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % self.fileName() )
 
     def moveToLog(self,reason=None):
@@ -710,10 +729,6 @@ class Candidate():
         text = self.page.get(get_redirect=True)
         results = re.findall(self._VerifiedR,text)
         
-        if self.imageCount() > 1:
-            out("%s: (ignoring, is multiimage)" % self.cutTitle())
-            return
-
         if not results:
             out("%s: (ignoring, no verified results)" % self.cutTitle())
             return
@@ -737,9 +752,15 @@ class Candidate():
 
         # Ok we should now have a candidate with verified results that we can park
         vres = results[0]
+
+        # If the suffix to the title has not been added, add it now
+        new_text = self.fixHeader(text,vres[3]);
+        if new_text != text:
+            self.commit(text,new_text,self.page,"Fixed header" )
+
         if vres[3] == "yes":
             self.handlePassedCandidate(vres)
-        elif  vres[3] == "no":
+        elif vres[3] == "no":
             # Non Featured picure
             self.moveToLog(self._conString)
         else:
@@ -802,11 +823,17 @@ class FPCandidate(Candidate):
         self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
-        return "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
-            (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+        if self.imageCount() > 1:
+            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|category=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
+        else:
+            return "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}" % \
+                (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
     def getCloseCommitComment(self):
-        return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
+        if self.imageCount() > 1:
+            return "Closing for review - contains alternatives, needs manual count"
+        else:
+            return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
     def handlePassedCandidate(self,results):
         
@@ -814,6 +841,17 @@ class FPCandidate(Candidate):
         # as there is not implemented support for it
         fcategory = re.sub(r'#.*','',results[4])
         
+        # Check if we have an alternative for a multi image
+        if self.imageCount() > 1:
+            if len(results)>5 and len(results[5]):
+                if not wikipedia.Page(wikipedia.getSite(), results[5]).exists():
+                    out("%s: (ignoring, specified alternative not found)" % results[5])
+                else:
+                    self._fileName = results[5]
+            else:
+                out("%s: (ignoring, alternative not set)" % self.cutTitle())
+                return
+
         # Featured picture
         if not len(fcategory):
             out("%s: (ignoring, category not set)" % self.cutTitle())
@@ -849,9 +887,9 @@ class DelistCandidate(Candidate):
         """Remove a candidate from all featured lists"""
         
         # We skip checking the page with the 4 newest images
-        # the chance that we are there is very small and evenf
+        # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
-        # So check and remove the candidate from any category pages
+        # So just check and remove the candidate from any category pages
         
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
@@ -932,7 +970,7 @@ def checkCandidates(check,page,delist):
     candidates = findCandidates(page,delist)
 
     def containsPattern(candidate):
-        return candidate.cleanTitle().lower().find(G_MatchPattern) != -1
+        return candidate.cleanTitle().lower().find(G_MatchPattern.lower()) != -1
 
     candidates = filter(containsPattern,candidates)
 
