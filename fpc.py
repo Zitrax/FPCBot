@@ -57,7 +57,7 @@ class Candidate():
     This class just serves as base for the DelistCandidate and FPCandidate classes
     """
 
-    def __init__(self, page, ProR, ConR, NeuR, SProR, SConR, SNeuR, ProString, ConString, ReviewedR, CountedR, VerifiedR ):
+    def __init__(self, page, ProR, ConR, NeuR, ProString, ConString, ReviewedR, CountedR, VerifiedR ):
         """page is a wikipedia.Page object"""
 
         # Later perhaps this can be cleaned up by letting the subclasses keep the variables
@@ -68,9 +68,6 @@ class Candidate():
         self._proR         = ProR  # Regexp for positive votes
         self._conR         = ConR  # Regexp for negative votes
         self._neuR         = NeuR  # Regexp for neutral  votes
-        self._s_proR       = SProR # Striked out positive regexp
-        self._s_conR       = SConR # Striked out negative regexp
-        self._s_neuR       = SNeuR # Striked out neutral  regexp
         self._proString    = ProString
         self._conString    = ConString
         self._ReviewedR    = ReviewedR
@@ -80,7 +77,6 @@ class Candidate():
         self._daysOld      = -1
         self._daysSinceLastEdit = -1
         self._creationTime = None
-        self._striked      = None
         self._imgCount     = None
         self._fileName     = None
         self._listPageName = None
@@ -91,10 +87,9 @@ class Candidate():
         """
         try:
             self.countVotes()
-            out("%s: S:%02d(-%02d) O:%02d(-%02d) N:%02d(-%02d) D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
+            out("%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
                              ( self.cutTitle(),
-                               self._pro,self._striked[0],self._con,self._striked[1],
-                               self._neu,self._striked[2],
+                               self._pro,self._con,self._neu,
                                self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
                                self.imageCount(),self.isWithdrawn(),
                                self.statusString()))
@@ -134,40 +129,19 @@ class Candidate():
             return
 
         text = self.page.get(get_redirect=True)
+        text = filter_content(text)
+
         self._pro = len(re.findall(self._proR,text)) 
         self._con = len(re.findall(self._conR,text))
         self._neu = len(re.findall(self._neuR,text))
 
-        self.findStrikedOutVotes()
-        self._pro -= self._striked[0]
-        self._con -= self._striked[1]
-        self._neu -= self._striked[2]
-
-        self._votesCounted = True
-
-    def findStrikedOutVotes(self):
-        """
-        We should not count striked out votes so 
-        find them and reduce the counts.
-        """
-        
-        if self._striked:
-            return self._striked
-
-        text  = self.page.get(get_redirect=True)
-        s_pro = len(re.findall(self._s_proR,text))
-        s_con = len(re.findall(self._s_conR,text))
-        s_neu = len(re.findall(self._s_neuR,text))
-
-        self._striked = (s_pro,s_con,s_neu)
-        return self._striked
-        
+        self._votesCounted = True        
 
     def isWithdrawn(self):
         """Withdrawn nominations should not be counted"""
         text = self.page.get(get_redirect=True)
+        text = filter_content(text)
         withdrawn  = len(re.findall(WithdrawnR,text))
-        withdrawn -= len(re.findall(StrikedOutWithdrawnR,text))
         return withdrawn>0
 
     def isFPX(self):
@@ -819,7 +793,7 @@ class FPCandidate(Candidate):
     """A candidate up for promotion"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,StrikedOutSupportR,StrikedOutOpposeR,StrikedOutNeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR,VerifiedResultR)
+        Candidate.__init__(self,page,SupportR,OpposeR,NeutralR,"featured","not featured",ReviewedTemplateR,CountedTemplateR,VerifiedResultR)
         self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
@@ -867,7 +841,7 @@ class DelistCandidate(Candidate):
     """A delisting candidate"""
 
     def __init__(self, page):
-        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,StrikedOutDelistR,StrikedOutKeepR,StrikedOutNeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR,VerifiedDelistResultR)
+        Candidate.__init__(self,page,DelistR,KeepR,NeutralR,"delisted","not delisted",DelistReviewedTemplateR,DelistCountedTemplateR,VerifiedDelistResultR)
         self._listPageName = "Commons:Featured picture candidates/removal"
 
     def getResultString(self):
@@ -996,6 +970,27 @@ def checkCandidates(check,page,delist):
 
         i += 1
 
+def filter_content(text):
+    """
+    Will filter away content that should not be parsed
+
+    Currently this includes:
+    * The <s> tag for striking out votes
+    * The <nowiki> tag which is just for displaying syntax
+    * Image notes
+    * Html comments
+
+    """
+    text = strip_tag(text,"s")
+    text = strip_tag(text,"nowiki")
+    text = re.sub(r'(?s){{\s*[Ii]mageNote\s*\|.*?}}.*{{\s*[iI]mageNoteEnd.*?}}','',text)
+    text = re.sub(r'(?s)<!--.*?-->','',text)
+    return text
+
+def strip_tag(text,tag):
+    """Will simply take a tag and remove a specified tag"""
+    return re.sub(r'(?s)<%s>.*</%s>' % (tag,tag),'',text)
+
 def findEndOfTemplate(text,template):
     """
     As regexps can't properly deal with nested parantheses this
@@ -1098,18 +1093,10 @@ OpposeR  = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join( oppose_templates),re
 NeutralR = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(neutral_templates),re.MULTILINE)
 DelistR  = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join( delist_templates),re.MULTILINE)
 KeepR    = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(   keep_templates),re.MULTILINE)
-# Striked out votes 
-StrikedOutSupportR = re.compile("<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>" % "|".join(support_templates),re.MULTILINE)
-StrikedOutOpposeR  = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join( oppose_templates),re.MULTILINE)
-StrikedOutNeutralR = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join(neutral_templates),re.MULTILINE)
-StrikedOutDelistR  = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join( delist_templates),re.MULTILINE)
-StrikedOutKeepR    = re.compile('<s>.*{{\s*(?:%s)(\|.*)?\s*}}.*</s>' % "|".join(   keep_templates),re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
 WithdrawnR = re.compile('{{\s*[wW]ithdraw\s*(\|.*)?}}',re.MULTILINE)
-# The </s> should match both inside and outside the ending }}
-StrikedOutWithdrawnR = re.compile('<s>.*{{\s*[wW]ithdraw\s*(\|.*</s>.*}}|(\|.*)?}}.*</s>)',re.MULTILINE) 
 # Nomination that contain the fpx template
 FpxR = re.compile('{{\s*FPX(\|.*)?}}',re.MULTILINE)
 # Counts the number of displayed images
