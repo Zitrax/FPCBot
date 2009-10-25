@@ -989,7 +989,7 @@ def filter_content(text):
 
 def strip_tag(text,tag):
     """Will simply take a tag and remove a specified tag"""
-    return re.sub(r'(?s)<%s>.*</%s>' % (tag,tag),'',text)
+    return re.sub(r'(?s)<%s>.*?</%s>' % (tag,tag),'',text)
 
 def findEndOfTemplate(text,template):
     """
