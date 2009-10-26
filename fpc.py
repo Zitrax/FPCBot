@@ -471,7 +471,7 @@ class Candidate():
         Return only the filename of this candidate
         This is first based on the title of the page but if that page is not found
         then the first image link in the page is used.
-        @param mainTitle if true disregard any cached filename that might be an alternate version
+        @param cache if true disregard any cached filename that might be an alternate version
         """
         # The regexp here also removes any possible crap between the prefix
         # and the actual start of the filename.
@@ -633,15 +633,23 @@ class Candidate():
             out("notifyNominator: No such page '%s' but ignoring..." % talk_link, color="lightred")
             return
 
+        fn_or = self.fileName(cache=False) # Original filename
+        fn_ca = self.fileName(cache=True)  # Cached filename (can be alternate)
+
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
-        if re.search("{{FPpromotion\|%s}}" % wikipattern(self.fileName(cache=False)),old_text):
+        if re.search("{{FPpromotion\|%s}}" % wikipattern(fn_or),old_text):
             out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link))
             return
 
-        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s}} /~~~~" % self.fileName(cache=False)
-        self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % self.fileName() )
+        # We add the subpage parameter if the original filename
+        # differs from the cached filename. The cached filename have
+        # been set to the alternate image if there is one.
+        subpage = "|subpage=%s" % fn_or if fn_or != fn_ca else ""
+
+        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (fn_ca,subpage)
+        self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_ca )
 
     def moveToLog(self,reason=None):
         """
