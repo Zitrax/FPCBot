@@ -1,0 +1,15 @@
+
+This file will just contain some short notes about things to fix or
+features that could be implemented.
+
+== Count votes per person ==
+
+* Testcase: - Run on old log and make sure all detected votes can be
+assigned to one single author - Look in old logs for duplicate votes
+  
+* Implementation: - Look for the next signature following a vote. This
+can also be used to raise a warning about unsigned votes.  - Should
+also look whether a vote comes from a logged in account
+
+== Fix notification template for candidates with multi-candidates ==
+
