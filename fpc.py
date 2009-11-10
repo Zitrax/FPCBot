@@ -228,7 +228,7 @@ class Candidate():
 
     def fixHeader(self,text,value=None):
         """
-        Will append the fetaured status to the header of the candidate
+        Will append the featured status to the header of the candidate
         Will return the new text
         @param value If specified ("yes" or "no" string will be based on it, otherwise isPassed() is used)
         """
@@ -378,14 +378,13 @@ class Candidate():
         if count >= 2:
             # We have several images, check if they are too small to be counted
             for img in matches:
-                s = re.search(ImagesSizeR,img.group(0))
-                if s:
-                    if int(s.group(1)) < 150:
-                        count -= 1
-                    else: continue
 
                 if re.search(ImagesThumbR,img.group(0)):
                     count -= 1
+                else:
+                    s = re.search(ImagesSizeR,img.group(0))
+                    if s and (int(s.group(1)) <= 150):
+                        count -= 1
 
         self._imgCount = count
         return count
