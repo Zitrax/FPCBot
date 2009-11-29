@@ -680,7 +680,7 @@ class Candidate():
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
 
         if old_cand_text == new_cand_text:
-            wikipattern.output("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
+            out("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
         else:
             self.commit(old_cand_text,new_cand_text,candidate_page,"Removing [[%s]]%s" % (self.fileName(),why) )
 
