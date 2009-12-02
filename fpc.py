@@ -677,7 +677,7 @@ class Candidate():
         # Remove from current list
         candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
-        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n" % wikipattern(self.page.title()),'', old_cand_text)
+        new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()),'', old_cand_text)
 
         if old_cand_text == new_cand_text:
             out("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
