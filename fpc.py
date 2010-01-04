@@ -675,7 +675,12 @@ class Candidate():
         current_month = Month2[today.month]
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
         log_page = wikipedia.Page(wikipedia.getSite(), log_link)
-        old_log_text = log_page.get(get_redirect=True)
+
+        # If the page does not exist we just create it ( put does that automatically )
+        try:
+            old_log_text = log_page.get(get_redirect=True)
+        except wikipedia.NoPage:
+            old_log_text = ""
 
         if re.search(wikipattern(self.fileName()),old_log_text):
             out("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle())
