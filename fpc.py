@@ -579,13 +579,22 @@ class Candidate():
         
         AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
 
+        fn_or = self.fileName(cache=False) # Original filename
+        fn_ca = self.fileName(cache=True)  # Cached filename (can be alternate)
+        # We add the subpage parameter if the original filename
+        # differs from the cached filename. The cached filename have
+        # been set to the alternate image if there is one.
+        subpage = "|subpage=%s" % fn_or if fn_or != fn_ca else ""
+
         # First check if there already is an assessments template on the page
         params = re.search(AssR,old_text)
         if params:
-            # Make sure to remove any existing com param
-            params = re.sub(r"\|\s*com\s*=\s*\d+\|?",'',params.group(1))
+            # Make sure to remove any existing com or subpage params
+            params = re.sub(r"\|\s*com\s*=\s*\d+",'',params.group(1))
+            params = re.sub(r" \|\s*subpage\s*=\s*[^{}|]+",'',params)
             params += "|com=1"
-            new_ass = "{{Assessments|%s}}" % params
+            params += subpage
+            new_ass = "{{Assessments%s}}" % params
             new_text = re.sub(AssR,new_ass,old_text)
             if new_text == old_text:
                 out("No change in addAssessments, '%s' already featured." % self.cleanTitle())
@@ -593,7 +602,7 @@ class Candidate():
         else:
             # There is no assessments template so just add it
             end = findEndOfTemplate(old_text,"[Ii]nformation")
-            new_text = old_text[:end] + "\n{{Assessments|com=1}}\n" + old_text[end:]
+            new_text = old_text[:end] + "\n{{Assessments|com=1%s}}\n" % subpage + old_text[end:]
             #new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
 
         self.commit(old_text,new_text,page,"FPC promotion")
