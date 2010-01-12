@@ -458,14 +458,14 @@ class Candidate():
                                                                                 status))
 
     def cutTitle(self):
-        """Returns a fixed with title"""
+        """Returns a fixed width title"""
         return re.sub(PrefixR,'',self.page.title())[0:50].ljust(50)
 
     def cleanTitle(self,keepExtension=False):
         """
         Returns a title string without prefix and extension
         Note that this always operates on the original title and that
-        a possible change by the alterative parameter is not considered,
+        a possible change by the alternative parameter is not considered,
         but maybe it should be ?
         """
         noprefix =  re.sub(PrefixR,'',self.page.title())
