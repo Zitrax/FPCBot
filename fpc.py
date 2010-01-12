@@ -515,7 +515,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            out("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle())
+            out("Skipping addToFeaturedList for '%s', page already listed." % self.cleanTitle(), color="lightred")
             return
 
         # This function first needs to find the main category
@@ -546,7 +546,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            out("Skipping addToCategorizedFeaturedList for '%s', page already listed." % self.cleanTitle())
+            out("Skipping addToCategorizedFeaturedList for '%s', page already listed." % self.cleanTitle(), color="lightred")
             return
 
         # A few categories are treated specially, the rest is appended to the last gallery
@@ -612,7 +612,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search(wikipattern(self.fileName()),old_text):
-            out("Skipping addToCurrentMonth for '%s', page already listed." % self.cleanTitle())
+            out("Skipping addToCurrentMonth for '%s', page already listed." % self.cleanTitle(), color="lightred")
             return
 
         #Find the number of lines in the gallery
@@ -648,7 +648,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search("{{FPpromotion\|%s}}" % wikipattern(fn_or),old_text):
-            out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link))
+            out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link), color="lightred")
             return
 
         # We add the subpage parameter if the original filename
@@ -683,7 +683,7 @@ class Candidate():
             old_log_text = ""
 
         if re.search(wikipattern(self.fileName()),old_log_text):
-            out("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle())
+            out("Skipping add in moveToLog for '%s', page already there" % self.cleanTitle(), color="lightred")
         else:
             new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
             self.commit(old_log_text,new_log_text,log_page,"Adding [[%s]]%s" % (self.fileName(),why) )
@@ -694,7 +694,7 @@ class Candidate():
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()),'', old_cand_text)
 
         if old_cand_text == new_cand_text:
-            out("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle())
+            out("Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(), color="lightred")
         else:
             self.commit(old_cand_text,new_cand_text,candidate_page,"Removing [[%s]]%s" % (self.fileName(),why) )
 
