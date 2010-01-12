@@ -1066,7 +1066,7 @@ def findEndOfTemplate(text,template):
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
 Month2  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7:'July', 8:'August', 9:'September', 10:'October', 11:'November', 12:'December' }
 
-DateR1 = re.compile('(?P<Hour>\d\d):(?P<Minute>\d\d), (P<Day>\d{1,2}) (?P<Month>[a-z]+) (?P<Year>\d{4})')
+DateR1 = re.compile('(?P<Hour>\d\d):(?P<Minute>\d\d), (?P<Day>\d{1,2}) (?P<Month>[a-z]+) (?P<Year>\d{4})')
 DateR2 = re.compile('(?P<Year>\d{4})-(?P<Month>\d\d)-(?P<Day>\d\d)t(?P<Hour>\d\d):(?P<Minute>\d\d):(?P<Second>\d\d)z')
 
 
