@@ -591,9 +591,11 @@ class Candidate():
         if params:
             # Make sure to remove any existing com or subpage params
             params = re.sub(r"\|\s*com\s*=\s*\d+",'',params.group(1))
-            params = re.sub(r" \|\s*subpage\s*=\s*[^{}|]+",'',params)
+            params = re.sub(r"\|\s*subpage\s*=\s*[^{}|]+",'',params)
             params += "|com=1"
             params += subpage
+            if params.find("|") != 0:
+                params = "|" + params
             new_ass = "{{Assessments%s}}" % params
             new_text = re.sub(AssR,new_ass,old_text)
             if new_text == old_text:
