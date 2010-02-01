@@ -668,7 +668,11 @@ class Candidate():
         subpage = "|subpage=%s" % fn_or if fn_or != fn_ca else ""
 
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (fn_ca,subpage)
-        self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_ca )
+
+        try:
+            self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_ca )
+        except wikipedia.LockedPage, error:
+            out("Page is locked '%s', but ignoring since it's just the user notification." % error, color="lightyellow")
 
     def moveToLog(self,reason=None):
         """
@@ -997,8 +1001,8 @@ def checkCandidates(check,page,delist):
                 check(candidate)
         except wikipedia.NoPage, error:
             out("No such page '%s'" % error, color="lightred")
-        except wikipedia.LockedPage:
-            out("Page is locked '%s'" % candidate.cleanTitle(), color="lightred")
+        except wikipedia.LockedPage, error:
+            out("Page is locked '%s'" % error, color="lightred")
 
         i += 1
 
