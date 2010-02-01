@@ -9,25 +9,15 @@ Programmed by Daniel78 at Commons.
 It adds the following commandline arguments:
 
 -test             Perform a testrun against an old log
-
 -close            Close and add result to the nominations
-
 -info             Just print the vote count info about the current nominations
-
 -park             Park closed and verified candidates
-
 -auto             Do not ask before commiting edits to articles
-
 -dry              Do not submit any edits, just print them
-
 -threads          Use threads to speed things up, can't be used in interactive mode
-
 -fpc              Handle the featured candidates (if neither -fpc or -delist is used all candidates are handled)
-
 -delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
-
 -notime           Avoid displaying timestamps in log output
-
 -match pattern    Only operate on candidates matching this pattern            
 """
 
