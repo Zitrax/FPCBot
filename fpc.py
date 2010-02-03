@@ -315,7 +315,7 @@ class Candidate():
             return self._daysSinceLastEdit
 
         try:
-            lastEdit = datetime.datetime.strptime(self.page.editTime(),"%Y%m%d%H%M%S")
+            lastEdit = datetime.datetime.strptime(str(self.page.editTime()),"%Y%m%d%H%M%S")
         except:
             return -1
         
