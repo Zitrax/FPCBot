@@ -1071,7 +1071,7 @@ DateR2 = re.compile('(?P<Year>\d{4})-(?P<Month>\d\d)-(?P<Day>\d\d)t(?P<Hour>\d\d
 support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
                      u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב', 
                      u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek',
-                     u'[Aa] favore?',u'[Ss]trong support')
+                     u'[Aa] favore?',u'[Ss]trong support',u'[Ss]Strong')
 oppose_templates  = (u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
                      u'[Cс]упраць',u'[Ee]n contra',u'[Cc]ontre',u'[Ii] gcoinne',u'[Dd]íliostaigh',u'[Dd]iscordo',u'נגד',u'á móti',u'反対',u'除外',u'반대',
                      u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi',u'FPX contested',u'[Cc]ontra',u'[Cc]ontrario',u'[Oo]versaturated')
