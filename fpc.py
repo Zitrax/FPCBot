@@ -342,7 +342,7 @@ class Candidate():
         if not self._votesCounted:
             self.countVotes()
 
-        return self._pro >= 5 and \
+        return self._pro >= 7 and \
             (self._pro >= 2*self._con)
     
 
