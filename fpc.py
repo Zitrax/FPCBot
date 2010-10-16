@@ -18,7 +18,7 @@ It adds the following commandline arguments:
 -fpc              Handle the featured candidates (if neither -fpc or -delist is used all candidates are handled)
 -delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
 -notime           Avoid displaying timestamps in log output
--match pattern    Only operate on candidates matching this pattern            
+-match pattern    Only operate on candidates matching this pattern
 """
 
 import wikipedia, re, datetime, sys, difflib
@@ -77,7 +77,7 @@ class Candidate():
         """
         try:
             self.countVotes()
-            out("%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" % 
+            out("%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%d Im:%02d W:%s (%s)" %
                              ( self.cutTitle(),
                                self._pro,self._con,self._neu,
                                self.daysOld(),self.daysSinceLastEdit(),self.sectionCount(),
@@ -103,7 +103,7 @@ class Candidate():
         history = page.getVersionHistory(reverseOrder=True,revCount=1)
         if not history:
             return "Unknown"
-        return "[[User:%s|%s]]" % (history[0][2],history[0][2])        
+        return "[[User:%s|%s]]" % (history[0][2],history[0][2])
 
     def creator(self):
         """Return the link to the user that created the image"""
@@ -121,11 +121,11 @@ class Candidate():
         text = self.page.get(get_redirect=True)
         text = filter_content(text)
 
-        self._pro = len(re.findall(self._proR,text)) 
+        self._pro = len(re.findall(self._proR,text))
         self._con = len(re.findall(self._conR,text))
         self._neu = len(re.findall(self._neuR,text))
 
-        self._votesCounted = True        
+        self._votesCounted = True
 
     def isWithdrawn(self):
         """Withdrawn nominations should not be counted"""
@@ -166,7 +166,7 @@ class Candidate():
             return
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
-            # Will close withdrawn nominations if there is more than one 
+            # Will close withdrawn nominations if there is more than one
             # full day since the last edit
 
             why = "withdrawn" if self.isWithdrawn() else "FPXed"
@@ -191,29 +191,29 @@ class Candidate():
 
         if re.search(r'{{\s*FPC-closed-ignored.*}}',old_text):
             out("\"%s\" is marked as ignored, so ignoring" % self.cutTitle())
-            return False            
+            return False
 
         if re.search(self._CountedR,old_text):
             out("\"%s\" needs review, ignoring" % self.cutTitle())
-            return False            
+            return False
 
         if re.search(self._ReviewedR,old_text):
             out("\"%s\" already closed and reviewed, ignoring" % self.cutTitle())
-            return False            
+            return False
 
         if self.imageCount() <= 1:
             self.countVotes()
 
         result = self.getResultString()
-            
+
         new_text = old_text + result
-        
+
         # Add the featured status to the header
         if self.imageCount() <= 1:
             new_text = self.fixHeader(new_text)
 
         self.commit(old_text,new_text,self.page,self.getCloseCommitComment() + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")) )
-        
+
         return True
 
     def fixHeader(self,text,value=None):
@@ -243,7 +243,7 @@ class Candidate():
     def getResultString(self):
         """Must be implemented by the subclasses (Text to add to closed pages)"""
         raise NotImplementedException()
-        
+
     def getCloseCommitComment(self):
         """Must be implemened by the subclasses (Commit comment for closed pages)"""
         raise NotImplementedException()
@@ -251,7 +251,7 @@ class Candidate():
     def creationTime(self):
         """
         Find the time that this candidate was created
-        If we can't find the creation date, for example due to 
+        If we can't find the creation date, for example due to
         the page not existing we return now() such that we
         will ignore this nomination as too young.
         """
@@ -272,7 +272,7 @@ class Candidate():
             month = int(m.group('Month'))
         else:
             month = Month[m.group('Month')]
-        
+
         self._creationTime = datetime.datetime(int(m.group('Year')),
                                                month,
                                                int(m.group('Day')),
@@ -282,7 +282,7 @@ class Candidate():
         #print "C:" + self._creationTime.isoformat()
         #print "N:" + datetime.datetime.utcnow().isoformat()
         return self._creationTime
-        
+
 
     def statusString(self):
         """Short status string about the candidate"""
@@ -318,7 +318,7 @@ class Candidate():
             lastEdit = datetime.datetime.strptime(str(self.page.editTime()),"%Y%m%d%H%M%S")
         except:
             return -1
-        
+
         delta = datetime.datetime.utcnow() - lastEdit
         self._daysSinceLastEdit = delta.days
         return self._daysSinceLastEdit
@@ -335,7 +335,7 @@ class Candidate():
         Does not check the age, it needs to be
         checked using isDone()
         """
-        
+
         if self.isWithdrawn():
             return False
 
@@ -344,7 +344,7 @@ class Candidate():
 
         return self._pro >= 7 and \
             (self._pro >= 2*self._con)
-    
+
 
     def isIgnored(self):
         """Some nominations currently require manual check"""
@@ -404,7 +404,7 @@ class Candidate():
     def compareResultToCount(self):
         """
         If there is an existing result we will compare
-        it to a new vote count made by this bot and 
+        it to a new vote count made by this bot and
         see if they match. This is for testing purposes
         of the bot and to find any incorrect old results.
         """
@@ -441,11 +441,11 @@ class Candidate():
 
         # List info to console
         out("%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)" % (self.cutTitle(),
-                                                                                self._pro,ws,
-                                                                                self._con ,wo,
-                                                                                self._neu,wn,
-                                                                                self.isPassed(),was_featured,
-                                                                                status))
+                                                                   self._pro,ws,
+                                                                   self._con ,wo,
+                                                                   self._neu,wn,
+                                                                   self.isPassed(),was_featured,
+                                                                   status))
 
     def cutTitle(self):
         """Returns a fixed width title"""
@@ -490,17 +490,17 @@ class Candidate():
         Will add this page to the list of featured images.
         This uses just the base of the category, like 'Animals'.
         Should only be called on closed and verified candidates
-        
+
         This is ==STEP 1== of the parking procedure
 
         @param category The categorization category
-        """        
+        """
 
 
         listpage = 'Commons:Featured pictures, list'
         page = wikipedia.Page(wikipedia.getSite(), listpage)
         old_text = page.get(get_redirect=True)
-        
+
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
@@ -566,7 +566,7 @@ class Candidate():
         """
         page = self.getImagePage()
         old_text = page.get(get_redirect=True)
-        
+
         AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
 
         fn_or = self.fileName(cache=False) # Original filename
@@ -626,7 +626,7 @@ class Candidate():
         new_text = re.sub('</gallery>',"%s|%d '''%s''' <br> uploaded by %s, nominated by %s\n</gallery>" % 
                           (self.fileName(), count, self.cleanTitle(), self.uploader(), self.nominator()) , old_text)
         self.commit(old_text,new_text,page,"Added [[%s]]" % self.fileName() );
-        
+
     def notifyNominator(self):
         """
         Add a template to the nominators talk page
@@ -666,14 +666,14 @@ class Candidate():
 
     def moveToLog(self,reason=None):
         """
-        Remove this candidate from the current list 
+        Remove this candidate from the current list
         and add it to the log of the current month
 
         This is ==STEP 6== of the parking procedure
         """
 
         why = (" (%s)" % reason) if reason else ""
-        
+
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
         today = datetime.date.today()
@@ -711,13 +711,12 @@ class Candidate():
         2. If verified and featured:
           * Add page to 'Commons:Featured pictures, list'
           * Add to subpage of 'Commons:Featured pictures, list'
-          * Add {{Assessments|com=1}} or just the parameter if the template is already there 
+          * Add {{Assessments|com=1}} or just the parameter if the template is already there
             to the picture page (should also handle subpages)
           * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
           * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
         3. If featured or not move it from 'Commons:Featured picture candidates/candidate list'
            to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
-        
         """
 
         # First make a check that the page actually exist:
@@ -728,7 +727,7 @@ class Candidate():
         # First look for verified results
         text = self.page.get(get_redirect=True)
         results = re.findall(self._VerifiedR,text)
-        
+
         if not results:
             out("%s: (ignoring, no verified results)" % self.cutTitle())
             return
@@ -736,7 +735,7 @@ class Candidate():
         if len(results) > 1:
             out("%s: (ignoring, several verified results ?)" % self.cutTitle())
             return
-        
+
         if self.isWithdrawn():
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
@@ -767,7 +766,7 @@ class Candidate():
             out("%s: (ignoring, unknown verified feature status '%s')" % (self.cutTitle(),vres[3]))
             return
 
-        
+
     def handlePassedCandidate(self,results):
         """Must be implemented by subclass (do the park procedure for passing candidate)"""
         raise NotImplementedException()
@@ -805,7 +804,7 @@ class Candidate():
                 u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
                 ['Yes', 'No', "Quit"],
                 ['y', 'N', 'q'], 'N')
-        
+
         if choice == 'y':
             page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
         elif choice == 'q':
@@ -813,7 +812,7 @@ class Candidate():
             sys.exit(0)
         else:
             out("Changes to '%s' ignored" % page.title())
-        
+
 
 class FPCandidate(Candidate):
     """A candidate up for promotion"""
@@ -836,11 +835,11 @@ class FPCandidate(Candidate):
             return "Closing for review (%d support, %d oppose, %d neutral, featured=%s)" % (self._pro,self._con,self._neu,"yes" if self.isPassed() else "no")
 
     def handlePassedCandidate(self,results):
-        
+
         # Strip away any eventual section
         # as there is not implemented support for it
         fcategory = re.sub(r'#.*','',results[4])
-        
+
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
             if len(results)>5 and len(results[5]):
@@ -885,12 +884,12 @@ class DelistCandidate(Candidate):
 
     def removeFromFeaturedLists(self,results):
         """Remove a candidate from all featured lists"""
-        
+
         # We skip checking the page with the 4 newest images
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
         # So just check and remove the candidate from any category pages
-        
+
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
@@ -907,7 +906,7 @@ class DelistCandidate(Candidate):
 
     def removeAssessments(self):
         """Remove FP status from an image"""
-        
+
         imagePage = self.getImagePage()
         old_text = imagePage.get(get_redirect=True)
 
@@ -929,7 +928,7 @@ def wikipattern(s):
             return "[ _]";
         elif m.group(0) == '(' or m.group(0) == ')':
             return '\\' + m.group(0)
-        
+
     return re.sub('[ _\()]',rep,s)
 
 def out(text, newline=True, date=False, color=None):
@@ -1024,10 +1023,10 @@ def findEndOfTemplate(text,template):
     such that we can insert new text after it.
     Will return the position or 0 if not found.
     """
-    m = re.search(r"{{\s*%s" % template,text) 
+    m = re.search(r"{{\s*%s" % template,text)
     if not m:
         return 0
-    
+
     lvl = 0
     cp = m.start()+2
 
@@ -1036,7 +1035,7 @@ def findEndOfTemplate(text,template):
         ne = text.find("}}",cp)
 
         # If we see no end tag, we give up
-        if ne==-1: 
+        if ne==-1:
             return 0
 
         # Handle case when there are no more start tags
@@ -1051,13 +1050,13 @@ def findEndOfTemplate(text,template):
             return ne+2
         elif ne < ns:
             lvl -= 1
-            cp = ne+2 
+            cp = ne+2
         else:
             lvl += 1
             cp = ns+2
     # Apparently we never found it
     return 0
-    
+
 # Data and regexps used by the bot
 Month  = { 'january':1, 'february':2, 'march':3, 'april':4, 'may':5, 'june':6, 'july':7, 'august':8, 'september':9, 'october':10, 'november':11, 'december':12 }
 Month2  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7:'July', 8:'August', 9:'September', 10:'October', 11:'November', 12:'December' }
@@ -1069,7 +1068,7 @@ DateR2 = re.compile('(?P<Year>\d{4})-(?P<Month>\d\d)-(?P<Day>\d\d)t(?P<Hour>\d\d
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
 support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
-                     u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב', 
+                     u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב',
                      u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek',
                      u'[Aa] favore?',u'[Ss]trong support',u'[Ss]Support', u'Υπέρ', u'[Ww]Support', u'[Ss]' )
 oppose_templates  = (u'[Oo]',u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
@@ -1080,7 +1079,7 @@ neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'�
 delist_templates  = (u'[Dd]elist',u'sdf') # Should the remove templates be valid here ? There seem to be no internationalized delist versions
 keep_templates    = (u'[Kk]eep',u'[Vv]k',u'[Mm]antener',u'[Gg]arder',u'維持',u'[Bb]ehold',u'[Mm]anter',u'[Bb]ehåll',u'เก็บ',u'保留')
 
-# 
+#
 # Compiled regular expressions follows
 #
 
@@ -1215,7 +1214,7 @@ def main(*args):
     for arg in args:
         if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime' and arg != '-match':
             out("Warning - unknown argument '%s' aborting, see -help." % arg, color="lightred")
-            sys.exit(0)            
+            sys.exit(0)
 
     for arg in args:
         worked = True
@@ -1251,11 +1250,10 @@ def main(*args):
 
     if not worked:
         out("Warning - you need to specify an argument, see -help.", color="lightred")
-            
+
 
 if __name__ == "__main__":
     try:
         main()
     finally:
         wikipedia.stopme()
-
