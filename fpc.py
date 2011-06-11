@@ -69,6 +69,7 @@ class Candidate():
         self._creationTime = None
         self._imgCount     = None
         self._fileName     = None
+        self._alternative  = None
         self._listPageName = None
 
     def printAllInfo(self):
@@ -166,7 +167,7 @@ class Candidate():
             return
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
-            # Will close withdrawn nominations if there is more than one
+            # Will close withdrawn nominations if there are more than one
             # full day since the last edit
 
             why = "withdrawn" if self.isWithdrawn() else "FPXed"
@@ -464,16 +465,19 @@ class Candidate():
         else:
             return re.sub(r'\.\w{1,3}$\s*','',noprefix)
 
-    def fileName(self,cache=True):
+    def fileName(self,alternative=True):
         """
         Return only the filename of this candidate
         This is first based on the title of the page but if that page is not found
         then the first image link in the page is used.
-        @param cache if true disregard any cached filename that might be an alternate version
+        @param alternative if false disregard any alternative and return the real filename
         """
         # The regexp here also removes any possible crap between the prefix
         # and the actual start of the filename.
-        if cache and self._fileName:
+        if alternative and self._alternative:
+            return self._alternative
+
+        if self._fileName:
             return self._fileName
 
         self._fileName = re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
@@ -569,12 +573,11 @@ class Candidate():
 
         AssR = re.compile(r'{{\s*[Aa]ssessments\s*\|(.*)}}')
 
-        fn_or = self.fileName(cache=False) # Original filename
-        fn_ca = self.fileName(cache=True)  # Cached filename (can be alternate)
+        fn_or = self.fileName(alternative=False) # Original filename
+        fn_al = self.fileName(alternative=True)  # Alternative filename
         # We add the subpage parameter if the original filename
-        # differs from the cached filename. The cached filename have
-        # been set to the alternate image if there is one.
-        subpage = "|subpage=%s" % fn_or if fn_or != fn_ca else ""
+        # differs from the alterantive filename.
+        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
 
         # First check if there already is an assessments template on the page
         params = re.search(AssR,old_text)
@@ -642,8 +645,8 @@ class Candidate():
             out("notifyNominator: No such page '%s' but ignoring..." % talk_link, color="lightred")
             return
 
-        fn_or = self.fileName(cache=False) # Original filename
-        fn_ca = self.fileName(cache=True)  # Cached filename (can be alternate)
+        fn_or = self.fileName(alternative=False) # Original filename
+        fn_al = self.fileName(alternative=True)  # Alternative filename
 
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
@@ -653,14 +656,13 @@ class Candidate():
             return
 
         # We add the subpage parameter if the original filename
-        # differs from the cached filename. The cached filename have
-        # been set to the alternate image if there is one.
-        subpage = "|subpage=%s" % fn_or if fn_or != fn_ca else ""
+        # differs from the alternative filename.
+        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
 
-        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (fn_ca,subpage)
+        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (fn_al,subpage)
 
         try:
-            self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_ca )
+            self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_al )
         except wikipedia.LockedPage, error:
             out("Page is locked '%s', but ignoring since it's just the user notification." % error, color="lightyellow")
 
@@ -846,7 +848,7 @@ class FPCandidate(Candidate):
                 if not wikipedia.Page(wikipedia.getSite(), results[5]).exists():
                     out("%s: (ignoring, specified alternative not found)" % results[5])
                 else:
-                    self._fileName = results[5]
+                    self._alternative = results[5]
             else:
                 out("%s: (ignoring, alternative not set)" % self.cutTitle())
                 return
