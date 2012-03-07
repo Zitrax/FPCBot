@@ -21,7 +21,7 @@ It adds the following commandline arguments:
 -match pattern    Only operate on candidates matching this pattern
 """
 
-import wikipedia, re, datetime, sys, difflib
+import wikipedia, re, datetime, sys, difflib, signal
 
 # Imports needed for threading
 import threading, time, config
@@ -996,6 +996,8 @@ def checkCandidates(check,page,delist):
             out("Page is locked '%s'" % error, color="lightred")
 
         i += 1
+        if G_Abort:
+            break
 
 def filter_content(text):
     """
@@ -1148,6 +1150,8 @@ G_Threads = False
 G_LogNoTime = False
 # Pattern to match
 G_MatchPattern = ""
+# Flag that will be set to True if CTRL-C was pressed
+G_Abort = False
 
 def main(*args):
 
@@ -1253,6 +1257,12 @@ def main(*args):
     if not worked:
         out("Warning - you need to specify an argument, see -help.", color="lightred")
 
+def signal_handler(signal, frame):
+    global G_Abort
+    print "\n\nReceived SIGINT, will abort...\n"
+    G_Abort = True
+
+signal.signal(signal.SIGINT, signal_handler)
 
 if __name__ == "__main__":
     try:
