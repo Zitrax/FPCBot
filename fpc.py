@@ -284,7 +284,6 @@ class Candidate():
         #print "N:" + datetime.datetime.utcnow().isoformat()
         return self._creationTime
 
-
     def statusString(self):
         """Short status string about the candidate"""
         if self.isIgnored():
@@ -582,10 +581,11 @@ class Candidate():
         # First check if there already is an assessments template on the page
         params = re.search(AssR,old_text)
         if params:
-            # Make sure to remove any existing com or subpage params
-            params = re.sub(r"\|\s*com\s*=\s*\d+",'',params.group(1))
+            # Make sure to remove any existing com/features or subpage params
+            # TODO: 'com' will be obsolete in the future and can then be removed
+            params = re.sub(r"\|\s*(?:featured|com)\s*=\s*\d+",'',params.group(1))
             params = re.sub(r"\|\s*subpage\s*=\s*[^{}|]+",'',params)
-            params += "|com=1"
+            params += "|featured=1"
             params += subpage
             if params.find("|") != 0:
                 params = "|" + params
@@ -597,8 +597,8 @@ class Candidate():
         else:
             # There is no assessments template so just add it
             end = findEndOfTemplate(old_text,"[Ii]nformation")
-            new_text = old_text[:end] + "\n{{Assessments|com=1%s}}\n" % subpage + old_text[end:]
-            #new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|com=1}}\n\1',old_text)
+            new_text = old_text[:end] + "\n{{Assessments|featured=1%s}}\n" % subpage + old_text[end:]
+            #new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
 
         self.commit(old_text,new_text,page,"FPC promotion")
 
@@ -713,7 +713,7 @@ class Candidate():
         2. If verified and featured:
           * Add page to 'Commons:Featured pictures, list'
           * Add to subpage of 'Commons:Featured pictures, list'
-          * Add {{Assessments|com=1}} or just the parameter if the template is already there
+          * Add {{Assessments|featured=1}} or just the parameter if the template is already there
             to the picture page (should also handle subpages)
           * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
           * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
@@ -918,7 +918,7 @@ class DelistCandidate(Candidate):
         # Then check for the assessments template
         # The replacement string needs to use the octal value for the char '2' to
         # not confuse python as '\12\2' would obviously not work
-        new_text = re.sub(r'({{[Aa]ssessments\s*\|.*com\s*=\s*)1(.*?}})',r'\1\062\2',new_text)
+        new_text = re.sub(r'({{[Aa]ssessments\s*\|.*(?:com|featured)\s*=\s*)1(.*?}})',r'\1\062\2',new_text)
 
         self.commit(old_text,new_text,imagePage,"Delisted")
 
