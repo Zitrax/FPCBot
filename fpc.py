@@ -786,7 +786,7 @@ class Candidate():
         @param comment The edit comment
         """
 
-        out("About to commit changes to: '%s'" % page.title())
+        out("\n About to commit changes to: '%s'" % page.title())
 
         # Show the diff
         for line in difflib.context_diff(old_text.splitlines(1), new_text.splitlines(1)):
