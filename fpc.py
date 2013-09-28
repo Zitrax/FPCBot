@@ -95,7 +95,7 @@ class Candidate():
 
     def nominator(self,link=True):
         """Return the link to the user that nominated this candidate"""
-        history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
+        history = self.page.getVersionHistory(reverseOrder=True,total=1)
         if not history:
             return "Unknown"
         if link:
@@ -106,7 +106,7 @@ class Candidate():
     def uploader(self):
         """Return the link to the user that uploaded the nominated image"""
         page = pywikibot.Page(pywikibot.getSite(), self.fileName())
-        history = page.getVersionHistory(reverseOrder=True,revCount=1)
+        history = page.getVersionHistory(reverseOrder=True,total=1)
         if not history:
             return "Unknown"
         return "[[User:%s|%s]]" % (history[0][2],history[0][2])
@@ -264,26 +264,12 @@ class Candidate():
         if self._creationTime:
             return self._creationTime
 
-        history = self.page.getVersionHistory(reverseOrder=True,revCount=1)
+        history = self.page.getVersionHistory(reverseOrder=True,total=1)
         if not history:
             out("Could not retrieve history for '%s', returning now()" % self.page.title())
             return datetime.datetime.now()
 
-        # Format of date has changed so we are currently supporting two
-        # DateR1 and DateR2
-        month = None
-        m = re.match(DateR1,history[0][1].lower())
-        if( not m ):
-            m = re.match(DateR2,history[0][1].lower())
-            month = int(m.group('Month'))
-        else:
-            month = Month[m.group('Month')]
-
-        self._creationTime = datetime.datetime(int(m.group('Year')),
-                                               month,
-                                               int(m.group('Day')),
-                                               int(m.group('Hour')),
-                                               int(m.group('Minute')))
+        self._creationTime = history[0][1]
 
         #print "C:" + self._creationTime.isoformat()
         #print "N:" + datetime.datetime.utcnow().isoformat()
@@ -955,7 +941,7 @@ def findCandidates(page_url, delist):
     page = pywikibot.Page(pywikibot.getSite(), page_url)
 
     candidates = []
-    templates = page.getTemplates()
+    templates = page.templates()
     for template in templates:
         title = template.title()
         if title.startswith(candPrefix):
