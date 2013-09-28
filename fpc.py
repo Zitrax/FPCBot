@@ -803,7 +803,7 @@ class Candidate():
                 ['y', 'N', 'q'], 'N')
 
         if choice == 'y':
-            page.put(new_text, comment=comment, watchArticle=True, minorEdit=False, maxTries=10 );
+            page.put(new_text, comment=comment, watchArticle=True, minorEdit=False );
         elif choice == 'q':
             out("Aborting.")
             sys.exit(0)
