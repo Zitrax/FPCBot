@@ -105,7 +105,7 @@ class Candidate():
 
     def uploader(self):
         """Return the link to the user that uploaded the nominated image"""
-        page = pywikibot.Page(pywikibot.getSite(), self.fileName())
+        page = pywikibot.Page(pywikibot.Site(), self.fileName())
         history = page.getVersionHistory(reverseOrder=True,total=1)
         if not history:
             return "Unknown"
@@ -117,7 +117,7 @@ class Candidate():
 
     def countVotes(self):
         """
-        Counts all the votes for this nomnination
+        Counts all the votes for this nomination
         and subtracts eventual striked out votes
         """
 
@@ -125,11 +125,14 @@ class Candidate():
             return
 
         text = self.page.get(get_redirect=True)
-        text = filter_content(text)
+        if text:
+            text = filter_content(text)
 
-        self._pro = len(re.findall(self._proR,text))
-        self._con = len(re.findall(self._conR,text))
-        self._neu = len(re.findall(self._neuR,text))
+            self._pro = len(re.findall(self._proR,text))
+            self._con = len(re.findall(self._conR,text))
+            self._neu = len(re.findall(self._neuR,text))
+        else:
+            out("Warning - %s has no content" % self.page, color="lightred")
 
         self._votesCounted = True
 
@@ -194,6 +197,9 @@ class Candidate():
             return False
 
         old_text = self.page.get(get_redirect=True)
+        if not old_text:
+            out("Warning - %s has no content" % self.page, color="lightred")
+            return False
 
         if re.search(r'{{\s*FPC-closed-ignored.*}}',old_text):
             out("\"%s\" is marked as ignored, so ignoring" % self.cutTitle())
@@ -472,7 +478,7 @@ class Candidate():
 
         self._fileName = re.sub("(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix,r'\2',self.page.title())
 
-        if not pywikibot.Page(pywikibot.getSite(), self._fileName).exists():
+        if not pywikibot.Page(pywikibot.Site(), self._fileName).exists():
             match = re.search(ImagesR,self.page.get(get_redirect=True))
             if match: self._fileName = match.group(1)
 
@@ -492,7 +498,7 @@ class Candidate():
 
 
         listpage = 'Commons:Featured pictures, list'
-        page = pywikibot.Page(pywikibot.getSite(), listpage)
+        page = pywikibot.Page(pywikibot.Site(), listpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -524,7 +530,7 @@ class Candidate():
         @param category The categorization category
         """
         catpage = "Commons:Featured pictures/" + category
-        page = pywikibot.Page(pywikibot.getSite(), catpage)
+        page = pywikibot.Page(pywikibot.Site(), catpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -549,7 +555,7 @@ class Candidate():
 
     def getImagePage(self):
         """Get the image page itself"""
-        return pywikibot.Page(pywikibot.getSite(), self.fileName())
+        return pywikibot.Page(pywikibot.Site(), self.fileName())
 
     def addAssessments(self):
         """
@@ -602,7 +608,7 @@ class Candidate():
         This is ==STEP 4== of the parking procedure
         """
         monthpage = 'Commons:Featured_pictures/chronological/current_month'
-        page = pywikibot.Page(pywikibot.getSite(), monthpage)
+        page = pywikibot.Page(pywikibot.Site(), monthpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -630,7 +636,7 @@ class Candidate():
         This is ==STEP 5== of the parking procedure
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
-        talk_page = pywikibot.Page(pywikibot.getSite(), talk_link)
+        talk_page = pywikibot.Page(pywikibot.Site(), talk_link)
 
         try:
             old_text = talk_page.get(get_redirect=True)
@@ -674,7 +680,7 @@ class Candidate():
         today = datetime.date.today()
         current_month = Month[today.month]
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
-        log_page = pywikibot.Page(pywikibot.getSite(), log_link)
+        log_page = pywikibot.Page(pywikibot.Site(), log_link)
 
         # If the page does not exist we just create it ( put does that automatically )
         try:
@@ -689,7 +695,7 @@ class Candidate():
             self.commit(old_log_text,new_log_text,log_page,"Adding [[%s]]%s" % (self.fileName(),why) )
 
         # Remove from current list
-        candidate_page = pywikibot.Page(pywikibot.getSite(), self._listPageName)
+        candidate_page = pywikibot.Page(pywikibot.Site(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()),'', old_cand_text)
 
@@ -740,7 +746,7 @@ class Candidate():
             return
 
         # Check if the image page exist, if not we ignore this candidate
-        if not pywikibot.Page(pywikibot.getSite(), self.fileName()).exists():
+        if not pywikibot.Page(pywikibot.Site(), self.fileName()).exists():
             out("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle())
             return
 
@@ -840,7 +846,7 @@ class FPCandidate(Candidate):
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
             if len(results)>5 and len(results[5]):
-                if not pywikibot.Page(pywikibot.getSite(), results[5]).exists():
+                if not pywikibot.Page(pywikibot.Site(), results[5]).exists():
                     out("%s: (ignoring, specified alternative not found)" % results[5])
                 else:
                     self._alternative = results[5]
@@ -938,7 +944,7 @@ def out(text, newline=True, date=False, color=None):
 def findCandidates(page_url, delist):
     """This finds all candidates on the main FPC page"""
 
-    page = pywikibot.Page(pywikibot.getSite(), page_url)
+    page = pywikibot.Page(pywikibot.Site(), page_url)
 
     candidates = []
     templates = page.templates()
@@ -1213,7 +1219,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg != '-test' and arg != '-close' and arg != '-info' and arg != '-park' and arg != '-threads' and arg != '-fpc' and arg != '-delist' and arg != '-help' and arg != '-notime' and arg != '-match':
+        if arg not in ['-test', '-close', '-info', '-park', '-threads', '-fpc', '-delist', '-help', '-notime', '-match', '-auto']:
             out("Warning - unknown argument '%s' aborting, see -help." % arg, color="lightred")
             sys.exit(0)
 
