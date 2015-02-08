@@ -92,7 +92,6 @@ class Candidate():
         except pywikibot.NoPage:
             out("%s: -- No such page -- " % self.cutTitle(), color="lightred")
 
-
     def nominator(self,link=True):
         """Return the link to the user that nominated this candidate"""
         history = self.page.getVersionHistory(reverseOrder=True,total=1)
@@ -103,13 +102,16 @@ class Candidate():
         else:
             return history[0][2]
 
-    def uploader(self):
+    def uploader(self, link=True):
         """Return the link to the user that uploaded the nominated image"""
         page = pywikibot.Page(pywikibot.Site(), self.fileName())
         history = page.getVersionHistory(reverseOrder=True,total=1)
         if not history:
             return "Unknown"
-        return "[[User:%s|%s]]" % (history[0][2],history[0][2])
+        if link:
+            return "[[User:%s|%s]]" % (history[0][2],history[0][2])
+        else:
+            return history[0][2]
 
     def creator(self):
         """Return the link to the user that created the image"""
@@ -629,19 +631,19 @@ class Candidate():
                           (self.fileName(), count, self.cleanTitle(), self.uploader(), self.nominator()) , old_text)
         self.commit(old_text,new_text,page,"Added [[%s]]" % self.fileName() );
 
-    def notifyNominator(self):
+    def notifyUser(self, user):
         """
-        Add a template to the nominators talk page
+        Add a template to the nominators/uploaders talk page
 
         This is ==STEP 5== of the parking procedure
         """
-        talk_link = "User_talk:%s" % self.nominator(link=False)
+        talk_link = "User_talk:%s" % user
         talk_page = pywikibot.Page(pywikibot.Site(), talk_link)
 
         try:
             old_text = talk_page.get(get_redirect=True)
         except pywikibot.NoPage:
-            out("notifyNominator: No such page '%s' but ignoring..." % talk_link, color="lightred")
+            out("notifyUser: No such page '%s' but ignoring..." % talk_link, color="lightred")
             return
 
         fn_or = self.fileName(alternative=False) # Original filename
@@ -651,7 +653,7 @@ class Candidate():
         # in that case skip. Can happen if the process
         # have been previously interrupted.
         if re.search("{{FPpromotion\|%s}}" % wikipattern(fn_or),old_text):
-            out("Skipping notifyNominator for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link), color="lightred")
+            out("Skipping notifyUser for '%s', page already listed at '%s'." % (self.cleanTitle(),talk_link), color="lightred")
             return
 
         # We add the subpage parameter if the original filename
@@ -862,7 +864,11 @@ class FPCandidate(Candidate):
         self.addToCategorizedFeaturedList(fcategory)
         self.addAssessments()
         self.addToCurrentMonth()
-        self.notifyNominator()
+        nominator = self.nominator(link=False)
+        uploader = self.uploader(link=False)
+        self.notifyUser(user=nominator)
+        if uploader != nominator:
+            self.notifyUser(user=uploader)
         self.moveToLog(self._proString)
 
 class DelistCandidate(Candidate):
@@ -1219,7 +1225,8 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg not in ['-test', '-close', '-info', '-park', '-threads', '-fpc', '-delist', '-help', '-notime', '-match', '-auto']:
+        if arg not in ['-test', '-close', '-info', '-park', '-threads', '-dry',
+                       '-fpc', '-delist', '-help', '-notime', '-match', '-auto']:
             out("Warning - unknown argument '%s' aborting, see -help." % arg, color="lightred")
             sys.exit(0)
 
