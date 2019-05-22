@@ -174,7 +174,7 @@ class Candidate():
             out("\"%s\" no such page?!" % self.cutTitle() )
             return
 
-        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
+        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() >= 1:
             # Will close withdrawn nominations if there are more than one
             # full day since the last edit
 
