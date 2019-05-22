@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-This bot runs as FPCBot on the wikimedia commons
+
+This bot is FPCBot on the wikimedia commons
 It implements vote counting and supports
 moving the finished nomination to the archive.
 
@@ -174,7 +175,7 @@ class Candidate():
             out("\"%s\" no such page?!" % self.cutTitle() )
             return
 
-        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
+        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() >= 1:
             # Will close withdrawn nominations if there are more than one
             # full day since the last edit
 
@@ -1069,7 +1070,7 @@ Month  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7
 support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
                      u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב',u'[Ww]eak support',
                      u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek',
-                     u'[Aa] favore?',u'[Ss]trong support',u'[Ss]Support', u'Υπέρ', u'[Ww]Support', u'[Ss]' )
+                     u'[Aa] favore?',u'[Ss]trong support',u'[Ss]Support', u'Υπέρ', u'[Ww]Support', u'[Ss]', u'[Aa]poio' )
 oppose_templates  = (u'[Oo]',u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
                      u'[Cс]упраць',u'[Ee]n contra',u'[Cc]ontre',u'[Ii] gcoinne',u'[Dd]íliostaigh',u'[Dd]iscordo',u'נגד',u'á móti',u'反対',u'除外',u'반대',
                      u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi',u'FPX contested',u'[Cc]ontra',u'[Cc]ontrario',u'[Oo]versaturated',
