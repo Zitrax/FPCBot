@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-This bot is the FPCBot on wikimedia commons
+
+This bot is FPCBot on the wikimedia commons
 It implements vote counting and supports
 moving the finished nomination to the archive.
 
