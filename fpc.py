@@ -550,6 +550,7 @@ class Candidate():
         # A few categories are treated specially, the rest is appended to the last gallery
         if category == "Places/Panoramas":
             new_text = re.sub(LastImageR,r'\1\n[[%s|thumb|627px|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
+
         
         else:
             # We just need to append to the bottom of the gallery with an added title
@@ -579,8 +580,8 @@ class Candidate():
         fn_or = self.fileName(alternative=False) # Original filename
         fn_al = self.fileName(alternative=True)  # Alternative filename
         # We add the com-nom parameter if the original filename
-        # differs from the alternative filename.
-        comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
+        # differs from the alterantive filename.
+        comnom = "|com-nom=%s" % fn_or if fn_or != fn_al else ""
 
         # First check if there already is an assessments template on the page
         params = re.search(AssR,old_text)
