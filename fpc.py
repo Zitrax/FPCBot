@@ -550,8 +550,7 @@ class Candidate():
         # A few categories are treated specially, the rest is appended to the last gallery
         if category == "Places/Panoramas":
             new_text = re.sub(LastImageR,r'\1\n[[%s|thumb|627px|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
-        elif category == "Animated":
-            new_text = re.sub(LastImageR,r'\1\n[[%s|frame|left|%s]]' % (self.fileName(),self.cleanTitle()) , old_text, 1)
+        
         else:
             # We just need to append to the bottom of the gallery with an added title
             # The regexp uses negative lookahead such that we place the candidate in the
@@ -936,10 +935,10 @@ def wikipattern(s):
     def rep(m):
         if m.group(0) == ' ' or m.group(0) == '_':
             return "[ _]";
-        elif m.group(0) == '(' or m.group(0) == ')' or m.group(0) == '*':
+        elif m.group(0) == '(' or m.group(0) == ')':
             return '\\' + m.group(0)
 
-    return re.sub('[ _\()*]',rep,s)
+    return re.sub('[ _\()]',rep,s)
 
 def out(text, newline=True, date=False, color=None):
     """Just output some text to the consoloe or log"""
