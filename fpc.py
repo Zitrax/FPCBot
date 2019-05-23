@@ -580,7 +580,7 @@ class Candidate():
         fn_al = self.fileName(alternative=True)  # Alternative filename
         # We add the com-nom parameter if the original filename
         # differs from the alternative filename.
-        comnom = "|com-nom=%s" % fn_or if fn_or != fn_al else ""
+        comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
 
         # First check if there already is an assessments template on the page
         params = re.search(AssR,old_text)
