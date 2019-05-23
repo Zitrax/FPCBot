@@ -562,7 +562,7 @@ class Candidate():
 
     def getImagePage(self):
         """Get the image page itself"""
-        return wikipedia.Page(wikipedia.getSite(), self.fileName())
+        return pywikibot.Page(pywikibot.getSite(), self.fileName())
 
     def addAssessments(self):
         """
@@ -615,7 +615,7 @@ class Candidate():
         This is ==STEP 4== of the parking procedure
         """
         monthpage = 'Commons:Featured_pictures/chronological/current_month'
-        page = wikipedia.Page(wikipedia.getSite(), monthpage)
+        page = pywikibot.Page(pywikibot.getSite(), monthpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -643,11 +643,11 @@ class Candidate():
         This is ==STEP 5== of the parking procedure
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
-        talk_page = wikipedia.Page(wikipedia.getSite(), talk_link)
+        talk_page = pywikibot.Page(pywikibot.getSite(), talk_link)
 
         try:
             old_text = talk_page.get(get_redirect=True)
-        except wikipedia.NoPage:
+        except pywikibot.NoPage:
             out("notifyNominator: No such page '%s' but ignoring..." % talk_link, color="lightred")
             return
 
@@ -669,7 +669,7 @@ class Candidate():
 
         try:
             self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_al )
-        except wikipedia.LockedPage, error:
+        except pywikibot.LockedPage, error:
             out("Page is locked '%s', but ignoring since it's just the user notification." % error, color="lightyellow")
 
     def moveToLog(self,reason=None):
@@ -687,12 +687,12 @@ class Candidate():
         today = datetime.date.today()
         current_month = Month2[today.month]
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (current_month,today.year)
-        log_page = wikipedia.Page(wikipedia.getSite(), log_link)
+        log_page = pywikibot.Page(pywikibot.getSite(), log_link)
 
         # If the page does not exist we just create it ( put does that automatically )
         try:
             old_log_text = log_page.get(get_redirect=True)
-        except wikipedia.NoPage:
+        except pywikibot.NoPage:
             old_log_text = ""
 
         if re.search(wikipattern(self.fileName()),old_log_text):
@@ -702,7 +702,7 @@ class Candidate():
             self.commit(old_log_text,new_log_text,log_page,"Adding [[%s]]%s" % (self.fileName(),why) )
 
         # Remove from current list
-        candidate_page = wikipedia.Page(wikipedia.getSite(), self._listPageName)
+        candidate_page = pywikibot.Page(pywikibot.getSite(), self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()),'', old_cand_text)
 
@@ -753,7 +753,7 @@ class Candidate():
             return
 
         # Check if the image page exist, if not we ignore this candidate
-        if not wikipedia.Page(wikipedia.getSite(), self.fileName()).exists():
+        if not pywikibot.Page(pywikibot.getSite(), self.fileName()).exists():
             out("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle())
             return
 
@@ -810,7 +810,7 @@ class Candidate():
         elif G_Auto:
             choice = 'y'
         else:
-            choice = wikipedia.inputChoice(
+            choice = pywikibot.inputChoice(
                 u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
                 ['Yes', 'No', "Quit"],
                 ['y', 'N', 'q'], 'N')
@@ -853,7 +853,7 @@ class FPCandidate(Candidate):
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
             if len(results)>5 and len(results[5]):
-                if not wikipedia.Page(wikipedia.getSite(), results[5]).exists():
+                if not pywikibot.Page(pywikibot.getSite(), results[5]).exists():
                     out("%s: (ignoring, specified alternative not found)" % results[5])
                 else:
                     self._alternative = results[5]
@@ -946,12 +946,12 @@ def out(text, newline=True, date=False, color=None):
     if color:
         text = "\03{%s}%s\03{default}" % (color, text)
     dstr = "%s: " % datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") if date and not G_LogNoTime else ""
-    wikipedia.output("%s%s" % (dstr,text) , toStdout=True, newline=newline)
+    pywikibot.output("%s%s" % (dstr,text) , toStdout=True, newline=newline)
 
 def findCandidates(page_url, delist):
     """This finds all candidates on the main FPC page"""
 
-    page = wikipedia.Page(wikipedia.getSite(), page_url)
+    page = pywikibot.Page(pywikibot.getSite(), page_url)
 
     candidates = []
     templates = page.getTemplates()
@@ -998,9 +998,9 @@ def checkCandidates(check,page,delist):
                 thread.start()
             else:
                 check(candidate)
-        except wikipedia.NoPage, error:
+        except pywikibot.NoPage, error:
             out("No such page '%s'" % error, color="lightred")
-        except wikipedia.LockedPage, error:
+        except pywikibot.LockedPage, error:
             out("Page is locked '%s'" % error, color="lightred")
 
         i += 1
@@ -1225,7 +1225,7 @@ def main(*args):
         out("Warning - '-threads' must be run with '-dry' or '-auto'", color="lightred")
         sys.exit(0)
 
-    args = wikipedia.handleArgs(*args)
+    args = pywikibot.handleArgs(*args)
 
     # Abort on unknown arguments
     for arg in args:
@@ -1279,4 +1279,4 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        wikipedia.stopme()
+        pywikibot.stopme()
