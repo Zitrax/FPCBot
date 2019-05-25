@@ -745,7 +745,7 @@ class Candidate:
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
-        if re.search("{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
+        if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
             out(
                 "Skipping notifyNominator for '%s', page already listed at '%s'."
                 % (self.cleanTitle(), talk_link),
@@ -904,7 +904,8 @@ class Candidate:
         """Must be implemented by subclass (do the park procedure for passing candidate)"""
         raise NotImplementedException()
 
-    def commit(self, old_text, new_text, page, comment):
+    @staticmethod
+    def commit(old_text, new_text, page, comment):
         """
         This will commit new_text to the page
         and unless running in automatic mode it
@@ -1085,7 +1086,7 @@ class DelistCandidate(Candidate):
                 else:
                     old_text = ref.get(get_redirect=True)
                     new_text = re.sub(
-                        r"([[)?([Ff]ile|[Ii]mage):%s.*\n"
+                        r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n"
                         % wikipattern(self.cleanTitle(keepExtension=True)),
                         "",
                         old_text,
@@ -1126,7 +1127,7 @@ def wikipattern(s):
         elif m.group(0) == "(" or m.group(0) == ")" or m.group(0) == "*":
             return "\\" + m.group(0)
 
-    return re.sub("[ _\()*]", rep, s)
+    return re.sub(r"[ _()*]", rep, s)
 
 
 def out(text, newline=True, date=False, color=None):
@@ -1401,7 +1402,7 @@ PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
 #
 PreviousResultR = re.compile(
-    "'''result:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
+    r"'''result:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
     re.MULTILINE,
 )
 
@@ -1438,29 +1439,29 @@ DelistReviewedTemplateR = re.compile(
 )
 
 # Is whitespace allowed at the end ?
-SectionR = re.compile("^={1,4}.+={1,4}\s*$", re.MULTILINE)
+SectionR = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
 # Voting templates
 SupportR = re.compile(
-    "{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(support_templates), re.MULTILINE
+    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(support_templates), re.MULTILINE
 )
 OpposeR = re.compile(
-    "{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(oppose_templates), re.MULTILINE
+    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(oppose_templates), re.MULTILINE
 )
 NeutralR = re.compile(
-    "{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(neutral_templates), re.MULTILINE
+    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(neutral_templates), re.MULTILINE
 )
 DelistR = re.compile(
-    "{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(delist_templates), re.MULTILINE
+    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(delist_templates), re.MULTILINE
 )
-KeepR = re.compile("{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(keep_templates), re.MULTILINE)
+KeepR = re.compile(r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(keep_templates), re.MULTILINE)
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
-WithdrawnR = re.compile("{{\s*[wW]ithdraw\s*(\|.*)?}}", re.MULTILINE)
+WithdrawnR = re.compile(r"{{\s*[wW]ithdraw\s*(\|.*)?}}", re.MULTILINE)
 # Nomination that contain the fpx template
-FpxR = re.compile("{{\s*FPX(\|.*)?}}", re.MULTILINE)
+FpxR = re.compile(r"{{\s*FPX(\|.*)?}}", re.MULTILINE)
 # Counts the number of displayed images
-ImagesR = re.compile("\[\[((?:[Ff]ile|[Ii]mage):[^\|]+).*?\]\]")
+ImagesR = re.compile(r"\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\]")
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r"\|.*?(\d+)\s*px")
 # Find if there is a thumb parameter specified
