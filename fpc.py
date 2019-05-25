@@ -27,10 +27,6 @@ import pywikibot, re, datetime, sys, difflib, signal
 import threading, time
 from pywikibot import config
 
-# Import for single process check
-# dependency can be installed using "easy_install tendo"
-from tendo import singleton
-
 class NotImplementedException(Exception):
     """Not implemented"""
 
@@ -1151,8 +1147,7 @@ G_Abort = False
 
 def main(*args):
 
-    # Will sys.exit(-1) if another instance is running
-    me = singleton.SingleInstance()
+    
 
     fpcPage    = 'Commons:Featured picture candidates/candidate list'
     delistPage = 'Commons:Featured_picture_candidates/removal'
