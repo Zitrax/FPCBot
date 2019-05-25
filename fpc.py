@@ -1139,7 +1139,7 @@ def out(text, newline=True, date=False, color=None):
         if date and not G_LogNoTime
         else ""
     )
-    pywikibot.output("%s%s" % (dstr, text), toStdout=True, newline=newline)
+    pywikibot.stdout("%s%s" % (dstr, text), newline=newline)
 
 
 def findCandidates(page_url, delist):
@@ -1546,7 +1546,7 @@ def main(*args):
         out("Warning - '-threads' must be run with '-dry' or '-auto'", color="lightred")
         sys.exit(0)
 
-    args = pywikibot.handleArgs(*args)
+    args = pywikibot.handle_args(*args)
 
     # Abort on unknown arguments
     for arg in args:
