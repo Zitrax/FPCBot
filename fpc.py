@@ -1490,8 +1490,8 @@ G_Abort = False
 
 def main(*args):
 
-    fpcPage = "Commons:Featured picture candidates/candidate list"
-    delistPage = "Commons:Featured_picture_candidates/removal"
+    fpcPage = "Commons:Featured picture candidates/candidate_list"
+    delistPage = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2009"
 
     worked = False
