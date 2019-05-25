@@ -28,6 +28,9 @@ import threading, time
 from pywikibot import config
 
 
+COMMONS = pywikibot.Site('commons', 'commons')
+
+
 class NotImplementedException(Exception):
     """Not implemented"""
 
@@ -121,7 +124,7 @@ class Candidate:
 
     def uploader(self):
         """Return the link to the user that uploaded the nominated image"""
-        page = pywikibot.Page(pywikibot.Site(), self.fileName())
+        page = pywikibot.Page(COMMONS, self.fileName())
         history = page.getVersionHistory(reverseOrder=True, total=1)
         if not history:
             return "Unknown"
@@ -529,7 +532,7 @@ class Candidate:
             "(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix, r"\2", self.page.title()
         )
 
-        if not pywikibot.Page(pywikibot.Site(), self._fileName).exists():
+        if not pywikibot.Page(COMMONS, self._fileName).exists():
             match = re.search(ImagesR, self.page.get(get_redirect=True))
             if match:
                 self._fileName = match.group(1)
@@ -548,7 +551,7 @@ class Candidate:
         """
 
         listpage = "Commons:Featured pictures, list"
-        page = pywikibot.Page(pywikibot.Site(), listpage)
+        page = pywikibot.Page(COMMONS, listpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -588,7 +591,7 @@ class Candidate:
         @param category The categorization category
         """
         catpage = "Commons:Featured pictures/" + category
-        page = pywikibot.Page(pywikibot.Site(), catpage)
+        page = pywikibot.Page(COMMONS, catpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -626,7 +629,7 @@ class Candidate:
 
     def getImagePage(self):
         """Get the image page itself"""
-        return pywikibot.Page(pywikibot.Site(), self.fileName())
+        return pywikibot.Page(COMMONS, self.fileName())
 
     def addAssessments(self):
         """
@@ -686,7 +689,7 @@ class Candidate:
         This is ==STEP 4== of the parking procedure
         """
         monthpage = "Commons:Featured_pictures/chronological/current_month"
-        page = pywikibot.Page(pywikibot.Site(), monthpage)
+        page = pywikibot.Page(COMMONS, monthpage)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
@@ -728,7 +731,7 @@ class Candidate:
         This is ==STEP 5== of the parking procedure
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
-        talk_page = pywikibot.Page(pywikibot.Site(), talk_link)
+        talk_page = pywikibot.Page(COMMONS, talk_link)
 
         try:
             old_text = talk_page.get(get_redirect=True)
@@ -791,7 +794,7 @@ class Candidate:
             current_month,
             today.year,
         )
-        log_page = pywikibot.Page(pywikibot.Site(), log_link)
+        log_page = pywikibot.Page(COMMONS, log_link)
 
         # If the page does not exist we just create it ( put does that automatically )
         try:
@@ -815,7 +818,7 @@ class Candidate:
             )
 
         # Remove from current list
-        candidate_page = pywikibot.Page(pywikibot.Site(), self._listPageName)
+        candidate_page = pywikibot.Page(COMMONS, self._listPageName)
         old_cand_text = candidate_page.get(get_redirect=True)
         new_cand_text = re.sub(
             r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()), "", old_cand_text
@@ -876,7 +879,7 @@ class Candidate:
             return
 
         # Check if the image page exist, if not we ignore this candidate
-        if not pywikibot.Page(pywikibot.Site(), self.fileName()).exists():
+        if not pywikibot.Page(COMMONS, self.fileName()).exists():
             out("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle())
             return
 
@@ -1000,7 +1003,7 @@ class FPCandidate(Candidate):
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
             if len(results) > 5 and len(results[5]):
-                if not pywikibot.Page(pywikibot.Site(), results[5]).exists():
+                if not pywikibot.Page(COMMONS, results[5]).exists():
                     out("%s: (ignoring, specified alternative not found)" % results[5])
                 else:
                     self._alternative = results[5]
@@ -1145,7 +1148,7 @@ def out(text, newline=True, date=False, color=None):
 def findCandidates(page_url, delist):
     """This finds all candidates on the main FPC page"""
 
-    page = pywikibot.Page(pywikibot.Site(), page_url)
+    page = pywikibot.Page(COMMONS, page_url)
 
     candidates = []
     templates = page.templates()
