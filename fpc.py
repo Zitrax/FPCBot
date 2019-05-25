@@ -425,7 +425,7 @@ class Candidate():
 
         # We have one result, so make a vote count and compare
         old_res = res[0]
-        was_featured = (old_res[3] == u'featured')
+        was_featured = (old_res[3] == 'featured')
         ws = int(old_res[0])
         wo = int(old_res[1])
         wn = int(old_res[2])
@@ -660,7 +660,7 @@ class Candidate():
 
         try:
             self.commit(old_text,new_text,talk_page,"FPC promotion of [[%s]]" % fn_al )
-        except pywikibot.LockedPage, error:
+        except pywikibot.LockedPage as error:
             out("Page is locked '%s', but ignoring since it's just the user notification." % error, color="lightyellow")
 
     def moveToLog(self,reason=None):
@@ -802,7 +802,7 @@ class Candidate():
             choice = 'y'
         else:
             choice = pywikibot.inputChoice(
-                u"Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
+                "Do you want to accept these changes to '%s' with comment '%s' ?" % ( page.title(), comment) ,
                 ['Yes', 'No', "Quit"],
                 ['y', 'N', 'q'], 'N')
 
@@ -972,7 +972,7 @@ def checkCandidates(check,page,delist):
     def containsPattern(candidate):
         return candidate.cleanTitle().lower().find(G_MatchPattern.lower()) != -1
 
-    candidates = filter(containsPattern,candidates)
+    candidates = list(filter(containsPattern,candidates))
 
     tot = len(candidates)
     i = 1
@@ -989,9 +989,9 @@ def checkCandidates(check,page,delist):
                 thread.start()
             else:
                 check(candidate)
-        except pywikibot.NoPage, error:
+        except pywikibot.NoPage as error:
             out("No such page '%s'" % error, color="lightred")
-        except pywikibot.LockedPage, error:
+        except pywikibot.LockedPage as error:
             out("Page is locked '%s'" % error, color="lightred")
 
         i += 1
@@ -1066,18 +1066,18 @@ Month  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7
 
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
-support_templates = (u'[Ss]upport',u'[Pp]ro',u'[Ss]im',u'[Tt]ak',u'[Ss]í',u'[Pp]RO',u'[Ss]up',u'[Yy]es',u'[Oo]ui',u'[Kk]yllä', # First support + redirects
-                     u'падтрымліваю',u'[Pp]our',u'[Tt]acaíocht',u'[Cc]oncordo',u'דעב',u'[Ww]eak support',
-                     u'[Ss]amþykkt',u'支持',u'찬성',u'[Ss]for',u'за',u'[Ss]tödjer',u'เห็นด้วย',u'[Dd]estek',
-                     u'[Aa] favore?',u'[Ss]trong support',u'[Ss]Support', u'Υπέρ', u'[Ww]Support', u'[Ss]' )
-oppose_templates  = (u'[Oo]',u'[Oo]ppose',u'[Kk]ontra',u'[Nn]ão',u'[Nn]ie',u'[Mm]autohe',u'[Oo]pp',u'[Nn]ein',u'[Ee]i', # First oppose + redirect
-                     u'[Cс]упраць',u'[Ee]n contra',u'[Cc]ontre',u'[Ii] gcoinne',u'[Dd]íliostaigh',u'[Dd]iscordo',u'נגד',u'á móti',u'反対',u'除外',u'반대',
-                     u'[Mm]ot',u'против',u'[Ss]tödjer ej',u'ไม่เห็นด้วย',u'[Kk]arsi',u'FPX contested',u'[Cc]ontra',u'[Cc]ontrario',u'[Oo]versaturated',
-                     u'[Ww]eak oppose')
-neutral_templates = (u'[Nn]eutral?',u'[Oo]partisk',u'[Nn]eutre',u'[Nn]eutro',u'נמנע',u'[Nn]øytral',u'中立',u'Нэўтральна',u'[Tt]arafsız',u'Воздерживаюсь',
-                     u'[Hh]lutlaus',u'중립',u'[Nn]eodrach',u'เป็นกลาง',u'[Vv]n',u'[Nn]eutrale')
-delist_templates  = (u'[Dd]elist',u'sdf') # Should the remove templates be valid here ? There seem to be no internationalized delist versions
-keep_templates    = (u'[Kk]eep',u'[Vv]k',u'[Mm]antener',u'[Gg]arder',u'維持',u'[Bb]ehold',u'[Mm]anter',u'[Bb]ehåll',u'เก็บ',u'保留')
+support_templates = ('[Ss]upport','[Pp]ro','[Ss]im','[Tt]ak','[Ss]í','[Pp]RO','[Ss]up','[Yy]es','[Oo]ui','[Kk]yllä', # First support + redirects
+                     'падтрымліваю','[Pp]our','[Tt]acaíocht','[Cc]oncordo','דעב','[Ww]eak support',
+                     '[Ss]amþykkt','支持','찬성','[Ss]for','за','[Ss]tödjer','เห็นด้วย','[Dd]estek',
+                     '[Aa] favore?','[Ss]trong support','[Ss]Support', 'Υπέρ', '[Ww]Support', '[Ss]' )
+oppose_templates  = ('[Oo]','[Oo]ppose','[Kk]ontra','[Nn]ão','[Nn]ie','[Mm]autohe','[Oo]pp','[Nn]ein','[Ee]i', # First oppose + redirect
+                     '[Cс]упраць','[Ee]n contra','[Cc]ontre','[Ii] gcoinne','[Dd]íliostaigh','[Dd]iscordo','נגד','á móti','反対','除外','반대',
+                     '[Mm]ot','против','[Ss]tödjer ej','ไม่เห็นด้วย','[Kk]arsi','FPX contested','[Cc]ontra','[Cc]ontrario','[Oo]versaturated',
+                     '[Ww]eak oppose')
+neutral_templates = ('[Nn]eutral?','[Oo]partisk','[Nn]eutre','[Nn]eutro','נמנע','[Nn]øytral','中立','Нэўтральна','[Tt]arafsız','Воздерживаюсь',
+                     '[Hh]lutlaus','중립','[Nn]eodrach','เป็นกลาง','[Vv]n','[Nn]eutrale')
+delist_templates  = ('[Dd]elist','sdf') # Should the remove templates be valid here ? There seem to be no internationalized delist versions
+keep_templates    = ('[Kk]eep','[Vv]k','[Mm]antener','[Gg]arder','維持','[Bb]ehold','[Mm]anter','[Bb]ehåll','เก็บ','保留')
 
 #
 # Compiled regular expressions follows
@@ -1258,7 +1258,7 @@ def main(*args):
 
 def signal_handler(signal, frame):
     global G_Abort
-    print "\n\nReceived SIGINT, will abort...\n"
+    print("\n\nReceived SIGINT, will abort...\n")
     G_Abort = True
 
 signal.signal(signal.SIGINT, signal_handler)
