@@ -1069,7 +1069,7 @@ Month  = { 1:'January', 2:'February', 3:'March', 4:'April', 5:'May', 6:'June', 7
 support_templates = ('[Ss]upport','[Pp]ro','[Ss]im','[Tt]ak','[Ss]í','[Pp]RO','[Ss]up','[Yy]es','[Oo]ui','[Kk]yllä', # First support + redirects
                      'падтрымліваю','[Pp]our','[Tt]acaíocht','[Cc]oncordo','דעב','[Ww]eak support',
                      '[Ss]amþykkt','支持','찬성','[Ss]for','за','[Ss]tödjer','เห็นด้วย','[Dd]estek',
-                     '[Aa] favore?','[Ss]trong support','[Ss]Support', 'Υπέρ', '[Ww]Support', '[Ss]' )
+                     '[Aa] favore?','[Ss]trong support','[Ss]Support', 'Υπέρ', '[Ww]Support', '[Ss]', '[Aa]poio' )
 oppose_templates  = ('[Oo]','[Oo]ppose','[Kk]ontra','[Nn]ão','[Nn]ie','[Mm]autohe','[Oo]pp','[Nn]ein','[Ee]i', # First oppose + redirect
                      '[Cс]упраць','[Ee]n contra','[Cc]ontre','[Ii] gcoinne','[Dd]íliostaigh','[Dd]iscordo','נגד','á móti','反対','除外','반대',
                      '[Mm]ot','против','[Ss]tödjer ej','ไม่เห็นด้วย','[Kk]arsi','FPX contested','[Cc]ontra','[Cc]ontrario','[Oo]versaturated',
