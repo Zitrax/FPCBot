@@ -21,7 +21,7 @@ It adds the following commandline arguments:
 -match pattern    Only operate on candidates matching this pattern
 """
 
-import pywikibot, re, datetime, sys, difflib, signal, wikipedia
+import pywikibot, re, datetime, sys, difflib, signal
 
 # Imports needed for threading
 import threading, time
