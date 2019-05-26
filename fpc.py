@@ -351,7 +351,7 @@ class Candidate:
 
         try:
             lastEdit = datetime.datetime.strptime(
-                str(self.page.editTime()), "%Y%m%d%H%M%S"
+                str(self.page.editTime()), "%Y-%m-%dT%H:%M:%SZ"
             )
         except:
             return -1
