@@ -1460,7 +1460,7 @@ KeepR = re.compile(r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(keep_templates), re.MUL
 # Finds if a withdraw template is used
 # This template has an optional string which we
 # must be able to detect after the pipe symbol
-WithdrawnR = re.compile(r"{{\s*[wW]ithdrawn?\s*(\|.*)?}}", re.MULTILINE)
+WithdrawnR = re.compile(r"{{\s*(?:[wW]ithdrawn?|[fF]DP)\s*(\|.*)?}}", re.MULTILINE)
 # Nomination that contain the fpx template
 FpxR = re.compile(r"{{\s*FPX(\|.*)?}}", re.MULTILINE)
 # Counts the number of displayed images
