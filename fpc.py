@@ -1356,6 +1356,7 @@ oppose_templates = (
     "[Cc]ontra",
     "[Cc]ontrario",
     "[Oo]versaturated",
+    "[Ss]trong oppose",
     "[Ww]eak oppose",
 )
 neutral_templates = (
