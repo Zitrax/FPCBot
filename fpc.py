@@ -1307,7 +1307,6 @@ support_templates = (
     "падтрымліваю",
     "[Pp]our",
     "[Tt]acaíocht",
-    "[Cc]oncordo",
     "דעב",
     "[Ww]eak support",
     "[Ss]amþykkt",
