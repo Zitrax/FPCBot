@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 This bot runs as FPCBot on wikimedia commons
+It implements vote counting and supports bot runs as FPCBot on wikimedia commons
 It implements vote counting and supports
 moving the finished nomination to the archive.
 
@@ -1128,10 +1129,10 @@ def wikipattern(s):
     def rep(m):
         if m.group(0) == " " or m.group(0) == "_":
             return "[ _]"
-        elif m.group(0) == "(" or m.group(0) == ")" or m.group(0) == "*":
+        elif m.group(0) == "(" or m.group(0) == ")" or m.group(0) == "*" or m.group(0) == "+" or m.group(0) == "=" or m.group(0) == "?" or m.group(0) == "!" or m.group(0) == "^" or m.group(0) == "-":
             return "\\" + m.group(0)
 
-    return re.sub(r"[ _()*]", rep, s)
+    return re.sub(r"[ _()*+=?!^-]", rep, s)
 
 
 def out(text, newline=True, date=False, color=None):
@@ -1631,3 +1632,4 @@ if __name__ == "__main__":
         main()
     finally:
         pywikibot.stopme()
+
