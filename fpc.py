@@ -1610,7 +1610,7 @@ def main(*args):
     global G_Site
 
     # Will sys.exit(-1) if another instance is running
-    #me = singleton.SingleInstance()
+    me = singleton.SingleInstance()
 
     fpcPage = "Commons:Featured picture candidates/candidate_list"
     delistPage = "Commons:Featured_picture_candidates/removal"
