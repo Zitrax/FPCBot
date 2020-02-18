@@ -126,7 +126,7 @@ class Candidate:
 
     def uploader(self, link=True):
         """Return the link to the user that uploaded the nominated image."""
-        page = pywikibot.Page(G_Site, self.fileName())
+        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
         history = page.getVersionHistory(reverseOrder=True, total=1)
         if not history:
             return "Unknown"
@@ -139,7 +139,7 @@ class Candidate:
         """Return the link to the user that created the image."""
         return self.uploader()
 
-    def FindCategoryOfFile(self):
+    def findCategoryOfFile(self):
         """Try to find category in the nomination page to make closing users life easier."""
         text = self.page.get(get_redirect=True)
         RegexCAT = re.compile(r'(?:.*)Category(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^,\]]{1,100})')
@@ -153,12 +153,11 @@ class Candidate:
 
         return Category
 
-    def NewFileNameIfMoved(self):
-        """Fixed https://github.com/Zitrax/FPCBot/issues/4."""
+    def newFileNameIfMoved(self):
+        """Returns new location of file if moved, issue-4."""
         page = pywikibot.Page(G_Site, self.fileName())
         if page.isRedirectPage() == True:
-            newfilename= re.sub (r'(?:\[|\]|commons:)', '', str(page.getRedirectTarget()))
-            return newfilename
+            return re.sub (r'(?:\[|\]|commons:)', '', str(page.getRedirectTarget()))
         else:
             file_name = self.fileName()
             return file_name
@@ -665,12 +664,12 @@ class Candidate:
         pictures descripion page.
 
         This is ==STEP 3== of the parking procedure
-        NewFileNameIfMoved checks if file is moved, if
+        newFileNameIfMoved checks if file is moved, if
         moved returns the target name else returns Original
         fileName
 
         """
-        page = pywikibot.Page(G_Site, self.NewFileNameIfMoved())
+        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
         old_text = page.get(get_redirect=True)
 
         AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
@@ -1093,7 +1092,7 @@ class FPCandidate(Candidate):
         else:
             return (
                 "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=%s|sig=~~~~}}"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.FindCategoryOfFile() )
+                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findCategoryOfFile() )
             )
 
     def getCloseCommitComment(self):
