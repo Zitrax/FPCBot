@@ -139,19 +139,19 @@ class Candidate:
         """Return the link to the user that created the image."""
         return self.uploader()
 
-    def findCategoryOfFile(self):
-        """Try to find category in the nomination page to make closing users life easier."""
+    def findGalleryOfFile(self):
+        """Try to find Gallery in the nomination page to make closing users life easier."""
         text = self.page.get(get_redirect=True)
-        RegexCAT = re.compile(r'(?:.*)Category(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^,\]]{1,100})')
-        matches = RegexCAT.finditer(text)
+        RegexGallery = re.compile(r'(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^,\]]{1,100})')
+        matches = RegexGallery.finditer(text)
         for m in matches:
-            Category = (m.group(1))
+            Gallery = (m.group(1))
         try:
-            Category
+            Gallery
         except:
-            Category = ""
+            Gallery = ""
 
-        return Category
+        return Gallery
 
     def newFileNameIfMoved(self):
         """Returns new location of file if moved, issue-4."""
@@ -566,15 +566,15 @@ class Candidate:
 
         return self._fileName
 
-    def addToFeaturedList(self, category):
+    def addToFeaturedList(self, gallery):
         """
         Will add this page to the list of featured images.
-        This uses just the base of the category, like 'Animals'.
+        This uses just the base of the gallery, like 'Animals'.
         Should only be called on closed and verified candidates
 
         This is ==STEP 1== of the parking procedure
 
-        @param category The categorization category
+        @param gallery The categorization gallery
         """
 
         listpage = "Commons:Featured pictures, list"
@@ -592,32 +592,32 @@ class Candidate:
             )
             return
 
-        # This function first needs to find the main category
+        # This function first needs to find the gallery
         # then inside the gallery tags remove the last line and
         # add this candidate to the top
 
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
-        # all in the chosen category
-        out("Looking for category: '%s'" % wikipattern(category))
+        # all in the chosen gallery
+        out("Looking for gallery: '%s'" % wikipattern(gallery))
         ListPageR = re.compile(
             r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)"
-            % wikipattern(category),
+            % wikipattern(gallery),
             re.MULTILINE,
         )
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % self.fileName(), old_text)
         self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
 
-    def addToCategorizedFeaturedList(self, category):
+    def addToCategorizedFeaturedList(self, gallery):
         """
-        Adds the candidate to the page with categorized featured
-        pictures. This is the full category.
+        Adds the candidate to the gallery of
+        pictures. This is the full gallery.
 
         This is ==STEP 2== of the parking procedure
 
-        @param category The categorization category
+        @param gallery The categorization gallery
         """
-        catpage = "Commons:Featured pictures/" + category
+        catpage = "Commons:Featured pictures/" + gallery
         page = pywikibot.Page(G_Site, catpage)
         old_text = page.get(get_redirect=True)
 
@@ -633,7 +633,7 @@ class Candidate:
             return
 
         # A few categories are treated specially, the rest is appended to the last gallery
-        if category == "Places/Panoramas":
+        if gallery == "Places/Panoramas":
             new_text = re.sub(
                 LastImageR,
                 r"\1\n[[%s|thumb|627px|left|%s]]"
@@ -1088,11 +1088,11 @@ class FPCandidate(Candidate):
 
     def getResultString(self):
         if self.imageCount() > 1:
-            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|category=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
+            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
         else:
             return (
-                "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=%s|sig=~~~~}}"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findCategoryOfFile() )
+                "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}"
+                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findGalleryOfFile() )
             )
 
     def getCloseCommitComment(self):
@@ -1108,7 +1108,7 @@ class FPCandidate(Candidate):
 
         # Strip away any eventual section
         # as there is not implemented support for it
-        fcategory = re.sub(r"#.*", "", results[4])
+        fgallery = re.sub(r"#.*", "", results[4])
 
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
@@ -1122,11 +1122,11 @@ class FPCandidate(Candidate):
                 return
 
         # Featured picture
-        if not len(fcategory):
-            out("%s: (ignoring, category not set)" % self.cutTitle())
+        if not len(fgallery):
+            out("%s: (ignoring, gallery not defined)" % self.cutTitle())
             return
-        self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fcategory).group(1))
-        self.addToCategorizedFeaturedList(fcategory)
+        self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fgallery).group(1))
+        self.addToCategorizedFeaturedList(fgallery)
         self.addAssessments()
         self.addToCurrentMonth()
         self.notifyNominator()
@@ -1168,7 +1168,7 @@ class DelistCandidate(Candidate):
         )
 
     def handlePassedCandidate(self, results):
-        # Delistings does not care about the category
+        # Delistings does not care about the gallery
         self.removeFromFeaturedLists(results)
         self.removeAssessments()
         self.moveToLog(self._proString)
@@ -1179,7 +1179,7 @@ class DelistCandidate(Candidate):
         # We skip checking the page with the 4 newest images
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
-        # So just check and remove the candidate from any category pages
+        # So just check and remove the candidate from any gallery pages
 
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
@@ -1529,7 +1529,7 @@ VerifiedResultR = re.compile(
                               \s*oppose\s*=\s*(\d+)\s*\|            # Oppose Votes  (2)
                               \s*neutral\s*=\s*(\d+)\s*\|           # Neutral votes (3)
                               \s*featured\s*=\s*(\w+)\s*\|          # Featured, should be yes or no, but is not verified at this point (4)
-                              \s*category\s*=\s*([^|]*)             # A category if the image was featured (5)
+                              \s*gallery\s*=\s*([^|]*)              # A gallery page if the image was featured (5)
                               (?:\|\s*alternative\s*=\s*([^|]*))?   # For candidate with alternatives this specifies the winning image (6)
                               .*}}                                  # END
                               """,
