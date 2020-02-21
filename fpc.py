@@ -1285,6 +1285,9 @@ def checkCandidates(check, page, delist):
     @param page   A page containing all candidates
     @param delist Boolean, telling whether this is delistings of fpcs
     """
+    if not G_Site.logged_in():
+        G_Site.login()
+
     candidates = findCandidates(page, delist)
 
     def containsPattern(candidate):
