@@ -631,11 +631,10 @@ class Candidate:
             section = section.replace(")","\)").replace("(","\(").replace("_"," ")
             regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
             search_for_section = re.search(regex_for_searching_sections, old_text)
-            section_text_search = search_for_section.group()
-            line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
-            candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
-            append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
-            
+            try:
+                section_text_search = search_for_section.group()
+            except AttributeError:
+                section = None
 
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
@@ -650,6 +649,9 @@ class Candidate:
 
         # If we find a section, we try to add the image in the section
         if section != None:
+            line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
+            candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
+            append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
             new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
         else:
             # We just need to append to the bottom of the gallery with an added title
