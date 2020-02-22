@@ -142,7 +142,7 @@ class Candidate:
     def findGalleryOfFile(self):
         """Try to find Gallery in the nomination page to make closing users life easier."""
         text = self.page.get(get_redirect=True)
-        RegexGallery = re.compile(r'(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^,\]]{1,100})')
+        RegexGallery = re.compile(r'(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})')
         matches = RegexGallery.finditer(text)
         for m in matches:
             Gallery = (m.group(1))
@@ -611,15 +611,31 @@ class Candidate:
     def addToCategorizedFeaturedList(self, gallery):
         """
         Adds the candidate to the gallery of
-        pictures. This is the full gallery.
+        pictures. This is the full gallery with
+        the section in that particular page.
 
         This is ==STEP 2== of the parking procedure
 
         @param gallery The categorization gallery
         """
-        gallery_full_path = "Commons:Featured pictures/" + gallery
+        gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
         page = pywikibot.Page(G_Site, gallery_full_path)
         old_text = page.get(get_redirect=True)
+        section_regex = r"#(.*)"
+        search_section = re.search(section_regex, gallery)
+        try:
+            section = search_section.group(1)
+        except AttributeError:
+            section = None
+        if section != None:
+            section = section.replace(")","\)").replace("(","\(").replace("_"," ")
+            regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+            search_for_section = re.search(regex_for_searching_sections, old_text)
+            section_text_search = search_for_section.group()
+            line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
+            candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
+            append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
+            
 
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
@@ -632,15 +648,9 @@ class Candidate:
             )
             return
 
-        # A few categories are treated specially, the rest is appended to the last gallery
-        if gallery == "Places/Panoramas":
-            new_text = re.sub(
-                LastImageR,
-                r"\1\n[[%s|thumb|627px|left|%s]]"
-                % (self.fileName(), self.cleanTitle()),
-                old_text,
-                1,
-            )
+        # If we find a section, we try to add the image in the section
+        if section != None:
+            new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
         else:
             # We just need to append to the bottom of the gallery with an added title
             # The regexp uses negative lookahead such that we place the candidate in the
@@ -1109,6 +1119,9 @@ class FPCandidate(Candidate):
         # Strip away any eventual section
         # as there is not implemented support for it
         fgallery = re.sub(r"#.*", "", results[4])
+        
+        # Now addToCategorizedFeaturedList can handle sections within the gallery page
+        gallery_without_removing_section = results[4]
 
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
@@ -1126,7 +1139,7 @@ class FPCandidate(Candidate):
             out("%s: (ignoring, gallery not defined)" % self.cutTitle())
             return
         self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fgallery).group(1))
-        self.addToCategorizedFeaturedList(fgallery)
+        self.addToCategorizedFeaturedList(gallery_without_removing_section)
         self.addAssessments()
         self.addToCurrentMonth()
         self.notifyNominator()
