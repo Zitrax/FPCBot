@@ -617,8 +617,8 @@ class Candidate:
 
         @param gallery The categorization gallery
         """
-        catpage = "Commons:Featured pictures/" + gallery
-        page = pywikibot.Page(G_Site, catpage)
+        gallery_full_path = "Commons:Featured pictures/" + gallery
+        page = pywikibot.Page(G_Site, gallery_full_path)
         old_text = page.get(get_redirect=True)
 
         # First check if we are already on the page,
