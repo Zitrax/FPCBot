@@ -628,7 +628,11 @@ class Candidate:
         except AttributeError:
             section = None
         if section != None:
-            section = section.replace(")","\)").replace("(","\(").replace("_"," ")
+            # Trying to generate a regex for finding the section in a gallery if specified in nomination
+            # First we are escaping all parentheses, as they are used in regex
+            # Replacement of all uunderscore with \s , some users just copy the url
+            # Replacing all \s with \s(?:\s*|)\s, user have linked the section to gallery. Why ? To make our lives harder 
+            section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
             regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
             search_for_section = re.search(regex_for_searching_sections, old_text)
             try:
@@ -647,7 +651,7 @@ class Candidate:
             )
             return
 
-        # If we find a section, we try to add the image in the section
+        # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
         if section != None:
             line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
             candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
