@@ -34,7 +34,8 @@ from tendo import singleton
 
 
 class NotImplementedException(Exception):
-    """Not implemented"""
+
+    """Not implemented."""
 
 
 class ThreadCheckCandidate(threading.Thread):
@@ -66,8 +67,7 @@ class Candidate:
         CountedR,
         VerifiedR,
     ):
-        """page is a pywikibot.Page object"""
-
+        """Page is a pywikibot.Page object ."""
         # Later perhaps this can be cleaned up by letting the subclasses keep the variables
         self.page = page
         self._pro = 0
@@ -115,7 +115,7 @@ class Candidate:
             out("%s: -- No such page -- " % self.cutTitle(), color="lightred")
 
     def nominator(self, link=True):
-        """Return the link to the user that nominated this candidate"""
+        """Return the link to the user that nominated this candidate."""
         history = self.page.getVersionHistory(reverseOrder=True, total=1)
         if not history:
             return "Unknown"
@@ -125,8 +125,8 @@ class Candidate:
             return history[0][2]
 
     def uploader(self, link=True):
-        """Return the link to the user that uploaded the nominated image"""
-        page = pywikibot.Page(G_Site, self.fileName())
+        """Return the link to the user that uploaded the nominated image."""
+        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
         history = page.getVersionHistory(reverseOrder=True, total=1)
         if not history:
             return "Unknown"
@@ -136,8 +136,31 @@ class Candidate:
             return history[0][2]
 
     def creator(self):
-        """Return the link to the user that created the image"""
+        """Return the link to the user that created the image."""
         return self.uploader()
+
+    def findGalleryOfFile(self):
+        """Try to find Gallery in the nomination page to make closing users life easier."""
+        text = self.page.get(get_redirect=True)
+        RegexGallery = re.compile(r'(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})')
+        matches = RegexGallery.finditer(text)
+        for m in matches:
+            Gallery = (m.group(1))
+        try:
+            Gallery
+        except:
+            Gallery = ""
+
+        return Gallery
+
+    def newFileNameIfMoved(self):
+        """Returns new location of file if moved, issue-4."""
+        page = pywikibot.Page(G_Site, self.fileName())
+        if page.isRedirectPage() == True:
+            return re.sub (r'(?:\[|\]|commons:)', '', str(page.getRedirectTarget()))
+        else:
+            file_name = self.fileName()
+            return file_name
 
     def countVotes(self):
         """
@@ -161,18 +184,18 @@ class Candidate:
         self._votesCounted = True
 
     def isWithdrawn(self):
-        """Withdrawn nominations should not be counted"""
+        """Withdrawn nominations should not be counted."""
         text = self.page.get(get_redirect=True)
         text = filter_content(text)
         withdrawn = len(re.findall(WithdrawnR, text))
         return withdrawn > 0
 
     def isFPX(self):
-        """Page marked with FPX template"""
+        """Page marked with FPX template."""
         return len(re.findall(FpxR, self.page.get(get_redirect=True)))
 
     def rulesOfFifthDay(self):
-        """Check if any of the rules of the fifth day can be applied"""
+        """Check if any of the rules of the fifth day can be applied."""
         if self.daysOld() < 5:
             return False
 
@@ -293,11 +316,11 @@ class Candidate:
         return re.sub(r"(===.*)(===)", r"\1%s\2" % status, text, 1)
 
     def getResultString(self):
-        """Must be implemented by the subclasses (Text to add to closed pages)"""
+        """Must be implemented by the subclasses (Text to add to closed pages)."""
         raise NotImplementedException()
 
     def getCloseCommitComment(self):
-        """Must be implemened by the subclasses (Commit comment for closed pages)"""
+        """Must be implemened by the subclasses (Commit comment for closed pages)."""
         raise NotImplementedException()
 
     def creationTime(self):
@@ -325,7 +348,7 @@ class Candidate:
         return self._creationTime
 
     def statusString(self):
-        """Short status string about the candidate"""
+        """Short status string about the candidate."""
         if self.isIgnored():
             return "Ignored"
         elif self.isWithdrawn():
@@ -336,8 +359,7 @@ class Candidate:
             return self._proString if self.isPassed() else self._conString
 
     def daysOld(self):
-        """Find the number of days this nomination has existed"""
-
+        """Find the number of days this nomination has existed."""
         if self._daysOld != -1:
             return self._daysOld
 
@@ -387,11 +409,11 @@ class Candidate:
         return self._pro >= 7 and (self._pro >= 2 * self._con)
 
     def isIgnored(self):
-        """Some nominations currently require manual check"""
+        """Some nominations currently require manual check."""
         return self.imageCount() > 1
 
     def sectionCount(self):
-        """Count the number of sections in this candidate"""
+        """Count the number of sections in this candidate."""
         text = self.page.get(get_redirect=True)
         return len(re.findall(SectionR, text))
 
@@ -502,7 +524,7 @@ class Candidate:
         )
 
     def cutTitle(self):
-        """Returns a fixed width title"""
+        """Returns a fixed width title."""
         return re.sub(PrefixR, "", self.page.title())[0:50].ljust(50)
 
     def cleanTitle(self, keepExtension=False):
@@ -544,15 +566,15 @@ class Candidate:
 
         return self._fileName
 
-    def addToFeaturedList(self, category):
+    def addToFeaturedList(self, gallery):
         """
         Will add this page to the list of featured images.
-        This uses just the base of the category, like 'Animals'.
+        This uses just the base of the gallery, like 'Animals'.
         Should only be called on closed and verified candidates
 
         This is ==STEP 1== of the parking procedure
 
-        @param category The categorization category
+        @param gallery The categorization gallery
         """
 
         listpage = "Commons:Featured pictures, list"
@@ -570,34 +592,53 @@ class Candidate:
             )
             return
 
-        # This function first needs to find the main category
+        # This function first needs to find the gallery
         # then inside the gallery tags remove the last line and
         # add this candidate to the top
 
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
-        # all in the chosen category
-        out("Looking for category: '%s'" % wikipattern(category))
+        # all in the chosen gallery
+        out("Looking for gallery: '%s'" % wikipattern(gallery))
         ListPageR = re.compile(
             r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)"
-            % wikipattern(category),
+            % wikipattern(gallery),
             re.MULTILINE,
         )
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % self.fileName(), old_text)
         self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
 
-    def addToCategorizedFeaturedList(self, category):
+    def addToCategorizedFeaturedList(self, gallery):
         """
-        Adds the candidate to the page with categorized featured
-        pictures. This is the full category.
+        Adds the candidate to the gallery of
+        pictures. This is the full gallery with
+        the section in that particular page.
 
         This is ==STEP 2== of the parking procedure
 
-        @param category The categorization category
+        @param gallery The categorization gallery
         """
-        catpage = "Commons:Featured pictures/" + category
-        page = pywikibot.Page(G_Site, catpage)
+        gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
+        page = pywikibot.Page(G_Site, gallery_full_path)
         old_text = page.get(get_redirect=True)
+        section_regex = r"#(.*)"
+        search_section = re.search(section_regex, gallery)
+        try:
+            section = search_section.group(1)
+        except AttributeError:
+            section = None
+        if section != None:
+            # Trying to generate a regex for finding the section in a gallery if specified in nomination
+            # First we are escaping all parentheses, as they are used in regex
+            # Replacement of all uunderscore with \s , some users just copy the url
+            # Replacing all \s with \s(?:\s*|)\s, user have linked the section to gallery. Why ? To make our lives harder 
+            section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
+            regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+            search_for_section = re.search(regex_for_searching_sections, old_text)
+            try:
+                section_text_search = search_for_section.group()
+            except AttributeError:
+                section = None
 
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
@@ -610,15 +651,12 @@ class Candidate:
             )
             return
 
-        # A few categories are treated specially, the rest is appended to the last gallery
-        if category == "Places/Panoramas":
-            new_text = re.sub(
-                LastImageR,
-                r"\1\n[[%s|thumb|627px|left|%s]]"
-                % (self.fileName(), self.cleanTitle()),
-                old_text,
-                1,
-            )
+        # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
+        if section != None:
+            line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
+            candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
+            append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
+            new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
         else:
             # We just need to append to the bottom of the gallery with an added title
             # The regexp uses negative lookahead such that we place the candidate in the
@@ -633,7 +671,7 @@ class Candidate:
         self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
 
     def getImagePage(self):
-        """Get the image page itself"""
+        """Get the image page itself."""
         return pywikibot.Page(G_Site, self.fileName())
 
     def addAssessments(self):
@@ -642,9 +680,12 @@ class Candidate:
         pictures descripion page.
 
         This is ==STEP 3== of the parking procedure
+        newFileNameIfMoved checks if file is moved, if
+        moved returns the target name else returns Original
+        fileName
 
         """
-        page = self.getImagePage()
+        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
         old_text = page.get(get_redirect=True)
 
         AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
@@ -693,10 +734,25 @@ class Candidate:
 
         This is ==STEP 4== of the parking procedure
         """
-        monthpage = "Commons:Featured_pictures/chronological/current_month"
+        FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
+        NomPagetext = self.page.get(get_redirect=True)
+        matches = FinalVotesR.finditer(NomPagetext)
+        for m in matches:
+            if m is None:
+                ws=wo=wn= "x"
+            else:
+                ws = m.group(1)
+                wo = m.group(2)
+                wn = m.group(3)
+    
+                
+        today = datetime.date.today()
+        monthpage = "Commons:Featured_pictures/chronological/%s %s" % (Month[today.month], today.year,)
         page = pywikibot.Page(G_Site, monthpage)
-        old_text = page.get(get_redirect=True)
-
+        try:
+            old_text = page.get(get_redirect=True)
+        except pywikibot.NoPage:
+            old_text = ""
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
@@ -710,23 +766,35 @@ class Candidate:
 
         # Find the number of lines in the gallery
         m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
-        count = m.group(0).count("\n")
+        try:
+            count = m.group(0).count("\n")
+        except:
+            count = 1
 
         # We just need to append to the bottom of the gallery
         # with an added title
         # TODO: We lack a good way to find the creator, so it is left out at the moment
+
+        if count ==1:
+            old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
+        else:pass
+    
         new_text = re.sub(
             "</gallery>",
-            "%s|%d '''%s''' <br> uploaded by %s, nominated by %s\n</gallery>"
+            "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
             % (
                 self.fileName(),
                 count,
                 self.cleanTitle(),
                 self.uploader(),
                 self.nominator(),
+                ws,
+                wo,
+                wn,
             ),
             old_text,
         )
+
         self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
 
     def notifyNominator(self):
@@ -782,7 +850,11 @@ class Candidate:
             )
 
     def notifyUploader(self):
-        
+        """
+        Add a template to the uploaders talk page
+
+        This is ==STEP 6== of the parking procedure
+        """
         talk_link = "User_talk:%s" % self.uploader(link=False)
         talk_page = pywikibot.Page(G_Site, talk_link)
 
@@ -833,7 +905,7 @@ class Candidate:
         Remove this candidate from the current list
         and add it to the log of the current month
 
-        This is ==STEP 6== of the parking procedure
+        This is ==STEP 7== of the parking procedure
         """
 
         why = (" (%s)" % reason) if reason else ""
@@ -956,7 +1028,7 @@ class Candidate:
             return
 
     def handlePassedCandidate(self, results):
-        """Must be implemented by subclass (do the park procedure for passing candidate)"""
+        """Must be implemented by subclass (do the park procedure for passing candidate)."""
         raise NotImplementedException()
 
     @staticmethod
@@ -1011,9 +1083,11 @@ class Candidate:
 
 
 class FPCandidate(Candidate):
-    """A candidate up for promotion"""
+
+    """A candidate up for promotion."""
 
     def __init__(self, page):
+        """Constructor."""
         Candidate.__init__(
             self,
             page,
@@ -1030,11 +1104,11 @@ class FPCandidate(Candidate):
 
     def getResultString(self):
         if self.imageCount() > 1:
-            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|category=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
+            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
         else:
             return (
-                "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|category=|sig=~~~~}}"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
+                "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}"
+                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findGalleryOfFile() )
             )
 
     def getCloseCommitComment(self):
@@ -1050,7 +1124,10 @@ class FPCandidate(Candidate):
 
         # Strip away any eventual section
         # as there is not implemented support for it
-        fcategory = re.sub(r"#.*", "", results[4])
+        fgallery = re.sub(r"#.*", "", results[4])
+        
+        # Now addToCategorizedFeaturedList can handle sections within the gallery page
+        gallery_without_removing_section = results[4]
 
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
@@ -1064,11 +1141,11 @@ class FPCandidate(Candidate):
                 return
 
         # Featured picture
-        if not len(fcategory):
-            out("%s: (ignoring, category not set)" % self.cutTitle())
+        if not len(fgallery):
+            out("%s: (ignoring, gallery not defined)" % self.cutTitle())
             return
-        self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fcategory).group(1))
-        self.addToCategorizedFeaturedList(fcategory)
+        self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fgallery).group(1))
+        self.addToCategorizedFeaturedList(gallery_without_removing_section)
         self.addAssessments()
         self.addToCurrentMonth()
         self.notifyNominator()
@@ -1077,7 +1154,8 @@ class FPCandidate(Candidate):
 
 
 class DelistCandidate(Candidate):
-    """A delisting candidate"""
+
+    """A delisting candidate."""
 
     def __init__(self, page):
         Candidate.__init__(
@@ -1109,18 +1187,18 @@ class DelistCandidate(Candidate):
         )
 
     def handlePassedCandidate(self, results):
-        # Delistings does not care about the category
+        # Delistings does not care about the gallery
         self.removeFromFeaturedLists(results)
         self.removeAssessments()
         self.moveToLog(self._proString)
 
     def removeFromFeaturedLists(self, results):
-        """Remove a candidate from all featured lists"""
+        """Remove a candidate from all featured lists."""
 
         # We skip checking the page with the 4 newest images
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
-        # So just check and remove the candidate from any category pages
+        # So just check and remove the candidate from any gallery pages
 
         references = self.getImagePage().getReferences(withTemplateInclusion=False)
         for ref in references:
@@ -1152,8 +1230,7 @@ class DelistCandidate(Candidate):
                     )
 
     def removeAssessments(self):
-        """Remove FP status from an image"""
-
+        """Remove FP status from an image."""
         imagePage = self.getImagePage()
         old_text = imagePage.get(get_redirect=True)
 
@@ -1175,7 +1252,7 @@ class DelistCandidate(Candidate):
 
 
 def wikipattern(s):
-    """Return a string that can be matched against different way of writing it on wikimedia projects"""
+    """Return a string that can be matched against different way of writing it on wikimedia projects."""
 
     def rep(m):
         if m.group(0) == " " or m.group(0) == "_":
@@ -1187,7 +1264,7 @@ def wikipattern(s):
 
 
 def out(text, newline=True, date=False, color=None):
-    """Just output some text to the consoloe or log"""
+    """Just output some text to the consoloe or log."""
     if color:
         text = "\03{%s}%s\03{default}" % (color, text)
     dstr = (
@@ -1199,7 +1276,7 @@ def out(text, newline=True, date=False, color=None):
 
 
 def findCandidates(page_url, delist):
-    """This finds all candidates on the main FPC page"""
+    """Finds all candidates on the main FPC page."""
 
     page = pywikibot.Page(G_Site, page_url)
 
@@ -1227,6 +1304,9 @@ def checkCandidates(check, page, delist):
     @param page   A page containing all candidates
     @param delist Boolean, telling whether this is delistings of fpcs
     """
+    if not G_Site.logged_in():
+        G_Site.login()
+
     candidates = findCandidates(page, delist)
 
     def containsPattern(candidate):
@@ -1280,7 +1360,7 @@ def filter_content(text):
 
 
 def strip_tag(text, tag):
-    """Will simply take a tag and remove a specified tag"""
+    """Will simply take a tag and remove a specified tag."""
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
 
 
@@ -1471,7 +1551,7 @@ VerifiedResultR = re.compile(
                               \s*oppose\s*=\s*(\d+)\s*\|            # Oppose Votes  (2)
                               \s*neutral\s*=\s*(\d+)\s*\|           # Neutral votes (3)
                               \s*featured\s*=\s*(\w+)\s*\|          # Featured, should be yes or no, but is not verified at this point (4)
-                              \s*category\s*=\s*([^|]*)             # A category if the image was featured (5)
+                              \s*gallery\s*=\s*([^|]*)              # A gallery page if the image was featured (5)
                               (?:\|\s*alternative\s*=\s*([^|]*))?   # For candidate with alternatives this specifies the winning image (6)
                               .*}}                                  # END
                               """,
@@ -1683,5 +1763,3 @@ if __name__ == "__main__":
         main()
     finally:
         pywikibot.stopme()
-
-
