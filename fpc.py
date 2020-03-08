@@ -34,7 +34,6 @@ from tendo import singleton
 
 
 class NotImplementedException(Exception):
-
     """Not implemented."""
 
 
@@ -124,20 +123,28 @@ class Candidate:
         else:
             return history[0][2]
 
-    def uploader(self, link=True):
-        """Return the link to the user that uploaded the nominated image."""
-        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
-        history = page.getVersionHistory(reverseOrder=True, total=1)
-        if not history:
-            return "Unknown"
-        if link:
-            return "[[User:%s|%s]]" % (history[0][2], history[0][2])
-        else:
-            return history[0][2]
 
     def creator(self):
-        """Return the link to the user that created the image."""
-        return self.uploader()
+        """Return the link to the user that created the image, Not implemented yet."""
+        pass
+
+    def isSet(self):
+        """Check if the nomination page has "/[Ss]et/" in it, if yes it must be a set nomination."""
+        if re.search(r"/[Ss]et", self.page.title()):
+            return True
+        else:
+            return False
+    
+    def setFiles(self):
+        """Try to return list of all files in a set, files in the last gallery in the nomination page."""
+        m = re.search(r"<gallery([^\]]*)</gallery>", self.page.get(get_redirect=True))
+        text_inside_gallery = m.group(1)
+        filesList = []
+        for line in text_inside_gallery.splitlines():
+            if line.startswith('File:'):
+                files = re.sub(r"\|.*", "", line)
+                filesList.append(files)
+        return filesList
 
     def findGalleryOfFile(self):
         """Try to find Gallery in the nomination page to make closing users life easier."""
@@ -576,6 +583,10 @@ class Candidate:
 
         @param gallery The categorization gallery
         """
+        if self.isSet() == True:
+            file = (self.setFiles())[0] # Add the first file from gallery.
+        else:
+            file = self.newFileNameIfMoved()
 
         listpage = "Commons:Featured pictures, list"
         page = pywikibot.Page(G_Site, listpage)
@@ -584,7 +595,7 @@ class Candidate:
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
-        if re.search(wikipattern(self.fileName()), old_text):
+        if re.search(wikipattern(file), old_text):
             out(
                 "Skipping addToFeaturedList for '%s', page already listed."
                 % self.cleanTitle(),
@@ -595,7 +606,6 @@ class Candidate:
         # This function first needs to find the gallery
         # then inside the gallery tags remove the last line and
         # add this candidate to the top
-
         # Thanks KODOS for a nice regexp gui
         # This adds ourself first in the list of length 4 and removes the last
         # all in the chosen gallery
@@ -605,8 +615,8 @@ class Candidate:
             % wikipattern(gallery),
             re.MULTILINE,
         )
-        new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % self.fileName(), old_text)
-        self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
+        new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
+        self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def addToCategorizedFeaturedList(self, gallery):
         """
@@ -617,58 +627,71 @@ class Candidate:
         This is ==STEP 2== of the parking procedure
 
         @param gallery The categorization gallery
+        If it's a set, will add all file from the list,
+        else just one if single nomination.
         """
-        gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
-        page = pywikibot.Page(G_Site, gallery_full_path)
-        old_text = page.get(get_redirect=True)
-        section_regex = r"#(.*)"
-        search_section = re.search(section_regex, gallery)
-        try:
-            section = search_section.group(1)
-        except AttributeError:
-            section = None
-        if section != None:
-            # Trying to generate a regex for finding the section in a gallery if specified in nomination
-            # First we are escaping all parentheses, as they are used in regex
-            # Replacement of all uunderscore with \s , some users just copy the url
-            # Replacing all \s with \s(?:\s*|)\s, user have linked the section to gallery. Why ? To make our lives harder 
-            section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
-            regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
-            search_for_section = re.search(regex_for_searching_sections, old_text)
+        if self.isSet() == True:
+            files = self.setFiles()
+        else:
+            files = []
+            files.append(self.newFileNameIfMoved())
+        for file in files:
+            gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
+            page = pywikibot.Page(G_Site, gallery_full_path)
+            old_text = page.get(get_redirect=True)
+            section_regex = r"#(.*)"
+            search_section = re.search(section_regex, gallery)
             try:
-                section_text_search = search_for_section.group()
+                section = search_section.group(1)
             except AttributeError:
                 section = None
 
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
-        if re.search(wikipattern(self.fileName()), old_text):
-            out(
-                "Skipping addToCategorizedFeaturedList for '%s', page already listed."
-                % self.cleanTitle(),
-                color="lightred",
-            )
-            return
+            if section != None:
 
-        # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
-        if section != None:
-            line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
-            candidate_text = "%s|%s" % (self.fileName(), self.cleanTitle())
-            append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
-            new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
-        else:
-            # We just need to append to the bottom of the gallery with an added title
-            # The regexp uses negative lookahead such that we place the candidate in the
-            # last gallery on the page.
-            new_text = re.sub(
-                "(?s)</gallery>(?!.*</gallery>)",
-                "%s|%s\n</gallery>" % (self.fileName(), self.cleanTitle()),
-                old_text,
-                1,
-            )
+                # Trying to generate a regex for finding the section in a gallery if specified in nomination
+                # First we are escaping all parentheses, as they are used in regex
+                # Replacement of all uunderscore with \s , some users just copy the url
+                # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
 
-        self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
+                section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
+                regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+                search_for_section = re.search(regex_for_searching_sections, old_text)
+                try:
+                    section_text_search = search_for_section.group()
+                except AttributeError:
+                    section = None
+
+            # First check if we are already on the page,
+            # in that case skip. Can happen if the process
+            # have been previously interrupted.
+
+            if re.search(wikipattern(file), old_text):
+                out(
+                    "Skipping addToCategorizedFeaturedList for '%s', page already listed."
+                    % self.cleanTitle(),
+                    color="lightred",
+                )
+                return
+
+            # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
+
+            if section != None:
+                line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
+                candidate_text = "%s|%s" % (file, self.cleanTitle())
+                append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
+                new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
+            else:
+                # We just need to append to the bottom of the gallery with an added title
+                # The regexp uses negative lookahead such that we place the candidate in the
+                # last gallery on the page.
+                new_text = re.sub(
+                    "(?s)</gallery>(?!.*</gallery>)",
+                    "%s|%s\n</gallery>" % (file, self.cleanTitle()),
+                    old_text,
+                    1,
+                )
+
+            self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def getImagePage(self):
         """Get the image page itself."""
@@ -678,55 +701,72 @@ class Candidate:
         """
         Adds the the assessments template to a featured
         pictures descripion page.
-
         This is ==STEP 3== of the parking procedure
         newFileNameIfMoved checks if file is moved, if
         moved returns the target name else returns Original
         fileName
-
+        Will add assessments to all files in a set
         """
-        page = pywikibot.Page(G_Site, self.newFileNameIfMoved())
-        old_text = page.get(get_redirect=True)
 
-        AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
-
-        fn_or = self.fileName(alternative=False)  # Original filename
-        fn_al = self.fileName(alternative=True)  # Alternative filename
-        # We add the com-nom parameter if the original filename
-        # differs from the alternative filename.
-        comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
-
-        # First check if there already is an assessments template on the page
-        params = re.search(AssR, old_text)
-        if params:
-            # Make sure to remove any existing com/features or subpage params
-            # TODO: 'com' will be obsolete in the future and can then be removed
-            # TODO: 'subpage' is the old name of com-nom. Can be removed later.
-            params = re.sub(r"\|\s*(?:featured|com)\s*=\s*\d+", "", params.group(1))
-            params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
-            params += "|featured=1"
-            params += comnom
-            if params.find("|") != 0:
-                params = "|" + params
-            new_ass = "{{Assessments%s}}" % params
-            new_text = re.sub(AssR, new_ass, old_text)
-            if new_text == old_text:
-                out(
-                    "No change in addAssessments, '%s' already featured."
-                    % self.cleanTitle()
-                )
-                return
+        if self.isSet() == True:
+            files = self.setFiles()
         else:
-            # There is no assessments template so just add it
-            end = findEndOfTemplate(old_text, "[Ii]nformation")
-            new_text = (
-                old_text[:end]
-                + "\n{{Assessments|featured=1%s}}\n" % comnom
-                + old_text[end:]
-            )
-            # new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
+            files = []
+            files.append(self.newFileNameIfMoved())
+        for file in files:
+            page = pywikibot.Page(G_Site, file)
+            current_page = page
+            old_text = page.get(get_redirect=True)
+            AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
+            fn_or = self.fileName(alternative=False)  # Original filename
+            fn_al = self.fileName(alternative=True)  # Alternative filename
+            # We add the com-nom parameter if the original filename
+            # differs from the alternative filename.
+            comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
+            
+            # The template needs the com-nom to link to the site from file page
+            if self.isSet() == True:
+                comnom = "|com-nom="+(re.search(r"/[Ss]et/(.*)", self.page.title())).group(1)
+            else:
+                pass
 
-        self.commit(old_text, new_text, page, "FPC promotion")
+            # First check if there already is an assessments template on the page
+            params = re.search(AssR, old_text)
+            if params:
+                # Make sure to remove any existing com/features or subpage params
+                # TODO: 'com' will be obsolete in the future and can then be removed
+                # TODO: 'subpage' is the old name of com-nom. Can be removed later.
+                params = re.sub(r"\|\s*(?:featured|com)\s*=\s*\d+", "", params.group(1))
+                params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
+                params += "|featured=1"
+                params += comnom
+                if params.find("|") != 0:
+                    params = "|" + params
+                new_ass = "{{Assessments%s}}" % params
+                new_text = re.sub(AssR, new_ass, old_text)
+                if new_text == old_text:
+                    out(
+                        "No change in addAssessments, '%s' already featured."
+                        % self.cleanTitle()
+                    )
+                    return
+            else:
+                # There is no assessments template so just add it
+                if re.search(r"\{\{(?:|\s*)[Ll]ocation", old_text):
+                    end = findEndOfTemplate(old_text, "[Ll]ocation")
+                elif re.search(r"\{\{(?:|\s*)[Oo]bject[_\s][Ll]ocation", old_text):
+                    end = findEndOfTemplate(old_text, "[Oo]bject[_\s][Ll]ocation")
+                else:
+                    end = findEndOfTemplate(old_text, "[Ii]nformation")
+                
+
+                new_text = (
+                    old_text[:end]
+                    + "\n{{Assessments|featured=1%s}}\n" % comnom
+                    + old_text[end:]
+                )
+                # new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
+                self.commit(old_text, new_text, current_page, "FPC promotion")
 
     def addToCurrentMonth(self):
         """
@@ -734,68 +774,79 @@ class Candidate:
 
         This is ==STEP 4== of the parking procedure
         """
-        FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
-        NomPagetext = self.page.get(get_redirect=True)
-        matches = FinalVotesR.finditer(NomPagetext)
-        for m in matches:
-            if m is None:
-                ws=wo=wn= "x"
+        if self.isSet() == True:
+            files = (self.setFiles())[:1] # The first file from gallery.
+        else:
+            files = []
+            files.append(self.newFileNameIfMoved())
+        for file in files:
+            FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
+            NomPagetext = self.page.get(get_redirect=True)
+            matches = FinalVotesR.finditer(NomPagetext)
+            for m in matches:
+                if m is None:
+                    ws=wo=wn= "x"
+                else:
+                    ws = m.group(1)
+                    wo = m.group(2)
+                    wn = m.group(3)
+
+            today = datetime.date.today()
+            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (Month[today.month], today.year,)
+            page = pywikibot.Page(G_Site, monthpage)
+            try:
+                old_text = page.get(get_redirect=True)
+            except pywikibot.NoPage:
+                old_text = ""
+            # First check if we are already on the page,
+            # in that case skip. Can happen if the process
+            # have been previously interrupted.
+            if re.search(wikipattern(file), old_text):
+                out(
+                    "Skipping addToCurrentMonth for '%s', page already listed."
+                    % self.cleanTitle(),
+                    color="lightred",
+                )
+                return
+
+            # Find the number of lines in the gallery
+            m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
+            try:
+                count = m.group(0).count("\n")
+            except:
+                count = 1
+
+            # We just need to append to the bottom of the gallery
+            # with an added title
+            # TODO: We lack a good way to find the creator, so it is left out at the moment
+
+            if count ==1:
+                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
+            else:pass
+            
+            if self.isSet() == True:
+                file_title = "'''%s''' - a set of %s files" % ((re.search(r"/[Ss]et/(.*)", self.page.title())).group(1), str(len(self.setFiles())))
             else:
-                ws = m.group(1)
-                wo = m.group(2)
-                wn = m.group(3)
-    
+                file_title = self.cleanTitle()
                 
-        today = datetime.date.today()
-        monthpage = "Commons:Featured_pictures/chronological/%s %s" % (Month[today.month], today.year,)
-        page = pywikibot.Page(G_Site, monthpage)
-        try:
-            old_text = page.get(get_redirect=True)
-        except pywikibot.NoPage:
-            old_text = ""
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
-        if re.search(wikipattern(self.fileName()), old_text):
-            out(
-                "Skipping addToCurrentMonth for '%s', page already listed."
-                % self.cleanTitle(),
-                color="lightred",
+
+            new_text = re.sub(
+                "</gallery>",
+                "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
+                % (
+                    file,
+                    count,
+                    file_title,
+                    uploader(file),
+                    self.nominator(),
+                    ws,
+                    wo,
+                    wn,
+                ),
+                old_text,
             )
-            return
 
-        # Find the number of lines in the gallery
-        m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
-        try:
-            count = m.group(0).count("\n")
-        except:
-            count = 1
-
-        # We just need to append to the bottom of the gallery
-        # with an added title
-        # TODO: We lack a good way to find the creator, so it is left out at the moment
-
-        if count ==1:
-            old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
-        else:pass
-    
-        new_text = re.sub(
-            "</gallery>",
-            "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
-            % (
-                self.fileName(),
-                count,
-                self.cleanTitle(),
-                self.uploader(),
-                self.nominator(),
-                ws,
-                wo,
-                wn,
-            ),
-            old_text,
-        )
-
-        self.commit(old_text, new_text, page, "Added [[%s]]" % self.fileName())
+            self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def notifyNominator(self):
         """
@@ -821,6 +872,38 @@ class Candidate:
         # First check if we are already on the page,
         # in that case skip. Can happen if the process
         # have been previously interrupted.
+
+        # We add the subpage parameter if the original filename
+        # differs from the alternative filename.
+        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
+
+        # notification for set candidates should add a gallery to talk page and
+        # it should be special compared to usual promotions.
+        
+        if self.isSet() == True:
+            if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
+                return
+            files_newline_string = converttostr(self.setFiles(), '\n')
+            new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
+                files_newline_string,
+                fn_al,
+                subpage,
+            )
+            try:
+                self.commit(
+                    old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
+                )
+            except pywikibot.LockedPage as error:
+                out(
+                    "Page is locked '%s', but ignoring since it's just the user notification."
+                    % error,
+                    color="lightyellow",
+                )
+            return
+        else:
+            pass
+
+
         if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
             out(
                 "Skipping notifyNominator for '%s', page already listed at '%s'."
@@ -828,10 +911,6 @@ class Candidate:
                 color="lightred",
             )
             return
-
-        # We add the subpage parameter if the original filename
-        # differs from the alternative filename.
-        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
 
         new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (
             fn_al,
@@ -852,54 +931,71 @@ class Candidate:
     def notifyUploader(self):
         """
         Add a template to the uploaders talk page
-
         This is ==STEP 6== of the parking procedure
         """
-        talk_link = "User_talk:%s" % self.uploader(link=False)
-        talk_page = pywikibot.Page(G_Site, talk_link)
+        if self.isSet() == True:
+            files = self.setFiles()
+        else:
+            files = []
+            files.append(self.newFileNameIfMoved())
+        
+        for file in files:
+            #Check if nominator and uploaders are same, avoiding adding a template twice
+            if self.nominator() == uploader(file, link=True):
+                continue
 
-        try:
-            old_text = talk_page.get(get_redirect=True)
-        except pywikibot.NoPage:
-            out(
-                "notifyUploader: No such page '%s' but ignoring..." % talk_link,
-                color="lightred",
+            talk_link = "User_talk:%s" % uploader(file, link=False)
+            talk_page = pywikibot.Page(G_Site, talk_link)
+            try:
+                old_text = talk_page.get(get_redirect=True)
+            except pywikibot.NoPage:
+                out(
+                    "notifyUploader: No such page '%s' but ignoring..." % talk_link,
+                    color="lightred",
+                )
+                return
+
+            fn_or = self.fileName(alternative=False)  # Original filename
+            fn_al = self.fileName(alternative=True)  # Alternative filename
+
+            # First check if we are already on the page,
+            # in that case skip. Can happen if the process
+            # have been previously interrupted.
+
+            if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
+                out(
+                    "Skipping notifyUploader for '%s', page already listed at '%s'."
+                    % (self.cleanTitle(), talk_link),
+                    color="lightred",
+                )
+                return
+
+            # We add the subpage parameter if the original filename
+            # differs from the alternative filename.
+
+            subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
+            
+            if self.isSet() == True:
+                subpage = "|subpage="+(re.search(r"[Ss]et/(.*)", self.page.title())).group(0)
+                fn_al = file
+
+            new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotedUploader|%s%s}} /~~~~" % (
+                fn_al,
+                subpage,
             )
-            return
 
-        fn_or = self.fileName(alternative=False)  # Original filename
-        fn_al = self.fileName(alternative=True)  # Alternative filename
+            try:
+                self.commit(
+                    old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
+                )
+            except pywikibot.LockedPage as error:
+                out(
+                    "Page is locked '%s', but ignoring since it's just the user notification."
+                    % error,
+                    color="lightyellow",
+                )
 
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
-        if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
-            out(
-                "Skipping notifyUploader for '%s', page already listed at '%s'."
-                % (self.cleanTitle(), talk_link),
-                color="lightred",
-            )
-            return
 
-        # We add the subpage parameter if the original filename
-        # differs from the alternative filename.
-        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
-
-        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotedUploader|%s%s}} /~~~~" % (
-            fn_al,
-            subpage,
-        )
-
-        try:
-            self.commit(
-                old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
-            )
-        except pywikibot.LockedPage as error:
-            out(
-                "Page is locked '%s', but ignoring since it's just the user notification."
-                % error,
-                color="lightyellow",
-            )
     def moveToLog(self, reason=None):
         """
         Remove this candidate from the current list
@@ -1083,7 +1179,6 @@ class Candidate:
 
 
 class FPCandidate(Candidate):
-
     """A candidate up for promotion."""
 
     def __init__(self, page):
@@ -1104,10 +1199,10 @@ class FPCandidate(Candidate):
 
     def getResultString(self):
         if self.imageCount() > 1:
-            return "\n\n{{FPC-results-ready-for-review|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
+            return "\n\n{{FPC-results-unreviewed|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
         else:
             return (
-                "\n\n{{FPC-results-ready-for-review|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}"
+                "\n\n{{FPC-results-unreviewed|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}"
                 % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findGalleryOfFile() )
             )
 
@@ -1125,7 +1220,7 @@ class FPCandidate(Candidate):
         # Strip away any eventual section
         # as there is not implemented support for it
         fgallery = re.sub(r"#.*", "", results[4])
-        
+
         # Now addToCategorizedFeaturedList can handle sections within the gallery page
         gallery_without_removing_section = results[4]
 
@@ -1154,7 +1249,6 @@ class FPCandidate(Candidate):
 
 
 class DelistCandidate(Candidate):
-
     """A delisting candidate."""
 
     def __init__(self, page):
@@ -1174,7 +1268,7 @@ class DelistCandidate(Candidate):
 
     def getResultString(self):
         return (
-            "\n\n{{FPC-delist-results-ready-for-review|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}"
+            "\n\n{{FPC-delist-results-unreviewed|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}"
             % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
         )
 
@@ -1194,7 +1288,6 @@ class DelistCandidate(Candidate):
 
     def removeFromFeaturedLists(self, results):
         """Remove a candidate from all featured lists."""
-
         # We skip checking the page with the 4 newest images
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
@@ -1277,9 +1370,7 @@ def out(text, newline=True, date=False, color=None):
 
 def findCandidates(page_url, delist):
     """Finds all candidates on the main FPC page."""
-
     page = pywikibot.Page(G_Site, page_url)
-
     candidates = []
     templates = page.templates()
     for template in templates:
@@ -1341,7 +1432,7 @@ def checkCandidates(check, page, delist):
 
 def filter_content(text):
     """
-    Will filter away content that should not be parsed
+    Will filter away content that should not be parsed.
 
     Currently this includes:
     * The <s> tag for striking out votes
@@ -1363,11 +1454,26 @@ def strip_tag(text, tag):
     """Will simply take a tag and remove a specified tag."""
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
 
+def uploader(file, link=True):
+    """Return the link to the user that uploaded the nominated image."""
+    page = pywikibot.Page(G_Site, file)
+    history = page.getVersionHistory(reverseOrder=True, total=1)
+    if not history:
+        return "Unknown"
+    if link:
+        return "[[User:%s|%s]]" % (history[0][2], history[0][2])
+    else:
+        return history[0][2]
+
+def converttostr(input_list, seperator):
+   """Make string from list."""
+   resultant_string = seperator.join(input_list)
+   return resultant_string
 
 def findEndOfTemplate(text, template):
     """
-    As regexps can't properly deal with nested parantheses this
-    function will manually scan for where a template ends
+    As regexps can't properly deal with nested parantheses.
+    this function will manually scan for where a template ends
     such that we can insert new text after it.
     Will return the position or 0 if not found.
     """
@@ -1565,10 +1671,10 @@ VerifiedDelistResultR = re.compile(
 
 # Matches the entire line including newline so they can be stripped away
 CountedTemplateR = re.compile(
-    r"^.*{{\s*FPC-results-ready-for-review.*}}.*$\n?", re.MULTILINE
+    r"^.*{{\s*FPC-results-unreviewed.*}}.*$\n?", re.MULTILINE
 )
 DelistCountedTemplateR = re.compile(
-    r"^.*{{\s*FPC-delist-results-ready-for-review.*}}.*$\n?", re.MULTILINE
+    r"^.*{{\s*FPC-delist-results-unreviewed.*}}.*$\n?", re.MULTILINE
 )
 ReviewedTemplateR = re.compile(r"^.*{{\s*FPC-results-reviewed.*}}.*$\n?", re.MULTILINE)
 DelistReviewedTemplateR = re.compile(

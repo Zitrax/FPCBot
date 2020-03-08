@@ -1,0 +1,12 @@
+certifi==2019.11.28
+chardet==3.0.4
+idna==2.9
+mwparserfromhell==0.5.4
+pbr==5.4.4
+pkg-resources==0.0.0
+pycparser==2.19
+pywikibot==3.0.20200111
+requests==2.23.0
+six==1.14.0
+tendo==0.2.15
+urllib3==1.25.8

@@ -1,4 +1,3 @@
-
 This file will just contain some short notes about things to fix or
 features that could be implemented.
 
@@ -9,7 +8,4 @@ assigned to one single author - Look in old logs for duplicate votes
   
 * Implementation: - Look for the next signature following a vote. This
 can also be used to raise a warning about unsigned votes.  - Should
-also look whether a vote comes from a logged in account
-
-== Fix notification template for candidates with multi-candidates ==
-
+also look whether a vote comes from a logged in account.
