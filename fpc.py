@@ -22,7 +22,7 @@ It adds the following commandline arguments:
 -match pattern    Only operate on candidates matching this pattern
 """
 
-import pywikibot, re, datetime, sys, difflib, signal
+import pywikibot, re, datetime, sys, signal
 
 # Imports needed for threading
 import threading, time
@@ -1009,7 +1009,7 @@ class Candidate:
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
         today = datetime.date.today()
-        current_month = Month[today.month]
+        current_month = datetime.datetime.utcnow().strftime("%B")
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (
             current_month,
             today.year,
@@ -1143,18 +1143,10 @@ class Candidate:
         out("\n About to commit changes to: '%s'" % page.title())
 
         # Show the diff
-        for line in difflib.context_diff(
-            old_text.splitlines(1), new_text.splitlines(1)
-        ):
-            if line.startswith("+ "):
-                out(line, newline=False, color="lightgreen")
-            elif line.startswith("- "):
-                out(line, newline=False, color="lightred")
-            elif line.startswith("! "):
-                out(line, newline=False, color="lightyellow")
-            else:
-                out(line, newline=False)
-        out("\n")
+        pywikibot.showDiff(
+            old_text,
+            new_text,
+            )
 
         if G_Dry:
             choice = "n"
@@ -1511,23 +1503,7 @@ def findEndOfTemplate(text, template):
     # Apparently we never found it
     return 0
 
-
 # Data and regexps used by the bot
-Month = {
-    1: "January",
-    2: "February",
-    3: "March",
-    4: "April",
-    5: "May",
-    6: "June",
-    7: "July",
-    8: "August",
-    9: "September",
-    10: "October",
-    11: "November",
-    12: "December",
-}
-
 
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
