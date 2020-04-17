@@ -1153,12 +1153,10 @@ class Candidate:
         elif G_Auto:
             choice = "y"
         else:
-            choice = pywikibot.inputChoice(
+            choice = pywikibot.bot.input_choice(
                 "Do you want to accept these changes to '%s' with comment '%s' ?"
                 % (page.title(), comment),
-                ["Yes", "No", "Quit"],
-                ["y", "N", "q"],
-                "N",
+                [('yes', 'y'), ('no', 'n'), ('quit', 'q')],
             )
 
         if choice == "y":
