@@ -115,13 +115,15 @@ class Candidate:
 
     def nominator(self, link=True):
         """Return the link to the user that nominated this candidate."""
-        history = self.page.getVersionHistory(reverseOrder=True, total=1)
+        history = self.page.revisions(reverse=True, total=1)
+        for data in history:
+            username = (data.user)
         if not history:
             return "Unknown"
         if link:
-            return "[[User:%s|%s]]" % (history[0][2], history[0][2])
+            return "[[User:%s|%s]]" % (username, username)
         else:
-            return history[0][2]
+            return username
 
 
     def creator(self):
@@ -1447,13 +1449,15 @@ def strip_tag(text, tag):
 def uploader(file, link=True):
     """Return the link to the user that uploaded the nominated image."""
     page = pywikibot.Page(G_Site, file)
-    history = page.getVersionHistory(reverseOrder=True, total=1)
+    history = page.revisions(reverse=True, total=1)
+    for data in history:
+        username = (data.user)
     if not history:
         return "Unknown"
     if link:
-        return "[[User:%s|%s]]" % (history[0][2], history[0][2])
+        return "[[User:%s|%s]]" % (username, username)
     else:
-        return history[0][2]
+        return username
 
 def converttostr(input_list, seperator):
    """Make string from list."""
