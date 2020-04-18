@@ -631,7 +631,7 @@ class Candidate:
         If it's a set, will add all file from the list,
         else just one if single nomination.
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
@@ -706,7 +706,7 @@ class Candidate:
         Will add assessments to all files in a set
         """
 
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
@@ -723,7 +723,7 @@ class Candidate:
             comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
             
             # The template needs the com-nom to link to the site from file page
-            if self.isSet() == True:
+            if self.isSet():
                 comnom = "|com-nom="+(re.search(r"/[Ss]et/(.*)", self.page.title())).group(1)
             else:
                 pass
@@ -772,7 +772,7 @@ class Candidate:
 
         This is ==STEP 4== of the parking procedure
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = (self.setFiles())[:1] # The first file from gallery.
         else:
             files = []
@@ -822,7 +822,7 @@ class Candidate:
                 old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
             else:pass
             
-            if self.isSet() == True:
+            if self.isSet():
                 file_title = "'''%s''' - a set of %s files" % ((re.search(r"/[Ss]et/(.*)", self.page.title())).group(1), str(len(self.setFiles())))
             else:
                 file_title = self.cleanTitle()
@@ -878,7 +878,7 @@ class Candidate:
         # notification for set candidates should add a gallery to talk page and
         # it should be special compared to usual promotions.
         
-        if self.isSet() == True:
+        if self.isSet():
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
             files_newline_string = converttostr(self.setFiles(), '\n')
@@ -931,7 +931,7 @@ class Candidate:
         Add a template to the uploaders talk page
         This is ==STEP 6== of the parking procedure
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
@@ -973,7 +973,7 @@ class Candidate:
 
             subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
             
-            if self.isSet() == True:
+            if self.isSet():
                 subpage = "|subpage="+(re.search(r"[Ss]et/(.*)", self.page.title())).group(0)
                 fn_al = file
 
