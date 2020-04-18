@@ -342,7 +342,8 @@ class Candidate:
         if self._creationTime:
             return self._creationTime
 
-        history = self.page.getVersionHistory(reverseOrder=True, total=1)
+        history = page.revisions(reverse=True, total=1)
+
         if not history:
             out(
                 "Could not retrieve history for '%s', returning now()"
@@ -350,7 +351,8 @@ class Candidate:
             )
             return datetime.datetime.now()
 
-        self._creationTime = history[0][1]
+        for data in history:
+            self._creationTime = (data['timestamp'])
 
         # print "C:" + self._creationTime.isoformat()
         # print "N:" + datetime.datetime.utcnow().isoformat()
