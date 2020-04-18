@@ -34,6 +34,7 @@ from tendo import singleton
 
 
 class NotImplementedException(Exception):
+
     """Not implemented."""
 
 
@@ -333,7 +334,7 @@ class Candidate:
         if self._creationTime:
             return self._creationTime
 
-        history = page.revisions(reverse=True, total=1)
+        history = self.page.revisions(reverse=True, total=1)
 
         if not history:
             out(
@@ -807,11 +808,11 @@ class Candidate:
                 )
                 return
 
-            # Find the number of lines in the gallery
+            # Find the number of lines in the gallery, if AttributeError set count as 1
             m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
             try:
                 count = m.group(0).count("\n")
-            except:
+            except AttributeError:
                 count = 1
 
             # We just need to append to the bottom of the gallery
