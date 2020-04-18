@@ -790,7 +790,7 @@ class Candidate:
                     wn = m.group(3)
 
             today = datetime.date.today()
-            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (Month[today.month], today.year,)
+            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
             page = pywikibot.Page(G_Site, monthpage)
             try:
                 old_text = page.get(get_redirect=True)
@@ -819,7 +819,7 @@ class Candidate:
             # TODO: We lack a good way to find the creator, so it is left out at the moment
 
             if count ==1:
-                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
+                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
             else:pass
             
             if self.isSet():
