@@ -162,15 +162,6 @@ class Candidate:
 
         return Gallery
 
-    def newFileNameIfMoved(self):
-        """Returns new location of file if moved, issue-4."""
-        page = pywikibot.Page(G_Site, self.fileName())
-        if page.isRedirectPage() == True:
-            return re.sub (r'(?:\[|\]|commons:)', '', str(page.getRedirectTarget()))
-        else:
-            file_name = self.fileName()
-            return file_name
-
     def countVotes(self):
         """
         Counts all the votes for this nomination
@@ -556,6 +547,7 @@ class Candidate:
         Return only the filename of this candidate
         This is first based on the title of the page but if that page is not found
         then the first image link in the page is used.
+        Will return the new file name if moved.
         @param alternative if false disregard any alternative and return the real filename
         """
         # The regexp here also removes any possible crap between the prefix
@@ -575,6 +567,11 @@ class Candidate:
             if match:
                 self._fileName = match.group(1)
 
+        #Check if file was moved after nomination
+        page = pywikibot.Page(G_Site, self._fileName)
+        if page.isRedirectPage():
+            self._fileName = page.getRedirectTarget().title()
+
         return self._fileName
 
     def addToFeaturedList(self, gallery):
@@ -587,10 +584,10 @@ class Candidate:
 
         @param gallery The categorization gallery
         """
-        if self.isSet() == True:
+        if self.isSet():
             file = (self.setFiles())[0] # Add the first file from gallery.
         else:
-            file = self.newFileNameIfMoved()
+            file = self.fileName()
 
         listpage = "Commons:Featured pictures, list"
         page = pywikibot.Page(G_Site, listpage)
@@ -638,7 +635,7 @@ class Candidate:
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
             page = pywikibot.Page(G_Site, gallery_full_path)
@@ -706,9 +703,6 @@ class Candidate:
         Adds the the assessments template to a featured
         pictures descripion page.
         This is ==STEP 3== of the parking procedure
-        newFileNameIfMoved checks if file is moved, if
-        moved returns the target name else returns Original
-        fileName
         Will add assessments to all files in a set
         """
 
@@ -716,7 +710,7 @@ class Candidate:
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             page = pywikibot.Page(G_Site, file)
             current_page = page
@@ -782,7 +776,7 @@ class Candidate:
             files = (self.setFiles())[:1] # The first file from gallery.
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
             NomPagetext = self.page.get(get_redirect=True)
@@ -941,7 +935,7 @@ class Candidate:
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         
         for file in files:
             #Check if nominator and uploaders are same, avoiding adding a template twice
