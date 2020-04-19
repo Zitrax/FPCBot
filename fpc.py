@@ -1430,7 +1430,7 @@ def filter_content(text):
     * Html comments
 
     """
-    text = strip_tag(text, "s")
+    text = strip_tag(text, "[Ss]")
     text = strip_tag(text, "nowiki")
     text = re.sub(
         r"(?s){{\s*[Ii]mageNote\s*\|.*?}}.*{{\s*[iI]mageNoteEnd.*?}}", "", text
