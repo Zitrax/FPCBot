@@ -22,7 +22,7 @@ It adds the following commandline arguments:
 -match pattern    Only operate on candidates matching this pattern
 """
 
-import pywikibot, re, datetime, sys, difflib, signal
+import pywikibot, re, datetime, sys, signal
 
 # Imports needed for threading
 import threading, time
@@ -34,6 +34,7 @@ from tendo import singleton
 
 
 class NotImplementedException(Exception):
+
     """Not implemented."""
 
 
@@ -115,13 +116,15 @@ class Candidate:
 
     def nominator(self, link=True):
         """Return the link to the user that nominated this candidate."""
-        history = self.page.getVersionHistory(reverseOrder=True, total=1)
+        history = self.page.revisions(reverse=True, total=1)
+        for data in history:
+            username = (data.user)
         if not history:
             return "Unknown"
         if link:
-            return "[[User:%s|%s]]" % (history[0][2], history[0][2])
+            return "[[User:%s|%s]]" % (username, username)
         else:
-            return history[0][2]
+            return username
 
 
     def creator(self):
@@ -159,15 +162,6 @@ class Candidate:
             Gallery = ""
 
         return Gallery
-
-    def newFileNameIfMoved(self):
-        """Returns new location of file if moved, issue-4."""
-        page = pywikibot.Page(G_Site, self.fileName())
-        if page.isRedirectPage() == True:
-            return re.sub (r'(?:\[|\]|commons:)', '', str(page.getRedirectTarget()))
-        else:
-            file_name = self.fileName()
-            return file_name
 
     def countVotes(self):
         """
@@ -340,7 +334,8 @@ class Candidate:
         if self._creationTime:
             return self._creationTime
 
-        history = self.page.getVersionHistory(reverseOrder=True, total=1)
+        history = self.page.revisions(reverse=True, total=1)
+
         if not history:
             out(
                 "Could not retrieve history for '%s', returning now()"
@@ -348,7 +343,8 @@ class Candidate:
             )
             return datetime.datetime.now()
 
-        self._creationTime = history[0][1]
+        for data in history:
+            self._creationTime = (data['timestamp'])
 
         # print "C:" + self._creationTime.isoformat()
         # print "N:" + datetime.datetime.utcnow().isoformat()
@@ -552,6 +548,7 @@ class Candidate:
         Return only the filename of this candidate
         This is first based on the title of the page but if that page is not found
         then the first image link in the page is used.
+        Will return the new file name if moved.
         @param alternative if false disregard any alternative and return the real filename
         """
         # The regexp here also removes any possible crap between the prefix
@@ -571,6 +568,11 @@ class Candidate:
             if match:
                 self._fileName = match.group(1)
 
+        #Check if file was moved after nomination
+        page = pywikibot.Page(G_Site, self._fileName)
+        if page.isRedirectPage():
+            self._fileName = page.getRedirectTarget().title()
+
         return self._fileName
 
     def addToFeaturedList(self, gallery):
@@ -583,10 +585,10 @@ class Candidate:
 
         @param gallery The categorization gallery
         """
-        if self.isSet() == True:
+        if self.isSet():
             file = (self.setFiles())[0] # Add the first file from gallery.
         else:
-            file = self.newFileNameIfMoved()
+            file = self.fileName()
 
         listpage = "Commons:Featured pictures, list"
         page = pywikibot.Page(G_Site, listpage)
@@ -630,11 +632,11 @@ class Candidate:
         If it's a set, will add all file from the list,
         else just one if single nomination.
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
             page = pywikibot.Page(G_Site, gallery_full_path)
@@ -702,17 +704,14 @@ class Candidate:
         Adds the the assessments template to a featured
         pictures descripion page.
         This is ==STEP 3== of the parking procedure
-        newFileNameIfMoved checks if file is moved, if
-        moved returns the target name else returns Original
-        fileName
         Will add assessments to all files in a set
         """
 
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             page = pywikibot.Page(G_Site, file)
             current_page = page
@@ -725,7 +724,7 @@ class Candidate:
             comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
             
             # The template needs the com-nom to link to the site from file page
-            if self.isSet() == True:
+            if self.isSet():
                 comnom = "|com-nom="+(re.search(r"/[Ss]et/(.*)", self.page.title())).group(1)
             else:
                 pass
@@ -774,11 +773,11 @@ class Candidate:
 
         This is ==STEP 4== of the parking procedure
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = (self.setFiles())[:1] # The first file from gallery.
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         for file in files:
             FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
             NomPagetext = self.page.get(get_redirect=True)
@@ -792,7 +791,7 @@ class Candidate:
                     wn = m.group(3)
 
             today = datetime.date.today()
-            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (Month[today.month], today.year,)
+            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
             page = pywikibot.Page(G_Site, monthpage)
             try:
                 old_text = page.get(get_redirect=True)
@@ -809,11 +808,11 @@ class Candidate:
                 )
                 return
 
-            # Find the number of lines in the gallery
+            # Find the number of lines in the gallery, if AttributeError set count as 1
             m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
             try:
                 count = m.group(0).count("\n")
-            except:
+            except AttributeError:
                 count = 1
 
             # We just need to append to the bottom of the gallery
@@ -821,10 +820,10 @@ class Candidate:
             # TODO: We lack a good way to find the creator, so it is left out at the moment
 
             if count ==1:
-                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (Month[today.month], today.year,)
+                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
             else:pass
             
-            if self.isSet() == True:
+            if self.isSet():
                 file_title = "'''%s''' - a set of %s files" % ((re.search(r"/[Ss]et/(.*)", self.page.title())).group(1), str(len(self.setFiles())))
             else:
                 file_title = self.cleanTitle()
@@ -880,7 +879,7 @@ class Candidate:
         # notification for set candidates should add a gallery to talk page and
         # it should be special compared to usual promotions.
         
-        if self.isSet() == True:
+        if self.isSet():
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
             files_newline_string = converttostr(self.setFiles(), '\n')
@@ -933,11 +932,11 @@ class Candidate:
         Add a template to the uploaders talk page
         This is ==STEP 6== of the parking procedure
         """
-        if self.isSet() == True:
+        if self.isSet():
             files = self.setFiles()
         else:
             files = []
-            files.append(self.newFileNameIfMoved())
+            files.append(self.fileName())
         
         for file in files:
             #Check if nominator and uploaders are same, avoiding adding a template twice
@@ -975,7 +974,7 @@ class Candidate:
 
             subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
             
-            if self.isSet() == True:
+            if self.isSet():
                 subpage = "|subpage="+(re.search(r"[Ss]et/(.*)", self.page.title())).group(0)
                 fn_al = file
 
@@ -1009,7 +1008,7 @@ class Candidate:
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
         today = datetime.date.today()
-        current_month = Month[today.month]
+        current_month = datetime.datetime.utcnow().strftime("%B")
         log_link = "Commons:Featured picture candidates/Log/%s %s" % (
             current_month,
             today.year,
@@ -1143,30 +1142,20 @@ class Candidate:
         out("\n About to commit changes to: '%s'" % page.title())
 
         # Show the diff
-        for line in difflib.context_diff(
-            old_text.splitlines(1), new_text.splitlines(1)
-        ):
-            if line.startswith("+ "):
-                out(line, newline=False, color="lightgreen")
-            elif line.startswith("- "):
-                out(line, newline=False, color="lightred")
-            elif line.startswith("! "):
-                out(line, newline=False, color="lightyellow")
-            else:
-                out(line, newline=False)
-        out("\n")
+        pywikibot.showDiff(
+            old_text,
+            new_text,
+            )
 
         if G_Dry:
             choice = "n"
         elif G_Auto:
             choice = "y"
         else:
-            choice = pywikibot.inputChoice(
+            choice = pywikibot.bot.input_choice(
                 "Do you want to accept these changes to '%s' with comment '%s' ?"
                 % (page.title(), comment),
-                ["Yes", "No", "Quit"],
-                ["y", "N", "q"],
-                "N",
+                [('yes', 'y'), ('no', 'n'), ('quit', 'q')],
             )
 
         if choice == "y":
@@ -1441,7 +1430,7 @@ def filter_content(text):
     * Html comments
 
     """
-    text = strip_tag(text, "s")
+    text = strip_tag(text, "[Ss]")
     text = strip_tag(text, "nowiki")
     text = re.sub(
         r"(?s){{\s*[Ii]mageNote\s*\|.*?}}.*{{\s*[iI]mageNoteEnd.*?}}", "", text
@@ -1457,13 +1446,15 @@ def strip_tag(text, tag):
 def uploader(file, link=True):
     """Return the link to the user that uploaded the nominated image."""
     page = pywikibot.Page(G_Site, file)
-    history = page.getVersionHistory(reverseOrder=True, total=1)
+    history = page.revisions(reverse=True, total=1)
+    for data in history:
+        username = (data.user)
     if not history:
         return "Unknown"
     if link:
-        return "[[User:%s|%s]]" % (history[0][2], history[0][2])
+        return "[[User:%s|%s]]" % (username, username)
     else:
-        return history[0][2]
+        return username
 
 def converttostr(input_list, seperator):
    """Make string from list."""
@@ -1511,23 +1502,7 @@ def findEndOfTemplate(text, template):
     # Apparently we never found it
     return 0
 
-
 # Data and regexps used by the bot
-Month = {
-    1: "January",
-    2: "February",
-    3: "March",
-    4: "April",
-    5: "May",
-    6: "June",
-    7: "July",
-    8: "August",
-    9: "September",
-    10: "October",
-    11: "November",
-    12: "December",
-}
-
 
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
