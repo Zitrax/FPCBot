@@ -30,7 +30,7 @@ from pywikibot import config
 
 # Import for single process check
 # dependency can be installed using "easy_install tendo"
-# from tendo import singleton
+from tendo import singleton
 
 
 class NotImplementedException(Exception):
@@ -1712,7 +1712,7 @@ def main(*args):
     global G_Site
 
     # Will sys.exit(-1) if another instance is running
-    #me = singleton.SingleInstance()
+    me = singleton.SingleInstance()
 
     candidates_page = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2009"
