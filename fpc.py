@@ -30,7 +30,7 @@ from pywikibot import config
 
 # Import for single process check
 # dependency can be installed using "easy_install tendo"
-from tendo import singleton
+# from tendo import singleton
 
 
 class NotImplementedException(Exception):
@@ -1253,7 +1253,7 @@ class DelistCandidate(Candidate):
             DelistCountedTemplateR,
             VerifiedDelistResultR,
         )
-        self._listPageName = "Commons:Featured picture candidates/removal"
+        self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
         return (
@@ -1366,9 +1366,9 @@ def findCandidates(page_url, delist):
         title = template.title()
         if title.startswith(candPrefix):
             # out("Adding '%s' (delist=%s)" % (title,delist))
-            if delist:
+            if delist and "/removal/" in title:
                 candidates.append(DelistCandidate(template))
-            else:
+            elif not delist and "/removal/" not in title:
                 candidates.append(FPCandidate(template))
         else:
             pass
@@ -1712,10 +1712,9 @@ def main(*args):
     global G_Site
 
     # Will sys.exit(-1) if another instance is running
-    me = singleton.SingleInstance()
+    #me = singleton.SingleInstance()
 
-    fpcPage = "Commons:Featured picture candidates/candidate_list"
-    delistPage = "Commons:Featured_picture_candidates/removal"
+    candidates_page = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2009"
 
     worked = False
@@ -1802,17 +1801,17 @@ def main(*args):
         elif arg == "-close":
             if delist:
                 out("Closing delist candidates...", color="lightblue")
-                checkCandidates(Candidate.closePage, delistPage, delist=True)
+                checkCandidates(Candidate.closePage, candidates_page, delist=True)
             if fpc:
                 out("Closing fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.closePage, fpcPage, delist=False)
+                checkCandidates(Candidate.closePage, candidates_page, delist=False)
         elif arg == "-info":
             if delist:
                 out("Gathering info about delist candidates...", color="lightblue")
-                checkCandidates(Candidate.printAllInfo, delistPage, delist=True)
+                checkCandidates(Candidate.printAllInfo, candidates_page, delist=True)
             if fpc:
                 out("Gathering info about fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.printAllInfo, fpcPage, delist=False)
+                checkCandidates(Candidate.printAllInfo, candidates_page, delist=False)
         elif arg == "-park":
             if G_Threads and G_Auto:
                 out(
@@ -1822,10 +1821,10 @@ def main(*args):
                 sys.exit(0)
             if delist:
                 out("Parking delist candidates...", color="lightblue")
-                checkCandidates(Candidate.park, delistPage, delist=True)
+                checkCandidates(Candidate.park, candidates_page, delist=True)
             if fpc:
                 out("Parking fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.park, fpcPage, delist=False)
+                checkCandidates(Candidate.park, candidates_page, delist=False)
 
     if not worked:
         out("Warning - you need to specify an argument, see -help.", color="lightred")
