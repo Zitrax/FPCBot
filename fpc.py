@@ -642,7 +642,7 @@ class Candidate:
             page = pywikibot.Page(G_Site, gallery_full_path)
             old_text = page.get(get_redirect=True)
             section_R = r"#(.*)"
-            m = re.search(section_regex, gallery)
+            m = re.search(section_R, gallery)
             try:
                 section = m.group(1)
             except AttributeError:
@@ -656,8 +656,8 @@ class Candidate:
                 # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
 
                 section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
-                scetion_search_R = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
-                m = re.search(scetion_search_R, old_text)
+                section_search_R = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+                m = re.search(section_search_R, old_text)
                 try:
                     old_section = m.group()
                 except AttributeError:
@@ -677,7 +677,7 @@ class Candidate:
 
             # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
             if section != None:
-                file_info = "%s|%s" % (file, self.cleanTitle())
+                file_info = "%s|%s\n</gallery>" % (file, self.cleanTitle())
                 updated_section = re.sub(r"</gallery>", file_info, old_section)
                 new_text = re.sub(old_section, updated_section, old_text)
             else:
