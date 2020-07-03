@@ -641,10 +641,10 @@ class Candidate:
             gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
             page = pywikibot.Page(G_Site, gallery_full_path)
             old_text = page.get(get_redirect=True)
-            section_regex = r"#(.*)"
-            search_section = re.search(section_regex, gallery)
+            section_R = r"#(.*)"
+            m = re.search(section_regex, gallery)
             try:
-                section = search_section.group(1)
+                section = m.group(1)
             except AttributeError:
                 section = None
 
@@ -656,10 +656,10 @@ class Candidate:
                 # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
 
                 section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
-                regex_for_searching_sections = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
-                search_for_section = re.search(regex_for_searching_sections, old_text)
+                scetion_search_R = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+                m = re.search(scetion_search_R, old_text)
                 try:
-                    section_text_search = search_for_section.group()
+                    old_section = m.group()
                 except AttributeError:
                     section = None
 
@@ -676,12 +676,10 @@ class Candidate:
                 return
 
             # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
-
             if section != None:
-                line_above_the_closing_gallery_tag = section_text_search.splitlines()[-2]
-                candidate_text = "%s|%s" % (file, self.cleanTitle())
-                append_candidate_text_in_line_above_closing_gallery_tag = line_above_the_closing_gallery_tag + "\n" + candidate_text
-                new_text = old_text.replace(line_above_the_closing_gallery_tag, append_candidate_text_in_line_above_closing_gallery_tag,1)
+                file_info = "%s|%s" % (file, self.cleanTitle())
+                updated_section = re.sub(r"</gallery>", file_info, old_section)
+                new_text = re.sub(old_section, updated_section, old_text)
             else:
                 # We just need to append to the bottom of the gallery with an added title
                 # The regexp uses negative lookahead such that we place the candidate in the
