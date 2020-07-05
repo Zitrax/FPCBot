@@ -679,7 +679,7 @@ class Candidate:
             if section != None:
                 file_info = "%s|%s\n</gallery>" % (file, self.cleanTitle())
                 updated_section = re.sub(r"</gallery>", file_info, old_section)
-                new_text = re.sub(old_section, updated_section, old_text)
+                new_text = old_text.replace(old_section, updated_section)
             else:
                 # We just need to append to the bottom of the gallery with an added title
                 # The regexp uses negative lookahead such that we place the candidate in the
