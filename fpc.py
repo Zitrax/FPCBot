@@ -1520,6 +1520,7 @@ support_templates = (
     "[Tt]acaíocht",
     "דעב",
     "[Ww]eak support",
+    "[Ww]eak [Ss]",
     "[Ss]amþykkt",
     "支持",
     "찬성",
