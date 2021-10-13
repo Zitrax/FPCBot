@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 This bot runs as FPCBot on wikimedia commons
 It implements vote counting and supports bot runs as FPCBot on wikimedia commons
@@ -24,13 +23,10 @@ It adds the following commandline arguments:
 
 import pywikibot, re, datetime, sys, signal
 
+
 # Imports needed for threading
 import threading, time
 from pywikibot import config
-
-# Import for single process check
-# dependency can be installed using "easy_install tendo"
-from tendo import singleton
 
 
 class NotImplementedException(Exception):
@@ -111,21 +107,20 @@ class Candidate:
                     self.statusString(),
                 )
             )
-        except pywikibot.NoPage:
+        except pywikibot.exceptions.NoPageError:
             out("%s: -- No such page -- " % self.cutTitle(), color="lightred")
 
     def nominator(self, link=True):
         """Return the link to the user that nominated this candidate."""
         history = self.page.revisions(reverse=True, total=1)
         for data in history:
-            username = (data.user)
+            username = data.user
         if not history:
             return "Unknown"
         if link:
             return "[[User:%s|%s]]" % (username, username)
         else:
             return username
-
 
     def creator(self):
         """Return the link to the user that created the image, Not implemented yet."""
@@ -137,14 +132,14 @@ class Candidate:
             return True
         else:
             return False
-    
+
     def setFiles(self):
         """Try to return list of all files in a set, files in the last gallery in the nomination page."""
         m = re.search(r"<gallery([^\]]*)</gallery>", self.page.get(get_redirect=True))
         text_inside_gallery = m.group(1)
         filesList = []
         for line in text_inside_gallery.splitlines():
-            if line.startswith('File:'):
+            if line.startswith("File:"):
                 files = re.sub(r"\|.*", "", line)
                 filesList.append(files)
         return filesList
@@ -152,10 +147,12 @@ class Candidate:
     def findGalleryOfFile(self):
         """Try to find Gallery in the nomination page to make closing users life easier."""
         text = self.page.get(get_redirect=True)
-        RegexGallery = re.compile(r'(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})')
+        RegexGallery = re.compile(
+            r"(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})"
+        )
         matches = RegexGallery.finditer(text)
         for m in matches:
-            Gallery = (m.group(1))
+            Gallery = m.group(1)
         try:
             Gallery
         except:
@@ -344,7 +341,7 @@ class Candidate:
             return datetime.datetime.now()
 
         for data in history:
-            self._creationTime = (data['timestamp'])
+            self._creationTime = data["timestamp"]
 
         # print "C:" + self._creationTime.isoformat()
         # print "N:" + datetime.datetime.utcnow().isoformat()
@@ -568,7 +565,7 @@ class Candidate:
             if match:
                 self._fileName = match.group(1)
 
-        #Check if file was moved after nomination
+        # Check if file was moved after nomination
         page = pywikibot.Page(G_Site, self._fileName)
         if page.isRedirectPage():
             self._fileName = page.getRedirectTarget().title()
@@ -586,7 +583,7 @@ class Candidate:
         @param gallery The categorization gallery
         """
         if self.isSet():
-            file = (self.setFiles())[0] # Add the first file from gallery.
+            file = (self.setFiles())[0]  # Add the first file from gallery.
         else:
             file = self.fileName()
 
@@ -638,7 +635,9 @@ class Candidate:
             files = []
             files.append(self.fileName())
         for file in files:
-            gallery_full_path = "Commons:Featured pictures/" + re.sub(r"#.*", "", gallery)
+            gallery_full_path = "Commons:Featured pictures/" + re.sub(
+                r"#.*", "", gallery
+            )
             page = pywikibot.Page(G_Site, gallery_full_path)
             old_text = page.get(get_redirect=True)
             section_R = r"#(.*)"
@@ -655,8 +654,15 @@ class Candidate:
                 # Replacement of all uunderscore with \s , some users just copy the url
                 # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
 
-                section = section.replace(")","\)").replace("(","\(").replace("_"," ").replace(" ", " (?:\[{2}|\]{2}|) ")
-                section_search_R = (section  +  r"(?:(?:[^\{\}]|\n)*?)(</gallery>)").replace(" ", "(?:\s*|)")
+                section = (
+                    section.replace(")", "\)")
+                    .replace("(", "\(")
+                    .replace("_", " ")
+                    .replace(" ", " (?:\[{2}|\]{2}|) ")
+                )
+                section_search_R = (
+                    section + r"(?:(?:[^\{\}]|\n)*?)(</gallery>)"
+                ).replace(" ", "(?:\s*|)")
                 m = re.search(section_search_R, old_text)
                 try:
                     old_section = m.group()
@@ -719,11 +725,15 @@ class Candidate:
             fn_al = self.fileName(alternative=True)  # Alternative filename
             # We add the com-nom parameter if the original filename
             # differs from the alternative filename.
-            comnom = "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
-            
+            comnom = (
+                "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
+            )
+
             # The template needs the com-nom to link to the site from file page
             if self.isSet():
-                comnom = "|com-nom="+(re.search(r"/[Ss]et/(.*)", self.page.title())).group(1)
+                comnom = "|com-nom=" + (
+                    re.search(r"/[Ss]et/(.*)", self.page.title())
+                ).group(1)
             else:
                 pass
 
@@ -755,7 +765,6 @@ class Candidate:
                     end = findEndOfTemplate(old_text, "[Oo]bject[_\s][Ll]ocation")
                 else:
                     end = findEndOfTemplate(old_text, "[Ii]nformation")
-                
 
                 new_text = (
                     old_text[:end]
@@ -772,28 +781,33 @@ class Candidate:
         This is ==STEP 4== of the parking procedure
         """
         if self.isSet():
-            files = (self.setFiles())[:1] # The first file from gallery.
+            files = (self.setFiles())[:1]  # The first file from gallery.
         else:
             files = []
             files.append(self.fileName())
         for file in files:
-            FinalVotesR = re.compile(r'FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|')
+            FinalVotesR = re.compile(
+                r"FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|"
+            )
             NomPagetext = self.page.get(get_redirect=True)
             matches = FinalVotesR.finditer(NomPagetext)
             for m in matches:
                 if m is None:
-                    ws=wo=wn= "x"
+                    ws = wo = wn = "x"
                 else:
                     ws = m.group(1)
                     wo = m.group(2)
                     wn = m.group(3)
 
             today = datetime.date.today()
-            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
+            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (
+                datetime.datetime.utcnow().strftime("%B"),
+                today.year,
+            )
             page = pywikibot.Page(G_Site, monthpage)
             try:
                 old_text = page.get(get_redirect=True)
-            except pywikibot.NoPage:
+            except pywikibot.exceptions.NoPageError:
                 old_text = ""
             # First check if we are already on the page,
             # in that case skip. Can happen if the process
@@ -817,15 +831,24 @@ class Candidate:
             # with an added title
             # TODO: We lack a good way to find the creator, so it is left out at the moment
 
-            if count ==1:
-                old_text = "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>" % (datetime.datetime.utcnow().strftime("%B"), today.year,)
-            else:pass
-            
+            if count == 1:
+                old_text = (
+                    "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
+                    % (
+                        datetime.datetime.utcnow().strftime("%B"),
+                        today.year,
+                    )
+                )
+            else:
+                pass
+
             if self.isSet():
-                file_title = "'''%s''' - a set of %s files" % ((re.search(r"/[Ss]et/(.*)", self.page.title())).group(1), str(len(self.setFiles())))
+                file_title = "'''%s''' - a set of %s files" % (
+                    (re.search(r"/[Ss]et/(.*)", self.page.title())).group(1),
+                    str(len(self.setFiles())),
+                )
             else:
                 file_title = self.cleanTitle()
-                
 
             new_text = re.sub(
                 "</gallery>",
@@ -856,7 +879,7 @@ class Candidate:
 
         try:
             old_text = talk_page.get(get_redirect=True)
-        except pywikibot.NoPage:
+        except pywikibot.exceptions.NoPageError:
             out(
                 "notifyNominator: No such page '%s' but ignoring..." % talk_link,
                 color="lightred",
@@ -876,11 +899,11 @@ class Candidate:
 
         # notification for set candidates should add a gallery to talk page and
         # it should be special compared to usual promotions.
-        
+
         if self.isSet():
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
-            files_newline_string = converttostr(self.setFiles(), '\n')
+            files_newline_string = converttostr(self.setFiles(), "\n")
             new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
                 files_newline_string,
                 fn_al,
@@ -890,7 +913,7 @@ class Candidate:
                 self.commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
-            except pywikibot.LockedPage as error:
+            except pywikibot.exceptions.LockedPageError as error:
                 out(
                     "Page is locked '%s', but ignoring since it's just the user notification."
                     % error,
@@ -899,7 +922,6 @@ class Candidate:
             return
         else:
             pass
-
 
         if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
             out(
@@ -918,7 +940,7 @@ class Candidate:
             self.commit(
                 old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
             )
-        except pywikibot.LockedPage as error:
+        except pywikibot.exceptions.LockedPageError as error:
             out(
                 "Page is locked '%s', but ignoring since it's just the user notification."
                 % error,
@@ -935,9 +957,9 @@ class Candidate:
         else:
             files = []
             files.append(self.fileName())
-        
+
         for file in files:
-            #Check if nominator and uploaders are same, avoiding adding a template twice
+            # Check if nominator and uploaders are same, avoiding adding a template twice
             if self.nominator() == uploader(file, link=True):
                 continue
 
@@ -945,7 +967,7 @@ class Candidate:
             talk_page = pywikibot.Page(G_Site, talk_link)
             try:
                 old_text = talk_page.get(get_redirect=True)
-            except pywikibot.NoPage:
+            except pywikibot.exceptions.NoPageError:
                 out(
                     "notifyUploader: No such page '%s' but ignoring..." % talk_link,
                     color="lightred",
@@ -971,27 +993,32 @@ class Candidate:
             # differs from the alternative filename.
 
             subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
-            
+
             if self.isSet():
-                subpage = "|subpage="+(re.search(r"[Ss]et/(.*)", self.page.title())).group(0)
+                subpage = "|subpage=" + (
+                    re.search(r"[Ss]et/(.*)", self.page.title())
+                ).group(0)
                 fn_al = file
 
-            new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotedUploader|%s%s}} /~~~~" % (
-                fn_al,
-                subpage,
+            new_text = (
+                old_text
+                + "\n\n== FP Promotion ==\n{{FPpromotedUploader|%s%s}} /~~~~"
+                % (
+                    fn_al,
+                    subpage,
+                )
             )
 
             try:
                 self.commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
-            except pywikibot.LockedPage as error:
+            except pywikibot.exceptions.LockedPageError as error:
                 out(
                     "Page is locked '%s', but ignoring since it's just the user notification."
                     % error,
                     color="lightyellow",
                 )
-
 
     def moveToLog(self, reason=None):
         """
@@ -1016,7 +1043,7 @@ class Candidate:
         # If the page does not exist we just create it ( put does that automatically )
         try:
             old_log_text = log_page.get(get_redirect=True)
-        except pywikibot.NoPage:
+        except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
         if re.search(wikipattern(self.fileName()), old_log_text):
@@ -1143,7 +1170,7 @@ class Candidate:
         pywikibot.showDiff(
             old_text,
             new_text,
-            )
+        )
 
         if G_Dry:
             choice = "n"
@@ -1153,11 +1180,11 @@ class Candidate:
             choice = pywikibot.bot.input_choice(
                 "Do you want to accept these changes to '%s' with comment '%s' ?"
                 % (page.title(), comment),
-                [('yes', 'y'), ('no', 'n'), ('quit', 'q')],
+                [("yes", "y"), ("no", "n"), ("quit", "q")],
             )
 
         if choice == "y":
-            page.put(new_text, comment=comment, watchArticle=True, minorEdit=False)
+            page.put(new_text, summary=comment, watch=None, minor=False)
         elif choice == "q":
             out("Aborting.")
             sys.exit(0)
@@ -1188,9 +1215,12 @@ class FPCandidate(Candidate):
         if self.imageCount() > 1:
             return "\n\n{{FPC-results-unreviewed|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
         else:
-            return (
-                "\n\n{{FPC-results-unreviewed|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no", self.findGalleryOfFile() )
+            return "\n\n{{FPC-results-unreviewed|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}" % (
+                self._pro,
+                self._con,
+                self._neu,
+                "yes" if self.isPassed() else "no",
+                self.findGalleryOfFile(),
             )
 
     def getCloseCommitComment(self):
@@ -1337,7 +1367,17 @@ def wikipattern(s):
     def rep(m):
         if m.group(0) == " " or m.group(0) == "_":
             return "[ _]"
-        elif m.group(0) == "(" or m.group(0) == ")" or m.group(0) == "*" or m.group(0) == "+" or m.group(0) == "=" or m.group(0) == "?" or m.group(0) == "!" or m.group(0) == "^" or m.group(0) == "-":
+        elif (
+            m.group(0) == "("
+            or m.group(0) == ")"
+            or m.group(0) == "*"
+            or m.group(0) == "+"
+            or m.group(0) == "="
+            or m.group(0) == "?"
+            or m.group(0) == "!"
+            or m.group(0) == "^"
+            or m.group(0) == "-"
+        ):
             return "\\" + m.group(0)
 
     return re.sub(r"[ _()*+=?!^-]", rep, s)
@@ -1382,6 +1422,7 @@ def checkCandidates(check, page, delist):
     @param page   A page containing all candidates
     @param delist Boolean, telling whether this is delistings of fpcs
     """
+
     if not G_Site.logged_in():
         G_Site.login()
 
@@ -1407,9 +1448,9 @@ def checkCandidates(check, page, delist):
                 thread.start()
             else:
                 check(candidate)
-        except pywikibot.NoPage as error:
+        except pywikibot.exceptions.NoPageError as error:
             out("No such page '%s'" % error, color="lightred")
-        except pywikibot.LockedPage as error:
+        except pywikibot.exceptions.LockedPageError as error:
             out("Page is locked '%s'" % error, color="lightred")
 
         i += 1
@@ -1441,12 +1482,13 @@ def strip_tag(text, tag):
     """Will simply take a tag and remove a specified tag."""
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
 
+
 def uploader(file, link=True):
     """Return the link to the user that uploaded the nominated image."""
     page = pywikibot.Page(G_Site, file)
     history = page.revisions(reverse=True, total=1)
     for data in history:
-        username = (data.user)
+        username = data.user
     if not history:
         return "Unknown"
     if link:
@@ -1454,10 +1496,12 @@ def uploader(file, link=True):
     else:
         return username
 
+
 def converttostr(input_list, seperator):
-   """Make string from list."""
-   resultant_string = seperator.join(input_list)
-   return resultant_string
+    """Make string from list."""
+    resultant_string = seperator.join(input_list)
+    return resultant_string
+
 
 def findEndOfTemplate(text, template):
     """
@@ -1499,6 +1543,7 @@ def findEndOfTemplate(text, template):
             cp = ns + 2
     # Apparently we never found it
     return 0
+
 
 # Data and regexps used by the bot
 
@@ -1644,9 +1689,7 @@ VerifiedDelistResultR = re.compile(
 )
 
 # Matches the entire line including newline so they can be stripped away
-CountedTemplateR = re.compile(
-    r"^.*{{\s*FPC-results-unreviewed.*}}.*$\n?", re.MULTILINE
-)
+CountedTemplateR = re.compile(r"^.*{{\s*FPC-results-unreviewed.*}}.*$\n?", re.MULTILINE)
 DelistCountedTemplateR = re.compile(
     r"^.*{{\s*FPC-delist-results-unreviewed.*}}.*$\n?", re.MULTILINE
 )
@@ -1709,9 +1752,6 @@ def main(*args):
     global G_LogNoTime
     global G_MatchPattern
     global G_Site
-
-    # Will sys.exit(-1) if another instance is running
-    me = singleton.SingleInstance()
 
     candidates_page = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2009"
