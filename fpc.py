@@ -1470,7 +1470,9 @@ def filter_content(text):
 
     """
     text = strip_tag(text, "[Ss]")
-    text = strip_tag(text, "nowiki")
+    text = strip_tag(text, "[Nn]owiki")
+    text = strip_tag(text, "[Ss]trike")
+    text = strip_tag(text, "[Dd]el")
     text = re.sub(
         r"(?s){{\s*[Ii]mageNote\s*\|.*?}}.*{{\s*[iI]mageNoteEnd.*?}}", "", text
     )
