@@ -1,2 +1,2 @@
-tendo==0.2.15
-pywikibot==3.0.20200405
+mwparserfromhell
+pywikibot
