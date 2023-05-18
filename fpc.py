@@ -1613,9 +1613,9 @@ oppose_templates = (
     "FPX contested",
     "[Cc]ontra",
     "[Cc]ontrario",
-    "[Oo]versaturated",
     "[Ss]trong oppose",
     "[Ww]eak oppose",
+    "[Ww]eak [Oo]",
 )
 neutral_templates = (
     "[Nn]eutral?",
