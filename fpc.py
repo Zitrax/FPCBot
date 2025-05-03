@@ -155,7 +155,7 @@ class Candidate:
             Gallery = m.group(1)
         try:
             Gallery
-        except:
+        except Exception:
             Gallery = ""
 
         return Gallery
@@ -311,7 +311,7 @@ class Candidate:
                 else ", %s" % self._conString
             )
 
-        return re.sub(r"(===.*)(===)", r"\1%s\2" % status, text, 1)
+        return re.sub(r"(===.*)(===)", r"\1%s\2" % status, text, count=1)
 
     def getResultString(self):
         """Must be implemented by the subclasses (Text to add to closed pages)."""
@@ -380,7 +380,7 @@ class Candidate:
             lastEdit = datetime.datetime.strptime(
                 str(self.page.editTime()), "%Y-%m-%dT%H:%M:%SZ"
             )
-        except:
+        except Exception:
             return -1
 
         delta = datetime.datetime.utcnow() - lastEdit
@@ -647,22 +647,22 @@ class Candidate:
             except AttributeError:
                 section = None
 
-            if section != None:
+            if section is not None:
 
                 # Trying to generate a regex for finding the section in a gallery if specified in nomination
                 # First we are escaping all parentheses, as they are used in regex
-                # Replacement of all uunderscore with \s , some users just copy the url
+                # Replacement of all uunderscore with ' ', some users just copy the url
                 # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
 
                 section = (
-                    section.replace(")", "\)")
-                    .replace("(", "\(")
+                    section.replace(")", r"\)")
+                    .replace("(", r"\(")
                     .replace("_", " ")
-                    .replace(" ", " (?:\[{2}|\]{2}|) ")
+                    .replace(" ", r" (?:\[{2}|\]{2}|) ")
                 )
                 section_search_R = (
                     section + r"(?:(?:[^\{\}]|\n)*?)(</gallery>)"
-                ).replace(" ", "(?:\s*|)")
+                ).replace(" ", r"(?:\s*|)")
                 m = re.search(section_search_R, old_text)
                 try:
                     old_section = m.group()
@@ -682,7 +682,7 @@ class Candidate:
                 return
 
             # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
-            if section != None:
+            if section is not None:
                 file_info = "%s|%s\n</gallery>" % (file, self.cleanTitle())
                 updated_section = re.sub(r"</gallery>", file_info, old_section)
                 new_text = old_text.replace(old_section, updated_section)
@@ -694,7 +694,7 @@ class Candidate:
                     "(?s)</gallery>(?!.*</gallery>)",
                     "%s|%s\n</gallery>" % (file, self.cleanTitle()),
                     old_text,
-                    1,
+                    count=1,
                 )
 
             self.commit(old_text, new_text, page, "Added [[%s]]" % file)
@@ -762,7 +762,7 @@ class Candidate:
                 if re.search(r"\{\{(?:|\s*)[Ll]ocation", old_text):
                     end = findEndOfTemplate(old_text, "[Ll]ocation")
                 elif re.search(r"\{\{(?:|\s*)[Oo]bject[_\s][Ll]ocation", old_text):
-                    end = findEndOfTemplate(old_text, "[Oo]bject[_\s][Ll]ocation")
+                    end = findEndOfTemplate(old_text, r"[Oo]bject[_\s][Ll]ocation")
                 else:
                     end = findEndOfTemplate(old_text, "[Ii]nformation")
 
@@ -1442,7 +1442,7 @@ def checkCandidates(check, page, delist):
 
         try:
             if G_Threads:
-                while threading.activeCount() >= config.max_external_links:
+                while threading.active_count() >= config.max_external_links:
                     time.sleep(0.1)
                 thread = ThreadCheckCandidate(candidate, check)
                 thread.start()
