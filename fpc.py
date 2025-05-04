@@ -145,20 +145,19 @@ class Candidate:
         return filesList
 
     def findGalleryOfFile(self):
-        """Try to find Gallery in the nomination page to make closing users life easier."""
+        """
+        Try to find the gallery link in the nomination subpage
+        in order to make the life of the closing users easier.
+        """
         text = self.page.get(get_redirect=True)
-        RegexGallery = re.compile(
-            r"(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})"
+        match = re.search(
+            r"Gallery[^\n]+\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
+            text,
         )
-        matches = RegexGallery.finditer(text)
-        for m in matches:
-            Gallery = m.group(1)
-        try:
-            Gallery
-        except Exception:
-            Gallery = ""
-
-        return Gallery
+        if match is not None:
+            return match.group(1)
+        else:
+            return ""
 
     def countVotes(self):
         """
