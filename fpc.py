@@ -745,7 +745,6 @@ class Candidate:
                 params += comnom
                 if params[0] != "|":
                     params = "|" + params
-                new_ass = "{{Assessments%s}}" % params
                 new_text = (
                     old_text[:match.start(0)]
                     + "{{Assessments%s}}" % params
