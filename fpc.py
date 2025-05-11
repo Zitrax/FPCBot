@@ -705,17 +705,14 @@ class Candidate:
 
     def addAssessments(self):
         """
-        Adds the the assessments template to a featured
-        pictures descripion page.
-        This is ==STEP 3== of the parking procedure
-        Will add assessments to all files in a set
+        Adds the {{Assessments}} template to the description page
+        of a featured picture, resp. to all files in a set.
+        This is ==STEP 3== of the parking procedure.
         """
-
         if self.isSet():
             files = self.setFiles()
         else:
-            files = []
-            files.append(self.fileName())
+            files = [self.fileName()]
         for file in files:
             page = pywikibot.Page(G_Site, file)
             current_page = page
@@ -738,19 +735,21 @@ class Candidate:
                 pass
 
             # First check if there already is an assessments template on the page
-            params = re.search(AssR, old_text)
-            if params:
+            match = re.search(AssR, old_text)
+            if match:
                 # Make sure to remove any existing com/features or subpage params
-                # TODO: 'com' will be obsolete in the future and can then be removed
-                # TODO: 'subpage' is the old name of com-nom. Can be removed later.
-                params = re.sub(r"\|\s*(?:featured|com)\s*=\s*\d+", "", params.group(1))
+                # TODO: 'subpage' is the old name of 'com-nom'. Can be removed later.
+                params = re.sub(r"\|\s*featured\s*=\s*\d+", "", match.group(1))
                 params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
                 params += "|featured=1"
                 params += comnom
-                if params.find("|") != 0:
+                if params[0] != "|":
                     params = "|" + params
-                new_ass = "{{Assessments%s}}" % params
-                new_text = re.sub(AssR, new_ass, old_text)
+                new_text = (
+                    old_text[:match.start(0)]
+                    + "{{Assessments%s}}" % params
+                    + old_text[match.end(0):]
+                )
                 if new_text == old_text:
                     out(
                         "No change in addAssessments, '%s' already featured."
@@ -765,13 +764,11 @@ class Candidate:
                     end = findEndOfTemplate(old_text, r"[Oo]bject[_\s][Ll]ocation")
                 else:
                     end = findEndOfTemplate(old_text, "[Ii]nformation")
-
                 new_text = (
                     old_text[:end]
                     + "\n{{Assessments|featured=1%s}}\n" % comnom
                     + old_text[end:]
                 )
-                # new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
             self.commit(old_text, new_text, current_page, "FPC promotion")
 
     def addToCurrentMonth(self):
