@@ -720,7 +720,7 @@ class Candidate:
             page = pywikibot.Page(G_Site, file)
             current_page = page
             old_text = page.get(get_redirect=True)
-            AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
+            AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
             fn_or = self.fileName(alternative=False)  # Original filename
             fn_al = self.fileName(alternative=True)  # Alternative filename
             # We add the com-nom parameter if the original filename
@@ -772,7 +772,7 @@ class Candidate:
                     + old_text[end:]
                 )
                 # new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
-                self.commit(old_text, new_text, current_page, "FPC promotion")
+            self.commit(old_text, new_text, current_page, "FPC promotion")
 
     def addToCurrentMonth(self):
         """
