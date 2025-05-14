@@ -1828,7 +1828,7 @@ def main(*args):
             "-dry",
         }:
             out(
-                "Warning - unknown argument '%s' aborting, see -help." % arg,
+                "Warning - unknown argument '%s'; aborting, see -help." % arg,
                 color="lightred",
             )
             sys.exit(0)
