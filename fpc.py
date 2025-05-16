@@ -134,15 +134,75 @@ class Candidate:
             return False
 
     def setFiles(self):
-        """Try to return list of all files in a set, files in the last gallery in the nomination page."""
-        m = re.search(r"<gallery([^\]]*)</gallery>", self.page.get(get_redirect=True))
-        text_inside_gallery = m.group(1)
-        filesList = []
-        for line in text_inside_gallery.splitlines():
-            if line.startswith("File:"):
-                files = re.sub(r"\|.*", "", line)
-                filesList.append(files)
-        return filesList
+        """
+        Try to return a list of all nominated files in a set nomination.
+        We just search for all filenames in the first <gallery>...</gallery>
+        on the nomination subpage.
+        If we can't identify any files the result is an empty list.
+        """
+        # Get the Wikitext of the nomination subpage
+        if self.page.isRedirectPage():
+            # The set nomination subpage has been renamed, leaving a redirect.
+            try:
+                target_page = self.page.getRedirectTarget()
+            except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
+                # Circular or invalid redirect
+                out(
+                    "Warning - invalid nomination redirect page "
+                    f"'{self.page.title()}'",
+                    color="lightred",
+                )
+                return []
+            wikitext = target_page.get(get_redirect=True)
+        else:
+            wikitext = self.page.get(get_redirect=True)
+        # Extract the contents of the <gallery>...</gallery> element
+        match = re.search(
+            r"<gallery[^>]*>(.+?)</gallery>",
+            wikitext,
+            flags=re.DOTALL,
+        )
+        if not match:
+            out(
+                "Warning - no <gallery> found in set nomination "
+                f"'{self.page.title()}'",
+                color="lightred",
+            )
+            return []
+        text_inside_gallery = match.group(1)
+        # As a precaution let's comb out all comments:
+        text_inside_gallery = re.sub(
+            r"<!--.+?-->", "", text_inside_gallery, flags=re.DOTALL
+        )
+        # First try to find files which are properly listed with 'File:'
+        # or 'Image:' prefix; they must be the first element on their line,
+        # but leading whitespace is tolerated:
+        files_list = re.findall(
+            r"^ *(?:[Ff]ile|[Ii]mage):([^\n|]+)",
+            text_inside_gallery,
+            flags=re.MULTILINE
+        )
+        if not files_list:
+            # If we did not find a single file, let's try a casual search
+            # for lines which, ahem, seem to start with an image filename:
+            files_list = re.findall(
+                r"^ *([^|\n:<>\[\]]+\.(?:jpe?g|tiff?|png|svg|webp|xcf))",
+                text_inside_gallery,
+                flags=re.MULTILINE | re.IGNORECASE,
+            )
+        if files_list:
+            # Appyly uniform formatting to all filenames:
+            files_list = [
+                f"File:{filename.strip().replace('_', ' ')}"
+                for filename in files_list
+            ]
+        else:
+            out(
+                "Warning - no images found in set nomination "
+                f"'{self.page.title()}'",
+                color="lightred",
+            )
+        return files_list
 
     def findGalleryOfFile(self):
         """Try to find Gallery in the nomination page to make closing users life easier."""
