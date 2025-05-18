@@ -525,7 +525,7 @@ class Candidate:
 
     def cutTitle(self):
         """Returns a fixed width title."""
-        return re.sub(PrefixR, "", self.page.title())[0:50].ljust(50)
+        return PrefixR.sub("", self.page.title())[0:50].ljust(50)
 
     def cleanTitle(self, keepExtension=False):
         """
@@ -534,11 +534,11 @@ class Candidate:
         a possible change by the alternative parameter is not considered,
         but maybe it should be ?
         """
-        noprefix = re.sub(PrefixR, "", self.page.title())
+        noprefix = PrefixR.sub("", self.page.title())
         if keepExtension:
             return noprefix
         else:
-            return re.sub(r"\.\w{1,3}$\s*", "", noprefix)
+            return re.sub(r"\.\w{2,4}\s*$", "", noprefix)
 
     def fileName(self, alternative=True):
         """
@@ -548,17 +548,14 @@ class Candidate:
         Will return the new file name if moved.
         @param alternative if false disregard any alternative and return the real filename
         """
-        # The regexp here also removes any possible crap between the prefix
-        # and the actual start of the filename.
         if alternative and self._alternative:
             return self._alternative
 
         if self._fileName:
             return self._fileName
 
-        self._fileName = re.sub(
-            "(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix, r"\2", self.page.title()
-        )
+        # Remove nomination page prefix and use standard 'File:' namespace
+        self._fileName = PrefixR.sub("File:", self.page.title())
 
         if not pywikibot.Page(G_Site, self._fileName).exists():
             match = re.search(ImagesR, self.page.get(get_redirect=True))
@@ -1046,7 +1043,7 @@ class Candidate:
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
-        if re.search(wikipattern(self.fileName()), old_log_text):
+        if re.search(wikipattern(self.page.title()), old_log_text):
             out(
                 "Skipping add in moveToLog for '%s', page already there"
                 % self.cleanTitle(),
@@ -1657,10 +1654,13 @@ keep_templates = (
 # Compiled regular expressions follows
 #
 
-# Used to remove the prefix and just print the file names
-# of the candidate titles.
+# Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
+# or to replace both by the standard 'File:' namespace.
+# Removes also any possible crap between the prefix and the namespace
+# and faulty spaces between namespace and filename (sometimes users
+# accidentally add such spaces when creating nominations).
 candPrefix = "Commons:Featured picture candidates/"
-PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
+PrefixR = re.compile(candPrefix + r".*?([Ff]ile|[Ii]mage): *")
 
 # Looks for result counts, an example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
