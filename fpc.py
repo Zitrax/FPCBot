@@ -574,13 +574,14 @@ class Candidate:
 
     def addToFeaturedList(self, gallery):
         """
-        Will add this page to the list of featured images.
-        This uses just the base of the gallery, like 'Animals'.
-        Should only be called on closed and verified candidates
+        Adds the new featured picture to the list with recently
+        featured images that is used on the FP landing page.
+        This method uses just the basic gallery name, like 'Animals'.
+        Should only be called on closed and verified candidates.
 
-        This is ==STEP 1== of the parking procedure
+        This is ==STEP 1== of the parking procedure.
 
-        @param gallery The categorization gallery
+        @param gallery The basic gallery name, like 'Animals'.
         """
         if self.isSet():
             file = (self.setFiles())[0]  # Add the first file from gallery.
@@ -617,17 +618,17 @@ class Candidate:
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
         self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
-    def addToCategorizedFeaturedList(self, gallery):
+    def addToGalleryPage(self, gallery):
         """
-        Adds the candidate to the gallery of
-        pictures. This is the full gallery with
-        the section in that particular page.
+        Adds the new featured picture (resp. all files from a set nomination)
+        to the appropriate featured picture gallery page.
+        Should only be called on closed and verified candidates.
 
-        This is ==STEP 2== of the parking procedure
+        This is ==STEP 2== of the parking procedure.
 
-        @param gallery The categorization gallery
-        If it's a set, will add all file from the list,
-        else just one if single nomination.
+        @param gallery The gallery link with the name of the gallery page
+        and (optionally) a section anchor which denotes the target section
+        on that page.
         """
         if self.isSet():
             files = self.setFiles()
@@ -675,7 +676,7 @@ class Candidate:
 
             if re.search(wikipattern(file), old_text):
                 out(
-                    "Skipping addToCategorizedFeaturedList for '%s', page already listed."
+                    "Skipping addToGalleryPage for '%s', page already listed."
                     % self.cleanTitle(),
                     color="lightred",
                 )
@@ -705,12 +706,12 @@ class Candidate:
 
     def addAssessments(self):
         """
-        Adds the the assessments template to a featured
-        pictures descripion page.
-        This is ==STEP 3== of the parking procedure
-        Will add assessments to all files in a set
-        """
+        Adds the {{Assessments}} template to the description page
+        of a featured picture, resp. to all files in a set.
+        Should only be called on closed and verified candidates.
 
+        This is ==STEP 3== of the parking procedure.
+        """
         if self.isSet():
             files = self.setFiles()
         else:
@@ -776,9 +777,10 @@ class Candidate:
 
     def addToCurrentMonth(self):
         """
-        Adds the candidate to the list of featured picture this month
+        Adds the candidate to the monthly overview of new featured pictures.
+        Should only be called on closed and verified candidates.
 
-        This is ==STEP 4== of the parking procedure
+        This is ==STEP 4== of the parking procedure.
         """
         if self.isSet():
             files = (self.setFiles())[:1]  # The first file from gallery.
@@ -870,9 +872,10 @@ class Candidate:
 
     def notifyNominator(self):
         """
-        Add a template to the nominators talk page
+        Add a FP promotion template to the nominator's talk page.
+        Should only be called on closed and verified candidates.
 
-        This is ==STEP 5== of the parking procedure
+        This is ==STEP 5== of the parking procedure.
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
         talk_page = pywikibot.Page(G_Site, talk_link)
@@ -949,8 +952,10 @@ class Candidate:
 
     def notifyUploader(self):
         """
-        Add a template to the uploaders talk page
-        This is ==STEP 6== of the parking procedure
+        Add a FP promotion template to the uploader's talk page.
+        Should only be called on closed and verified candidates.
+
+        This is ==STEP 6== of the parking procedure.
         """
         if self.isSet():
             files = self.setFiles()
@@ -1022,10 +1027,11 @@ class Candidate:
 
     def moveToLog(self, reason=None):
         """
-        Remove this candidate from the current list
-        and add it to the log of the current month
+        Remove this candidate from the list of current candidates
+        and add it to the log for the current month.
+        Should only be called on closed and verified candidates.
 
-        This is ==STEP 7== of the parking procedure
+        This is ==STEP 7== of the parking procedure.
         """
 
         why = (" (%s)" % reason) if reason else ""
@@ -1233,13 +1239,18 @@ class FPCandidate(Candidate):
             )
 
     def handlePassedCandidate(self, results):
-
-        # Strip away any eventual section
-        # as there is not implemented support for it
-        fgallery = re.sub(r"#.*", "", results[4])
-
-        # Now addToCategorizedFeaturedList can handle sections within the gallery page
-        gallery_without_removing_section = results[4]
+        """
+        Promotes a new featured picture (or set of featured pictures):
+        adds it to the appropriate gallery page, to the monthly overview
+        and to the landing-page list of recent FPs,
+        inserts the {{Assessments}} template into the description page(s),
+        notifies nominator and uploader, etc.
+        """
+        # Some methods need the full gallery link with section anchor,
+        # others only the gallery page name or even just the basic gallery.
+        full_gallery_link = results[4].strip()
+        gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
+        basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
 
         # Check if we have an alternative for a multi image
         if self.imageCount() > 1:
@@ -1252,12 +1263,12 @@ class FPCandidate(Candidate):
                 out("%s: (ignoring, alternative not set)" % self.cutTitle())
                 return
 
-        # Featured picture
-        if not len(fgallery):
+        # Promote the new featured picture(s)
+        if not gallery_page:
             out("%s: (ignoring, gallery not defined)" % self.cutTitle())
             return
-        self.addToFeaturedList(re.search(r"(.*?)(?:/|$)", fgallery).group(1))
-        self.addToCategorizedFeaturedList(gallery_without_removing_section)
+        self.addToFeaturedList(basic_gallery)
+        self.addToGalleryPage(full_gallery_link)
         self.addAssessments()
         self.addToCurrentMonth()
         self.notifyNominator()
