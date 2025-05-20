@@ -1,31 +1,41 @@
+#!/usr/bin/env python3
 """
-This bot runs as FPCBot on wikimedia commons
-It implements vote counting and supports bot runs as FPCBot on wikimedia commons
-It implements vote counting and supports
-moving the finished nomination to the archive.
+This script runs as FPCBot on Wikimedia Commons.
+It counts the votes in featured picture nominations,
+closes and archives finished nominations,
+informs uploaders and nominators about the success
+and adds newly promoted featured pictures to the gallery pages.
 
 Programmed by Daniel78 at Commons.
 
-It adds the following commandline arguments:
+Command line options:
 
--test             Perform a testrun against an old log
--close            Close and add result to the nominations
--info             Just print the vote count info about the current nominations
--park             Park closed and verified candidates
--auto             Do not ask before commiting edits to articles
--dry              Do not submit any edits, just print them
--threads          Use threads to speed things up, can't be used in interactive mode
--fpc              Handle the featured candidates (if neither -fpc or -delist is used all candidates are handled)
--delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
--notime           Avoid displaying timestamps in log output
--match pattern    Only operate on candidates matching this pattern
+-test           Perform a testrun against an old log.
+-close          Close and add results to the nominations.
+-info           Just print the vote count info about the current nominations.
+-park           Park closed and verified candidates.
+-auto           Do not ask before commiting edits to articles.
+-dry            Do not submit any edits, just print them.
+-threads        Use threads to speed things up
+                (can't be used in interactive mode).
+-fpc            Handle the featured candidates (if neither -fpc
+                nor -delist is used all candidates are handled).
+-delist         Handle the delisting candidates (if neither -fpc
+                nor -delist is used all candidates are handled).
+-notime         Avoid displaying timestamps in log output.
+-match pattern  Only operate on candidates matching this pattern.
 """
 
-import pywikibot, re, datetime, sys, signal
+# Standard library imports
+import sys
+import signal
+import datetime
+import time
+import re
+import threading
 
-
-# Imports needed for threading
-import threading, time
+# Third-party imports
+import pywikibot
 from pywikibot import config
 
 
