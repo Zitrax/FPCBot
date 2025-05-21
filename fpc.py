@@ -1823,7 +1823,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg not in [
+        if arg not in {
             "-test",
             "-close",
             "-info",
@@ -1835,9 +1835,10 @@ def main(*args):
             "-notime",
             "-match",
             "-auto",
-        ]:
+            "-dry",
+        }:
             out(
-                "Warning - unknown argument '%s' aborting, see -help." % arg,
+                "Warning - unknown argument '%s'; aborting, see -help." % arg,
                 color="lightred",
             )
             sys.exit(0)
