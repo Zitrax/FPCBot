@@ -217,6 +217,9 @@ class Candidate:
         if self._pro >= 10 and self._con == 0:
             return True
 
+        # If we arrive here, no rule applies.
+        return False
+
     def closePage(self):
         """
         Will add the voting results to the page if it is finished.
