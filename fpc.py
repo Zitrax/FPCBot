@@ -713,11 +713,11 @@ class Candidate:
             files = self.setFiles()
         else:
             files = [self.fileName()]
+        AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
         for file in files:
             page = pywikibot.Page(G_Site, file)
             current_page = page
             old_text = page.get(get_redirect=True)
-            AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
             fn_or = self.fileName(alternative=False)  # Original filename
             fn_al = self.fileName(alternative=True)  # Alternative filename
             # We add the com-nom parameter if the original filename
