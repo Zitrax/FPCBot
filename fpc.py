@@ -464,45 +464,55 @@ class Candidate:
 
     def existingResult(self):
         """
-        Will scan this nomination and check whether it has
-        already been closed, and if so parses for the existing
-        result.
-        The return value is a list of tuples, and normally
-        there should only be one such tuple. The tuple
-        contains four values:
-        support,oppose,neutral,(featured|not featured)
+        Scans the nomination subpage of this candidate and tries to find
+        and parse the results of the nomination.
+        Returns either an empty list (if the nomination was not closed
+        or does not use one of the usual formats for the results)
+        or a list of tuples; normally it should contain just a single tuple.
+        The length of the tuple varies, depending on the results format,
+        but only the first four values of the tuple are important
+        for the comparison of the results:
+        [0] count of support votes,
+        [1] count of oppose votes,
+        [2] count of neutral votes,
+        [3] ('yes'|'no'|'featured'|'not featured').
         """
         text = self.page.get(get_redirect=True)
-        return re.findall(PreviousResultR, text)
+        # Search first for result(s) using the new template-base format,
+        # and if this fails for result(s) in the old text-based format:
+        results = re.findall(VerifiedResultR, text)
+        if not results:
+            results = re.findall(PreviousResultR, text)
+        return results
 
     def compareResultToCount(self):
         """
-        If there is an existing result we will compare
-        it to a new vote count made by this bot and
-        see if they match. This is for testing purposes
-        of the bot and to find any incorrect old results.
+        If there is an existing result we compare it to a new vote count
+        made by this bot and check whether they match or not.
+        This is useful to test the vote counting code of the bot
+        and to find possibly incorrect old results.
         """
         res = self.existingResult()
 
         if self.isWithdrawn():
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
-
         elif self.isFPX():
             out("%s: (ignoring, was FPXed)" % self.cutTitle())
             return
-
+        elif self.imageCount() > 1:
+            out("%s: (ignoring, contains alternatives)" % self.cutTitle())
+            return
         elif not res:
             out("%s: (ignoring, has no results)" % self.cutTitle())
             return
-
         elif len(res) > 1:
             out("%s: (ignoring, has several results)" % self.cutTitle())
             return
 
         # We have one result, so make a vote count and compare
         old_res = res[0]
-        was_featured = old_res[3] == "featured"
+        was_featured = old_res[3].lower() in {"yes", "featured"}
         ws = int(old_res[0])
         wo = int(old_res[1])
         wn = int(old_res[2])
@@ -1671,15 +1681,15 @@ keep_templates = (
 candPrefix = "Commons:Featured picture candidates/"
 PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
 
-# Looks for result counts, an example of such a line is:
+# Looks for results using the old, text-based results format
+# which was in use until August 2009.  An example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
-#
 PreviousResultR = re.compile(
-    r"'''result:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
+    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
     re.MULTILINE,
 )
 
-# Looks for verified results
+# Looks for verified results using the new, template-based format
 VerifiedResultR = re.compile(
     r"""
                               {{\s*FPC-results-reviewed\s*\|        # Template start
@@ -1765,7 +1775,7 @@ def main(*args):
     global G_Site
 
     candidates_page = "Commons:Featured picture candidates/candidate_list"
-    testLog = "Commons:Featured_picture_candidates/Log/January_2009"
+    testLog = "Commons:Featured_picture_candidates/Log/January_2025"
 
     worked = False
     delist = False
