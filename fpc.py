@@ -454,21 +454,24 @@ class Candidate:
         """
         Scans the nomination subpage of this candidate and tries to find
         and parse the results of the nomination.
-        The return value is either None (if the nomination was not closed
+        Returns either an empty list (if the nomination was not closed
         or does not use one of the usual formats for the results)
-        or a list of tuples; normally there should just a single tuple.
+        or a list of tuples; normally it should contain just a single tuple.
         The length of the tuple varies, depending on the results format,
         but only the first four values of the tuple are important
         for the comparison of the results:
-        support, oppose, neutral, (yes|no|featured|not featured)
+        [0] count of support votes,
+        [1] count of oppose votes,
+        [2] count of neutral votes,
+        [3] ('yes'|'no'|'featured'|'not featured').
         """
         text = self.page.get(get_redirect=True)
-        # Search first for a result using the new template-base format,
-        # and if this fails for a result in the old text-based format:
-        match = re.findall(VerifiedResultR, text)
-        if not match:
-            match = re.findall(PreviousResultR, text)
-        return match
+        # Search first for result(s) using the new template-base format,
+        # and if this fails for result(s) in the old text-based format:
+        results = re.findall(VerifiedResultR, text)
+        if not results:
+            results = re.findall(PreviousResultR, text)
+        return results
 
     def compareResultToCount(self):
         """
