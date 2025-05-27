@@ -1388,8 +1388,7 @@ class DelistCandidate(Candidate):
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
         # So just check and remove the candidate from any gallery pages
-
-        references = self.getImagePage().getReferences(withTemplateInclusion=False)
+        references = self.getImagePage().getReferences(with_template_inclusion=False)
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
