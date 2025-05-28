@@ -1,31 +1,41 @@
+#!/usr/bin/env python3
 """
-This bot runs as FPCBot on wikimedia commons
-It implements vote counting and supports bot runs as FPCBot on wikimedia commons
-It implements vote counting and supports
-moving the finished nomination to the archive.
+This script runs as FPCBot on Wikimedia Commons.
+It counts the votes in featured picture nominations,
+closes and archives finished nominations,
+informs uploaders and nominators about the success
+and adds newly promoted featured pictures to the gallery pages.
 
 Programmed by Daniel78 at Commons.
 
-It adds the following commandline arguments:
+Command line options:
 
--test             Perform a testrun against an old log
--close            Close and add result to the nominations
--info             Just print the vote count info about the current nominations
--park             Park closed and verified candidates
--auto             Do not ask before commiting edits to articles
--dry              Do not submit any edits, just print them
--threads          Use threads to speed things up, can't be used in interactive mode
--fpc              Handle the featured candidates (if neither -fpc or -delist is used all candidates are handled)
--delist           Handle the delisting candidates (if neither -fpc or -delist is used all candidates are handled)
--notime           Avoid displaying timestamps in log output
--match pattern    Only operate on candidates matching this pattern
+-test           Perform a testrun against an old log.
+-close          Close and add results to the nominations.
+-info           Just print the vote count info about the current nominations.
+-park           Park closed and verified candidates.
+-auto           Do not ask before commiting edits to articles.
+-dry            Do not submit any edits, just print them.
+-threads        Use threads to speed things up
+                (can't be used in interactive mode).
+-fpc            Handle the featured candidates (if neither -fpc
+                nor -delist is used all candidates are handled).
+-delist         Handle the delisting candidates (if neither -fpc
+                nor -delist is used all candidates are handled).
+-notime         Avoid displaying timestamps in log output.
+-match pattern  Only operate on candidates matching this pattern.
 """
 
-import pywikibot, re, datetime, sys, signal
+# Standard library imports
+import sys
+import signal
+import datetime
+import time
+import re
+import threading
 
-
-# Imports needed for threading
-import threading, time
+# Third-party imports
+import pywikibot
 from pywikibot import config
 
 
@@ -134,31 +144,90 @@ class Candidate:
             return False
 
     def setFiles(self):
-        """Try to return list of all files in a set, files in the last gallery in the nomination page."""
-        m = re.search(r"<gallery([^\]]*)</gallery>", self.page.get(get_redirect=True))
-        text_inside_gallery = m.group(1)
-        filesList = []
-        for line in text_inside_gallery.splitlines():
-            if line.startswith("File:"):
-                files = re.sub(r"\|.*", "", line)
-                filesList.append(files)
-        return filesList
+        """
+        Try to return a list of all nominated files in a set nomination.
+        We just search for all filenames in the first <gallery>...</gallery>
+        on the nomination subpage.
+        If we can't identify any files the result is an empty list.
+        """
+        # Get the Wikitext of the nomination subpage
+        if self.page.isRedirectPage():
+            # The set nomination subpage has been renamed, leaving a redirect.
+            try:
+                target_page = self.page.getRedirectTarget()
+            except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
+                # Circular or invalid redirect
+                out(
+                    "Warning - invalid nomination redirect page "
+                    f"'{self.page.title()}'",
+                    color="lightred",
+                )
+                return []
+            wikitext = target_page.get(get_redirect=True)
+        else:
+            wikitext = self.page.get(get_redirect=True)
+        # Extract the contents of the <gallery>...</gallery> element
+        match = re.search(
+            r"<gallery[^>]*>(.+?)</gallery>",
+            wikitext,
+            flags=re.DOTALL,
+        )
+        if not match:
+            out(
+                "Warning - no <gallery> found in set nomination "
+                f"'{self.page.title()}'",
+                color="lightred",
+            )
+            return []
+        text_inside_gallery = match.group(1)
+        # As a precaution let's comb out all comments:
+        text_inside_gallery = re.sub(
+            r"<!--.+?-->", "", text_inside_gallery, flags=re.DOTALL
+        )
+        # First try to find files which are properly listed with 'File:'
+        # or 'Image:' prefix; they must be the first element on their line,
+        # but leading whitespace is tolerated:
+        files_list = re.findall(
+            r"^ *(?:[Ff]ile|[Ii]mage):([^\n|]+)",
+            text_inside_gallery,
+            flags=re.MULTILINE
+        )
+        if not files_list:
+            # If we did not find a single file, let's try a casual search
+            # for lines which, ahem, seem to start with an image filename:
+            files_list = re.findall(
+                r"^ *([^|\n:<>\[\]]+\.(?:jpe?g|tiff?|png|svg|webp|xcf))",
+                text_inside_gallery,
+                flags=re.MULTILINE | re.IGNORECASE,
+            )
+        if files_list:
+            # Appyly uniform formatting to all filenames:
+            files_list = [
+                f"File:{filename.strip().replace('_', ' ')}"
+                for filename in files_list
+            ]
+        else:
+            out(
+                "Warning - no images found in set nomination "
+                f"'{self.page.title()}'",
+                color="lightred",
+            )
+        return files_list
 
     def findGalleryOfFile(self):
-        """Try to find Gallery in the nomination page to make closing users life easier."""
+        """
+        Try to find the gallery link in the nomination subpage
+        in order to make the life of the closing users easier.
+        """
         text = self.page.get(get_redirect=True)
-        RegexGallery = re.compile(
-            r"(?:.*)Gallery(?:.*)(?:\s.*)\[\[Commons\:Featured[_ ]pictures\/([^\]]{1,180})"
+        match = re.search(
+            r"Gallery[^\n]+?\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
+            text,
         )
-        matches = RegexGallery.finditer(text)
-        for m in matches:
-            Gallery = m.group(1)
-        try:
-            Gallery
-        except Exception:
-            Gallery = ""
-
-        return Gallery
+        if match is not None:
+            return match.group(1)
+        else:
+            return ""
 
     def countVotes(self):
         """
@@ -206,6 +275,9 @@ class Candidate:
         # Second rule of the fifth day
         if self._pro >= 10 and self._con == 0:
             return True
+
+        # If we arrive here, no rule applies.
+        return False
 
     def closePage(self):
         """
@@ -452,45 +524,55 @@ class Candidate:
 
     def existingResult(self):
         """
-        Will scan this nomination and check whether it has
-        already been closed, and if so parses for the existing
-        result.
-        The return value is a list of tuples, and normally
-        there should only be one such tuple. The tuple
-        contains four values:
-        support,oppose,neutral,(featured|not featured)
+        Scans the nomination subpage of this candidate and tries to find
+        and parse the results of the nomination.
+        Returns either an empty list (if the nomination was not closed
+        or does not use one of the usual formats for the results)
+        or a list of tuples; normally it should contain just a single tuple.
+        The length of the tuple varies, depending on the results format,
+        but only the first four values of the tuple are important
+        for the comparison of the results:
+        [0] count of support votes,
+        [1] count of oppose votes,
+        [2] count of neutral votes,
+        [3] ('yes'|'no'|'featured'|'not featured').
         """
         text = self.page.get(get_redirect=True)
-        return re.findall(PreviousResultR, text)
+        # Search first for result(s) using the new template-base format,
+        # and if this fails for result(s) in the old text-based format:
+        results = re.findall(VerifiedResultR, text)
+        if not results:
+            results = re.findall(PreviousResultR, text)
+        return results
 
     def compareResultToCount(self):
         """
-        If there is an existing result we will compare
-        it to a new vote count made by this bot and
-        see if they match. This is for testing purposes
-        of the bot and to find any incorrect old results.
+        If there is an existing result we compare it to a new vote count
+        made by this bot and check whether they match or not.
+        This is useful to test the vote counting code of the bot
+        and to find possibly incorrect old results.
         """
         res = self.existingResult()
 
         if self.isWithdrawn():
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
-
         elif self.isFPX():
             out("%s: (ignoring, was FPXed)" % self.cutTitle())
             return
-
+        elif self.imageCount() > 1:
+            out("%s: (ignoring, contains alternatives)" % self.cutTitle())
+            return
         elif not res:
             out("%s: (ignoring, has no results)" % self.cutTitle())
             return
-
         elif len(res) > 1:
             out("%s: (ignoring, has several results)" % self.cutTitle())
             return
 
         # We have one result, so make a vote count and compare
         old_res = res[0]
-        was_featured = old_res[3] == "featured"
+        was_featured = old_res[3].lower() in {"yes", "featured"}
         ws = int(old_res[0])
         wo = int(old_res[1])
         wn = int(old_res[2])
@@ -525,7 +607,7 @@ class Candidate:
 
     def cutTitle(self):
         """Returns a fixed width title."""
-        return re.sub(PrefixR, "", self.page.title())[0:50].ljust(50)
+        return PrefixR.sub("", self.page.title())[0:50].ljust(50)
 
     def cleanTitle(self, keepExtension=False):
         """
@@ -534,11 +616,11 @@ class Candidate:
         a possible change by the alternative parameter is not considered,
         but maybe it should be ?
         """
-        noprefix = re.sub(PrefixR, "", self.page.title())
+        noprefix = PrefixR.sub("", self.page.title())
         if keepExtension:
             return noprefix
         else:
-            return re.sub(r"\.\w{1,3}$\s*", "", noprefix)
+            return re.sub(r"\.\w{2,4}\s*$", "", noprefix)
 
     def fileName(self, alternative=True):
         """
@@ -548,17 +630,14 @@ class Candidate:
         Will return the new file name if moved.
         @param alternative if false disregard any alternative and return the real filename
         """
-        # The regexp here also removes any possible crap between the prefix
-        # and the actual start of the filename.
         if alternative and self._alternative:
             return self._alternative
 
         if self._fileName:
             return self._fileName
 
-        self._fileName = re.sub(
-            "(%s.*?)([Ff]ile|[Ii]mage)" % candPrefix, r"\2", self.page.title()
-        )
+        # Remove nomination page prefix and use standard 'File:' namespace
+        self._fileName = PrefixR.sub("File:", self.page.title())
 
         if not pywikibot.Page(G_Site, self._fileName).exists():
             match = re.search(ImagesR, self.page.get(get_redirect=True))
@@ -715,13 +794,12 @@ class Candidate:
         if self.isSet():
             files = self.setFiles()
         else:
-            files = []
-            files.append(self.fileName())
+            files = [self.fileName()]
+        AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
         for file in files:
             page = pywikibot.Page(G_Site, file)
             current_page = page
             old_text = page.get(get_redirect=True)
-            AssR = re.compile(r"{{\s*[Aa]ssessments\s*\|(.*)}}")
             fn_or = self.fileName(alternative=False)  # Original filename
             fn_al = self.fileName(alternative=True)  # Alternative filename
             # We add the com-nom parameter if the original filename
@@ -739,19 +817,21 @@ class Candidate:
                 pass
 
             # First check if there already is an assessments template on the page
-            params = re.search(AssR, old_text)
-            if params:
+            match = re.search(AssR, old_text)
+            if match:
                 # Make sure to remove any existing com/features or subpage params
-                # TODO: 'com' will be obsolete in the future and can then be removed
-                # TODO: 'subpage' is the old name of com-nom. Can be removed later.
-                params = re.sub(r"\|\s*(?:featured|com)\s*=\s*\d+", "", params.group(1))
+                # TODO: 'subpage' is the old name of 'com-nom'. Can be removed later.
+                params = re.sub(r"\|\s*featured\s*=\s*\d+", "", match.group(1))
                 params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
                 params += "|featured=1"
                 params += comnom
-                if params.find("|") != 0:
+                if params[0] != "|":
                     params = "|" + params
-                new_ass = "{{Assessments%s}}" % params
-                new_text = re.sub(AssR, new_ass, old_text)
+                new_text = (
+                    old_text[:match.start(0)]
+                    + "{{Assessments%s}}" % params
+                    + old_text[match.end(0):]
+                )
                 if new_text == old_text:
                     out(
                         "No change in addAssessments, '%s' already featured."
@@ -766,14 +846,12 @@ class Candidate:
                     end = findEndOfTemplate(old_text, r"[Oo]bject[_\s][Ll]ocation")
                 else:
                     end = findEndOfTemplate(old_text, "[Ii]nformation")
-
                 new_text = (
                     old_text[:end]
                     + "\n{{Assessments|featured=1%s}}\n" % comnom
                     + old_text[end:]
                 )
-                # new_text = re.sub(r'({{\s*[Ii]nformation)',r'{{Assessments|featured=1}}\n\1',old_text)
-                self.commit(old_text, new_text, current_page, "FPC promotion")
+            self.commit(old_text, new_text, current_page, "FPC promotion")
 
     def addToCurrentMonth(self):
         """
@@ -1052,7 +1130,7 @@ class Candidate:
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
-        if re.search(wikipattern(self.fileName()), old_log_text):
+        if re.search(wikipattern(self.page.title()), old_log_text):
             out(
                 "Skipping add in moveToLog for '%s', page already there"
                 % self.cleanTitle(),
@@ -1250,6 +1328,9 @@ class FPCandidate(Candidate):
         # others only the gallery page name or even just the basic gallery.
         full_gallery_link = results[4].strip()
         gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
+        if not gallery_page:
+            out("%s: (ignoring, gallery not defined)" % self.cutTitle())
+            return
         basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
 
         # Check if we have an alternative for a multi image
@@ -1264,9 +1345,6 @@ class FPCandidate(Candidate):
                 return
 
         # Promote the new featured picture(s)
-        if not gallery_page:
-            out("%s: (ignoring, gallery not defined)" % self.cutTitle())
-            return
         self.addToFeaturedList(basic_gallery)
         self.addToGalleryPage(full_gallery_link)
         self.addAssessments()
@@ -1320,8 +1398,7 @@ class DelistCandidate(Candidate):
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
         # So just check and remove the candidate from any gallery pages
-
-        references = self.getImagePage().getReferences(withTemplateInclusion=False)
+        references = self.getImagePage().getReferences(with_template_inclusion=False)
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
@@ -1668,20 +1745,23 @@ keep_templates = (
 # Compiled regular expressions follows
 #
 
-# Used to remove the prefix and just print the file names
-# of the candidate titles.
+# Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
+# or to replace both by the standard 'File:' namespace.
+# Removes also any possible crap between the prefix and the namespace
+# and faulty spaces between namespace and filename (sometimes users
+# accidentally add such spaces when creating nominations).
 candPrefix = "Commons:Featured picture candidates/"
-PrefixR = re.compile("%s.*?([Ff]ile|[Ii]mage)?:" % candPrefix)
+PrefixR = re.compile(candPrefix + r".*?([Ff]ile|[Ii]mage): *")
 
-# Looks for result counts, an example of such a line is:
+# Looks for results using the old, text-based results format
+# which was in use until August 2009.  An example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
-#
 PreviousResultR = re.compile(
-    r"'''result:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
+    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
     re.MULTILINE,
 )
 
-# Looks for verified results
+# Looks for verified results using the new, template-based format
 VerifiedResultR = re.compile(
     r"""
                               {{\s*FPC-results-reviewed\s*\|        # Template start
@@ -1767,7 +1847,7 @@ def main(*args):
     global G_Site
 
     candidates_page = "Commons:Featured picture candidates/candidate_list"
-    testLog = "Commons:Featured_picture_candidates/Log/January_2009"
+    testLog = "Commons:Featured_picture_candidates/Log/January_2025"
 
     worked = False
     delist = False
@@ -1824,7 +1904,7 @@ def main(*args):
 
     # Abort on unknown arguments
     for arg in args:
-        if arg not in [
+        if arg not in {
             "-test",
             "-close",
             "-info",
@@ -1836,9 +1916,10 @@ def main(*args):
             "-notime",
             "-match",
             "-auto",
-        ]:
+            "-dry",
+        }:
             out(
-                "Warning - unknown argument '%s' aborting, see -help." % arg,
+                "Warning - unknown argument '%s'; aborting, see -help." % arg,
                 color="lightred",
             )
             sys.exit(0)
