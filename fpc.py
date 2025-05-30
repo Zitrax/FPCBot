@@ -854,89 +854,89 @@ class Candidate:
         @param files List with filename(s) of the featured picture or set.
         """
         # For set nominations just use the first file.
-        files = files[:1]
-        for file in files:
-            FinalVotesR = re.compile(
-                r"FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|"
-            )
-            NomPagetext = self.page.get(get_redirect=True)
-            matches = FinalVotesR.finditer(NomPagetext)
-            for m in matches:
-                if m is None:
-                    ws = wo = wn = "x"
-                else:
-                    ws = m.group(1)
-                    wo = m.group(2)
-                    wn = m.group(3)
+        file = files[0]
 
-            today = datetime.date.today()
-            monthpage = "Commons:Featured_pictures/chronological/%s %s" % (
-                datetime.datetime.utcnow().strftime("%B"),
-                today.year,
-            )
-            page = pywikibot.Page(G_Site, monthpage)
-            try:
-                old_text = page.get(get_redirect=True)
-            except pywikibot.exceptions.NoPageError:
-                old_text = ""
-            # First check if we are already on the page,
-            # in that case skip. Can happen if the process
-            # have been previously interrupted.
-            if re.search(wikipattern(file), old_text):
-                out(
-                    "Skipping addToCurrentMonth for '%s', page already listed."
-                    % self.cleanTitle(),
-                    color="lightred",
-                )
-                return
-
-            # Find the number of lines in the gallery, if AttributeError set count as 1
-            m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
-            try:
-                count = m.group(0).count("\n")
-            except AttributeError:
-                count = 1
-
-            # We just need to append to the bottom of the gallery
-            # with an added title
-            # TODO: We lack a good way to find the creator, so it is left out at the moment
-
-            if count == 1:
-                old_text = (
-                    "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
-                    % (
-                        datetime.datetime.utcnow().strftime("%B"),
-                        today.year,
-                    )
-                )
+        # Extract voting results
+        FinalVotesR = re.compile(
+            r"FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|"
+        )
+        NomPagetext = self.page.get(get_redirect=True)
+        matches = FinalVotesR.finditer(NomPagetext)
+        for m in matches:
+            if m is None:
+                ws = wo = wn = "x"
             else:
-                pass
+                ws = m.group(1)
+                wo = m.group(2)
+                wn = m.group(3)
 
-            if self.isSet():
-                file_title = "'''%s''' - a set of %s files" % (
-                    (re.search(r"/[Ss]et/(.*)", self.page.title())).group(1),
-                    str(len(self.setFiles())),
-                )
-            else:
-                file_title = self.cleanTitle()
+        # Get the current monthly overview page
+        today = datetime.date.today()
+        monthpage = "Commons:Featured_pictures/chronological/%s %s" % (
+            datetime.datetime.utcnow().strftime("%B"),
+            today.year,
+        )
+        page = pywikibot.Page(G_Site, monthpage)
+        try:
+            old_text = page.get(get_redirect=True)
+        except pywikibot.exceptions.NoPageError:
+            old_text = ""
 
-            new_text = re.sub(
-                "</gallery>",
-                "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
+        # First check if we are already on the page,
+        # in that case skip. Can happen if the process
+        # have been previously interrupted.
+        if re.search(wikipattern(file), old_text):
+            out(
+                "Skipping addToCurrentMonth for '%s', page already listed."
+                % self.cleanTitle(),
+                color="lightred",
+            )
+            return
+
+        # Find the number of lines in the gallery, if AttributeError set count as 1
+        m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
+        try:
+            count = m.group(0).count("\n")
+        except AttributeError:
+            count = 1
+
+        # We just need to append to the bottom of the gallery
+        # with an added title
+        # TODO: We lack a good way to find the creator, so it is left out at the moment
+        if count == 1:
+            old_text = (
+                "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
                 % (
-                    file,
-                    count,
-                    file_title,
-                    uploader(file),
-                    self.nominator(),
-                    ws,
-                    wo,
-                    wn,
-                ),
-                old_text,
+                    datetime.datetime.utcnow().strftime("%B"),
+                    today.year,
+                )
             )
 
-            self.commit(old_text, new_text, page, "Added [[%s]]" % file)
+        if self.isSet():
+            file_title = "'''%s''' - a set of %s files" % (
+                (re.search(r"/[Ss]et/(.*)", self.page.title())).group(1),
+                str(len(self.setFiles())),
+            )
+        else:
+            file_title = self.cleanTitle()
+
+        new_text = re.sub(
+            "</gallery>",
+            "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
+            % (
+                file,
+                count,
+                file_title,
+                uploader(file),
+                self.nominator(),
+                ws,
+                wo,
+                wn,
+            ),
+            old_text,
+        )
+
+        self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def notifyNominator(self, files):
         """
