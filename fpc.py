@@ -651,7 +651,7 @@ class Candidate:
 
         return self._fileName
 
-    def addToFeaturedList(self, gallery):
+    def addToFeaturedList(self, gallery, files):
         """
         Adds the new featured picture to the list with recently
         featured images that is used on the FP landing page.
@@ -661,12 +661,9 @@ class Candidate:
         This is ==STEP 1== of the parking procedure.
 
         @param gallery The basic gallery name, like 'Animals'.
+        @param files List with filename(s) of the featured picture or set.
         """
-        if self.isSet():
-            file = (self.setFiles())[0]  # Add the first file from gallery.
-        else:
-            file = self.fileName()
-
+        file = files[0]  # For set nominations just use the first file.
         listpage = "Commons:Featured pictures, list"
         page = pywikibot.Page(G_Site, listpage)
         old_text = page.get(get_redirect=True)
@@ -697,7 +694,7 @@ class Candidate:
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
         self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
-    def addToGalleryPage(self, gallery):
+    def addToGalleryPage(self, gallery, files):
         """
         Adds the new featured picture (resp. all files from a set nomination)
         to the appropriate featured picture gallery page.
@@ -708,12 +705,8 @@ class Candidate:
         @param gallery The gallery link with the name of the gallery page
         and (optionally) a section anchor which denotes the target section
         on that page.
+        @param files List with filename(s) of the featured picture or set.
         """
-        if self.isSet():
-            files = self.setFiles()
-        else:
-            files = []
-            files.append(self.fileName())
         for file in files:
             gallery_full_path = "Commons:Featured pictures/" + re.sub(
                 r"#.*", "", gallery
@@ -783,18 +776,16 @@ class Candidate:
         """Get the image page itself."""
         return pywikibot.Page(G_Site, self.fileName())
 
-    def addAssessments(self):
+    def addAssessments(self, files):
         """
         Adds the {{Assessments}} template to the description page
         of a featured picture, resp. to all files in a set.
         Should only be called on closed and verified candidates.
 
         This is ==STEP 3== of the parking procedure.
+
+        @param files List with filename(s) of the featured picture or set.
         """
-        if self.isSet():
-            files = self.setFiles()
-        else:
-            files = [self.fileName()]
         AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
         for file in files:
             page = pywikibot.Page(G_Site, file)
@@ -853,18 +844,17 @@ class Candidate:
                 )
             self.commit(old_text, new_text, current_page, "FPC promotion")
 
-    def addToCurrentMonth(self):
+    def addToCurrentMonth(self, files):
         """
         Adds the candidate to the monthly overview of new featured pictures.
         Should only be called on closed and verified candidates.
 
         This is ==STEP 4== of the parking procedure.
+
+        @param files List with filename(s) of the featured picture or set.
         """
-        if self.isSet():
-            files = (self.setFiles())[:1]  # The first file from gallery.
-        else:
-            files = []
-            files.append(self.fileName())
+        # For set nominations just use the first file.
+        files = files[:1]
         for file in files:
             FinalVotesR = re.compile(
                 r"FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|"
@@ -948,12 +938,14 @@ class Candidate:
 
             self.commit(old_text, new_text, page, "Added [[%s]]" % file)
 
-    def notifyNominator(self):
+    def notifyNominator(self, files):
         """
         Add a FP promotion template to the nominator's talk page.
         Should only be called on closed and verified candidates.
 
         This is ==STEP 5== of the parking procedure.
+
+        @param files List with filename(s) of the featured picture or set.
         """
         talk_link = "User_talk:%s" % self.nominator(link=False)
         talk_page = pywikibot.Page(G_Site, talk_link)
@@ -984,7 +976,7 @@ class Candidate:
         if self.isSet():
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
-            files_newline_string = converttostr(self.setFiles(), "\n")
+            files_newline_string = converttostr(files, "\n")
             new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
                 files_newline_string,
                 fn_al,
@@ -1028,19 +1020,15 @@ class Candidate:
                 color="lightyellow",
             )
 
-    def notifyUploader(self):
+    def notifyUploader(self, files):
         """
         Add a FP promotion template to the uploader's talk page.
         Should only be called on closed and verified candidates.
 
         This is ==STEP 6== of the parking procedure.
-        """
-        if self.isSet():
-            files = self.setFiles()
-        else:
-            files = []
-            files.append(self.fileName())
 
+        @param files List with filename(s) of the featured picture or set.
+        """
         for file in files:
             # Check if nominator and uploaders are same, avoiding adding a template twice
             if self.nominator() == uploader(file, link=True):
@@ -1345,12 +1333,16 @@ class FPCandidate(Candidate):
                 return
 
         # Promote the new featured picture(s)
-        self.addToFeaturedList(basic_gallery)
-        self.addToGalleryPage(full_gallery_link)
-        self.addAssessments()
-        self.addToCurrentMonth()
-        self.notifyNominator()
-        self.notifyUploader()
+        files = self.setFiles() if self.isSet() else [self.fileName()]
+        if not files:
+            out("%s: (ignoring, no file(s) found)" % self.cutTitle())
+            return
+        self.addToFeaturedList(basic_gallery, files)
+        self.addToGalleryPage(full_gallery_link, files)
+        self.addAssessments(files)
+        self.addToCurrentMonth(files)
+        self.notifyNominator(files)
+        self.notifyUploader(files)
         self.moveToLog(self._proString)
 
 
