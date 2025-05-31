@@ -707,70 +707,94 @@ class Candidate:
         on that page.
         @param files List with filename(s) of the featured picture or set.
         """
-        for file in files:
-            gallery_full_path = "Commons:Featured pictures/" + re.sub(
-                r"#.*", "", gallery
+        # The calling code must guarantee that gallery link and files list
+        # are not empty.  An assertion can help us to catch bugs:
+        assert gallery and files
+
+        # Replace all underscores and non-breaking spaces by plain spaces
+        # (underscores are present if users just copy the gallery link,
+        # NBSP can be entered by accident with some keyboard settings,
+        # e.g. on macOS or Linux)
+        gallery = gallery.replace("_", " ").replace("\u00A0", " ")
+        # Split the gallery link into gallery page name and section anchor
+        # (the latter can be empty)
+        link_parts = gallery.split("#", maxsplit=1)
+        gallery_page_name = link_parts[0].strip()
+        section = link_parts[1].strip() if len(link_parts) > 1 else ""
+
+        # Read the gallery page
+        full_page_name = f"Commons:Featured pictures/{gallery_page_name}"
+        page = pywikibot.Page(G_Site, full_page_name)
+        old_text = page.get(get_redirect=True)
+        clean_title = self.cleanTitle()
+
+        # Check if some files are already on the page.
+        # This can happen if the process has previously been interrupted.
+        # We skip these files but handle any file which is not yet present.
+        new_files = [
+            file for file in files
+            if not re.search(wikipattern(file), old_text)
+        ]
+        if not new_files:
+            # Not a single file needs to be added, so we can stop here.
+            out(
+                f"Skipping addToGalleryPage() for '{clean_title}', "
+                "file(s) already listed."
             )
-            page = pywikibot.Page(G_Site, gallery_full_path)
-            old_text = page.get(get_redirect=True)
-            section_R = r"#(.*)"
-            m = re.search(section_R, gallery)
-            try:
-                section = m.group(1)
-            except AttributeError:
-                section = None
+            return
+        # Format the new entries and a summary for the message
+        new_entries = "".join(f"{file}|{clean_title}\n" for file in new_files)
+        files_for_msg = ", ".join(f"'{file}'" for file in new_files)
 
-            if section is not None:
+        # Have we got a section anchor?
+        if section:
+            # Search for the target section, i.e. a (sub)heading followed
+            # by the associated <gallery>...</gallery> element,
+            # separated by at most a single line (e.g. a 'See also' hint)
+            section_pattern = (
+                r"(\n=+ *"
+                + re.escape(section)  # Escape chars with regex meaning.
+                + r" *=+ *\n+(?:[^<= \n][^\n]+\s+)?<gallery\b.+?)</gallery>"
+            )
+            match = re.search(section_pattern, old_text, flags=re.DOTALL)
+            # Now match is a valid match object if we have found
+            # the section, else it is None.
+        else:
+            # There was no section anchor, so there is no match
+            match = None
 
-                # Trying to generate a regex for finding the section in a gallery if specified in nomination
-                # First we are escaping all parentheses, as they are used in regex
-                # Replacement of all uunderscore with ' ', some users just copy the url
-                # Replacing all \s with \s(?:\s*|)\s, user have linked the section to categories. Why ? To make our lives harder
-
-                section = (
-                    section.replace(")", r"\)")
-                    .replace("(", r"\(")
-                    .replace("_", " ")
-                    .replace(" ", r" (?:\[{2}|\]{2}|) ")
-                )
-                section_search_R = (
-                    section + r"(?:(?:[^\{\}]|\n)*?)(</gallery>)"
-                ).replace(" ", r"(?:\s*|)")
-                m = re.search(section_search_R, old_text)
-                try:
-                    old_section = m.group()
-                except AttributeError:
-                    section = None
-
-            # First check if we are already on the page,
-            # in that case skip. Can happen if the process
-            # have been previously interrupted.
-
-            if re.search(wikipattern(file), old_text):
+        # Add the new file(s) to the gallery page
+        if match is not None:
+            # Append the new file(s) to the target section:
+            new_text = (
+                old_text[:match.end(1)]
+                + new_entries
+                + old_text[match.end(1):]
+            )
+            message = (
+                f"Added {files_for_msg} to the target section '{section}'."
+            )
+        else:
+            # Either the section anchor was missing or empty,
+            # or we did not find the matching target section.
+            # Append the new file(s) to the 'Unsorted' section;
+            # it should be just the last <gallery></gallery> on the page.
+            gallery_end_pos = old_text.rfind("</gallery>")
+            if gallery_end_pos < 0:
+                # Ouch, the page does not contain a single <gallery></gallery>
                 out(
-                    "Skipping addToGalleryPage for '%s', page already listed."
-                    % self.cleanTitle(),
+                    f"Skipping addToGalleryPage() for '{clean_title}', "
+                    "no 'Unsorted' section found - not a valid gallery page?",
                     color="lightred",
                 )
                 return
-
-            # If we found a section, we try to add the image in the section else add to the bottom most gallery (unsorted)
-            if section is not None:
-                file_info = "%s|%s\n</gallery>" % (file, self.cleanTitle())
-                updated_section = re.sub(r"</gallery>", file_info, old_section)
-                new_text = old_text.replace(old_section, updated_section)
-            else:
-                # We just need to append to the bottom of the gallery with an added title
-                # The regexp uses negative lookahead such that we place the candidate in the
-                # last gallery on the page.
-                new_text = re.sub(
-                    "(?s)</gallery>(?!.*</gallery>)",
-                    "%s|%s\n</gallery>" % (file, self.cleanTitle()),
-                    old_text,
-                    count=1,
-                )
-
-            self.commit(old_text, new_text, page, "Added [[%s]]" % file)
+            new_text = (
+                old_text[:gallery_end_pos]
+                + new_entries
+                + old_text[gallery_end_pos:]
+            )
+            message = f"Added {files_for_msg} to the 'Unsorted' section."
+        self.commit(old_text, new_text, page, message)
 
     def getImagePage(self):
         """Get the image page itself."""
