@@ -622,6 +622,23 @@ class Candidate:
         else:
             return re.sub(r"\.\w{2,4}\s*$", "", noprefix)
 
+    def cleanSetTitle(self, keep_set=False):
+        """
+        Returns the title of a set nomination without the leading
+        'Commons:Featured picture candidates/' and (optionally)
+        without the 'Set/' part.  Strips leading/trailing whitespace.
+        """
+        match = re.search(r"/ *([Ss]et/(.+))$", self.page.title())
+        if not match:
+            out(
+                "Warning - called cleanSetTitle() on a nomination "
+                "which does not look like a set",
+                color="lightred",
+            )
+            return self.page.title()
+        title = match.group(1) if keep_set else match.group(2)
+        return title.strip()
+
     def fileName(self, alternative=True):
         """
         Return only the filename of this candidate
@@ -726,7 +743,10 @@ class Candidate:
         full_page_name = f"Commons:Featured pictures/{gallery_page_name}"
         page = pywikibot.Page(G_Site, full_page_name)
         old_text = page.get(get_redirect=True)
-        clean_title = self.cleanTitle()
+        if self.isSet():
+            clean_title = self.cleanSetTitle(keep_set=False)
+        else:
+            clean_title = self.cleanTitle()
 
         # Check if some files are already on the page.
         # This can happen if the process has previously been interrupted.
@@ -827,9 +847,7 @@ class Candidate:
 
             # The template needs the com-nom to link to the site from file page
             if self.isSet():
-                comnom = "|com-nom=" + (
-                    re.search(r"/[Ss]et/(.*)", self.page.title())
-                ).group(1)
+                comnom = "|com-nom=" + self.cleanSetTitle(keep_set=False)
             else:
                 pass
 
@@ -940,8 +958,8 @@ class Candidate:
 
         if self.isSet():
             file_title = "'''%s''' - a set of %s files" % (
-                (re.search(r"/[Ss]et/(.*)", self.page.title())).group(1),
-                str(len(self.setFiles())),
+                self.cleanSetTitle(keep_set=False),
+                str(len(files)),
             )
         else:
             file_title = self.cleanTitle()
@@ -1092,9 +1110,8 @@ class Candidate:
             subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
 
             if self.isSet():
-                subpage = "|subpage=" + (
-                    re.search(r"[Ss]et/(.*)", self.page.title())
-                ).group(0)
+                # NB that in this case we must keep the 'Set/' prefix.
+                subpage = "|subpage=" + self.cleanSetTitle(keep_set=True)
                 fn_al = file
 
             new_text = (
