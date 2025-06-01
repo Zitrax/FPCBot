@@ -839,17 +839,15 @@ class Candidate:
             old_text = page.get(get_redirect=True)
             fn_or = self.fileName(alternative=False)  # Original filename
             fn_al = self.fileName(alternative=True)  # Alternative filename
-            # We add the com-nom parameter if the original filename
-            # differs from the alternative filename.
-            comnom = (
-                "|com-nom=%s" % fn_or.replace("File:", "") if fn_or != fn_al else ""
-            )
 
-            # The template needs the com-nom to link to the site from file page
+            # We need the 'com-nom' parameter for sets or if the alternative
+            # filename differs from the original filename.
             if self.isSet():
                 comnom = "|com-nom=" + self.cleanSetTitle(keep_set=False)
+            elif fn_al != fn_or:
+                comnom = "|com-nom=" + fn_or.replace("File:", "")
             else:
-                pass
+                comnom = ""
 
             # First check if there already is an assessments template on the page
             match = re.search(AssR, old_text)
@@ -1095,7 +1093,6 @@ class Candidate:
             # First check if we are already on the page,
             # in that case skip. Can happen if the process
             # have been previously interrupted.
-
             if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
                 out(
                     "Skipping notifyUploader for '%s', page already listed at '%s'."
@@ -1104,15 +1101,16 @@ class Candidate:
                 )
                 return
 
-            # We add the subpage parameter if the original filename
-            # differs from the alternative filename.
-
-            subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
-
+            # We need the 'subpage' parameter for sets or if the alternative
+            # filename differs from the original filename.
+            # NB that in this case we must keep the 'Set/' prefix.
             if self.isSet():
-                # NB that in this case we must keep the 'Set/' prefix.
                 subpage = "|subpage=" + self.cleanSetTitle(keep_set=True)
                 fn_al = file
+            elif fn_al != fn_or:
+                subpage = "|subpage=" + fn_or
+            else:
+                subpage = ""
 
             new_text = (
                 old_text
