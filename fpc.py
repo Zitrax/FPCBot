@@ -744,7 +744,9 @@ class Candidate:
             return
         # Format the new entries and a summary for the message
         new_entries = "".join(f"{file}|{clean_title}\n" for file in new_files)
-        files_for_msg = ", ".join(f"'{file}'" for file in new_files)
+        files_for_msg = f"[[{new_files[0]}]]"
+        if len(new_files) > 1:
+            files_for_msg += f" and {len(new_files) - 1} more set file(s)"
 
         # Have we got a section anchor?
         if section:
@@ -772,7 +774,7 @@ class Candidate:
                 + old_text[match.end(1):]
             )
             message = (
-                f"Added {files_for_msg} to the target section '{section}'."
+                f"Added {files_for_msg} to section '{section}'"
             )
         else:
             # Either the section anchor was missing or empty,
@@ -793,7 +795,7 @@ class Candidate:
                 + new_entries
                 + old_text[gallery_end_pos:]
             )
-            message = f"Added {files_for_msg} to the 'Unsorted' section."
+            message = f"Added {files_for_msg} to the 'Unsorted' section"
         self.commit(old_text, new_text, page, message)
 
     def getImagePage(self):
