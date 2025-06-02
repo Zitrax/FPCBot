@@ -616,11 +616,13 @@ class Candidate:
         a possible change by the alternative parameter is not considered,
         but maybe it should be ?
         """
-        noprefix = PrefixR.sub("", self.page.title())
+        title = PrefixR.sub("", self.page.title())
+        # We must also remove the trailing '/2', '/3' etc. of repeated noms:
+        title = re.sub(r"/ *[0-9]+$", "", title)
         if keepExtension:
-            return noprefix
+            return title
         else:
-            return re.sub(r"\.\w{2,4}\s*$", "", noprefix)
+            return re.sub(r"\.\w{2,4}\s*$", "", title)
 
     def cleanSetTitle(self, keep_set=False):
         """
