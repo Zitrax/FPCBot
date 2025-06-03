@@ -1021,7 +1021,7 @@ class Candidate:
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
             files_newline_string = converttostr(files, "\n")
-            new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
+            new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>\n%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
                 files_newline_string,
                 fn_al,
                 subpage,
