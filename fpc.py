@@ -1485,25 +1485,17 @@ class DelistCandidate(Candidate):
 
 
 def wikipattern(s):
-    """Return a string that can be matched against different way of writing it on wikimedia projects."""
+    """
+    Prepares a filename, page name etc. so that it can be used in a regex
+    and that spaces and underscores are handled as interchangeable,
+    as usual in MediaWiki filenames, page names etc.
+    """
+    return re.sub(r"(?:\\ |_)", r"[ _]", re.escape(s))
 
-    def rep(m):
-        if m.group(0) == " " or m.group(0) == "_":
-            return "[ _]"
-        elif (
-            m.group(0) == "("
-            or m.group(0) == ")"
-            or m.group(0) == "*"
-            or m.group(0) == "+"
-            or m.group(0) == "="
-            or m.group(0) == "?"
-            or m.group(0) == "!"
-            or m.group(0) == "^"
-            or m.group(0) == "-"
-        ):
-            return "\\" + m.group(0)
 
-    return re.sub(r"[ _()*+=?!^-]", rep, s)
+# If this assertion ever fails, re.escape() handles spaces differently now,
+# so please update the regex in the function above.
+assert re.escape(" ") == r"\ "
 
 
 def out(text, newline=True, date=False, color=None):
