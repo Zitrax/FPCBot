@@ -1282,9 +1282,11 @@ class Candidate:
         out("\n About to commit changes to: '%s'" % page.title())
 
         # Show the diff
+        lines_of_context = 0 if (G_Auto and not G_Dry) else 3
         pywikibot.showDiff(
             old_text,
             new_text,
+            context=lines_of_context,
         )
 
         if G_Dry:
