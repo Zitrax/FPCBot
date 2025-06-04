@@ -949,7 +949,7 @@ class Candidate:
         # TODO: We lack a good way to find the creator, so it is left out at the moment
         if count == 1:
             old_text = (
-                "{{subst:FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
+                "{{FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
                 % (
                     datetime.datetime.utcnow().strftime("%B"),
                     today.year,
