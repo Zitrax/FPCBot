@@ -1020,9 +1020,8 @@ class Candidate:
         if self.isSet():
             if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
                 return
-            files_newline_string = converttostr(files, "\n")
             new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>\n%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
-                files_newline_string,
+                "\n".join(files),
                 fn_al,
                 subpage,
             )
@@ -1614,12 +1613,6 @@ def uploader(file, link=True):
         return "[[User:%s|%s]]" % (username, username)
     else:
         return username
-
-
-def converttostr(input_list, seperator):
-    """Make string from list."""
-    resultant_string = seperator.join(input_list)
-    return resultant_string
 
 
 def findEndOfTemplate(text, template):
