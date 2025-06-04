@@ -1858,6 +1858,8 @@ G_LogNoTime = False
 G_MatchPattern = ""
 # Flag that will be set to True if CTRL-C was pressed
 G_Abort = False
+# Pywikibot Site object
+G_Site = None
 
 
 def main(*args):
