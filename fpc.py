@@ -1500,15 +1500,15 @@ assert re.escape(" ") == r"\ "
 
 
 def out(text, newline=True, date=False, color=None):
-    """Just output some text to the consoloe or log."""
+    """Just output some text to the console or log."""
     if color:
-        text = "\03{%s}%s\03{default}" % (color, text)
+        text = f"<<{color}>>{text}<<default>>"
     dstr = (
-        "%s: " % datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        f"{datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}: "
         if date and not G_LogNoTime
         else ""
     )
-    pywikibot.stdout("%s%s" % (dstr, text), newline=newline)
+    pywikibot.stdout(f"{dstr}{text}", newline=newline)
 
 
 def findCandidates(page_url, delist):
