@@ -403,20 +403,20 @@ class Candidate:
         if self._creationTime:
             return self._creationTime
 
-        history = self.page.revisions(reverse=True, total=1)
-
-        if not history:
-            out(
-                "Could not retrieve history for '%s', returning now()"
-                % self.page.title()
-            )
-            return datetime.datetime.now()
-
-        for data in history:
-            self._creationTime = data["timestamp"]
+        try:
+            timestamp = self.page.oldest_revision.timestamp
+        except pywikibot.exceptions.PageRelatedError:
+            self._creationTime = datetime.datetime.now(datetime.UTC)
+        else:
+            # MediaWiki timestamps are always stored in UTC,
+            # but querying a revision timestamp still returns an offset-naive
+            # pywikibot.Timestamp object.  Therefore we convert it right away
+            # to an offset-aware datetime object in order to compare it
+            # easily and correctly to offset-aware datetime objects:
+            self._creationTime = timestamp.replace(tzinfo=datetime.UTC)
 
         # print "C:" + self._creationTime.isoformat()
-        # print "N:" + datetime.datetime.utcnow().isoformat()
+        # print "N:" + datetime.datetime.now(datetime.UTC).isoformat()
         return self._creationTime
 
     def statusString(self):
@@ -435,7 +435,7 @@ class Candidate:
         if self._daysOld != -1:
             return self._daysOld
 
-        delta = datetime.datetime.utcnow() - self.creationTime()
+        delta = datetime.datetime.now(datetime.UTC) - self.creationTime()
         self._daysOld = delta.days
         return self._daysOld
 
@@ -449,13 +449,17 @@ class Candidate:
             return self._daysSinceLastEdit
 
         try:
-            lastEdit = datetime.datetime.strptime(
-                str(self.page.editTime()), "%Y-%m-%dT%H:%M:%SZ"
-            )
-        except Exception:
+            timestamp = self.page.latest_revision.timestamp
+        except pywikibot.exceptions.PageRelatedError:
             return -1
+        # MediaWiki timestamps are always stored in UTC,
+        # but querying a revision timestamp still returns an offset-naive
+        # pywikibot.Timestamp object.  Therefore we convert it right away
+        # to an offset-aware datetime object in order to compare it
+        # easily and correctly to offset-aware datetime objects:
+        last_edit = timestamp.replace(tzinfo=datetime.UTC)
 
-        delta = datetime.datetime.utcnow() - lastEdit
+        delta = datetime.datetime.now(datetime.UTC) - last_edit
         self._daysSinceLastEdit = delta.days
         return self._daysSinceLastEdit
 
@@ -915,11 +919,10 @@ class Candidate:
                 wn = m.group(3)
 
         # Get the current monthly overview page
-        today = datetime.date.today()
-        monthpage = "Commons:Featured_pictures/chronological/%s %s" % (
-            datetime.datetime.utcnow().strftime("%B"),
-            today.year,
-        )
+        now = datetime.datetime.now(datetime.UTC)
+        year = now.year
+        month = now.strftime("%B")  # Full local month name, here: English
+        monthpage = f"Commons:Featured pictures/chronological/{month} {year}"
         page = pywikibot.Page(G_Site, monthpage)
         try:
             old_text = page.get(get_redirect=True)
@@ -949,11 +952,9 @@ class Candidate:
         # TODO: We lack a good way to find the creator, so it is left out at the moment
         if count == 1:
             old_text = (
-                "{{FPArchiveChrono}}\n== %s %s ==\n<gallery>\n</gallery>"
-                % (
-                    datetime.datetime.utcnow().strftime("%B"),
-                    today.year,
-                )
+                "{{FPArchiveChrono}}\n"
+                f"== {month} {year} ==\n"
+                "<gallery>\n</gallery>"
             )
 
         if self.isSet():
@@ -1146,12 +1147,10 @@ class Candidate:
 
         # Add to log
         # (Note FIXME, we must probably create this page if it does not exist)
-        today = datetime.date.today()
-        current_month = datetime.datetime.utcnow().strftime("%B")
-        log_link = "Commons:Featured picture candidates/Log/%s %s" % (
-            current_month,
-            today.year,
-        )
+        now = datetime.datetime.now(datetime.UTC)
+        year = now.year
+        month = now.strftime("%B")  # Full local month name, here: English
+        log_link = f"Commons:Featured picture candidates/Log/{month} {year}"
         log_page = pywikibot.Page(G_Site, log_link)
 
         # If the page does not exist we just create it ( put does that automatically )
@@ -1440,7 +1439,7 @@ class DelistCandidate(Candidate):
                 if ref.title().startswith("Commons:Featured pictures/chronological"):
                     out("Adding delist note to %s" % ref.title())
                     old_text = ref.get(get_redirect=True)
-                    now = datetime.datetime.utcnow()
+                    now = datetime.datetime.now(datetime.UTC)
                     new_text = re.sub(
                         r"(([Ff]ile|[Ii]mage):%s.*)\n"
                         % wikipattern(self.cleanTitle(keepExtension=True)),
