@@ -397,8 +397,9 @@ class Candidate:
         """
         Returns the time at which this nomination was created.
         If we can't determine the creation time, for example because
-        the page does not exist, we return the current time
-        so that we ignore this nomination as too young.
+        the page has been moved without leaving a redirect etc.,
+        we return the current time so that we ignore this nomination
+        as too young.
         """
         if self._creationTime:
             return self._creationTime
@@ -407,18 +408,17 @@ class Candidate:
             timestamp = self.page.oldest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
             out(
-                f"Could not ascertain creation time of '{self.page.title()}', "
+                "Could not ascertain creation time of nomination, "
                 "returning now()",
                 color="lightred",
             )
             return datetime.datetime.now(datetime.UTC)
-        else:
-            # MediaWiki timestamps are always stored in UTC,
-            # but querying a revision timestamp still returns an offset-naive
-            # pywikibot.Timestamp object.  Therefore we convert it right away
-            # to an offset-aware datetime object in order to compare it
-            # easily and correctly to offset-aware datetime objects:
-            self._creationTime = timestamp.replace(tzinfo=datetime.UTC)
+        # MediaWiki timestamps are always stored in UTC,
+        # but querying a revision timestamp still returns an offset-naive
+        # pywikibot.Timestamp object.  Therefore we convert it right away
+        # to an offset-aware datetime object in order to compare it
+        # easily and correctly to offset-aware datetime objects:
+        self._creationTime = timestamp.replace(tzinfo=datetime.UTC)
 
         # print "C:" + self._creationTime.isoformat()
         # print "N:" + datetime.datetime.now(datetime.UTC).isoformat()
