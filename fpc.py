@@ -622,7 +622,11 @@ class Candidate:
 
     def cutTitle(self):
         """Returns a fixed width title."""
-        return PrefixR.sub("", self.page.title())[0:50].ljust(50)
+        title = (
+            self.cleanSetTitle(keep_set=True) if self.isSet()
+            else PrefixR.sub("", self.page.title(), count=1)
+        )
+        return title[0:50].ljust(50)
 
     def cleanTitle(self, keepExtension=False):
         """
