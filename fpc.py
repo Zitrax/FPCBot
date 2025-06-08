@@ -285,10 +285,13 @@ class Candidate:
         If it was, True is returned else False
         """
 
-        # First make a check that the page actually exist:
+        # First make sure that the page actually exists
         if not self.page.exists():
-            out('"%s" no such page?!' % self.cutTitle())
-            return
+            out(
+                '"%s" Warning: no such page?!' % self.cutTitle(),
+                color="lightred",
+            )
+            return False
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
             # Will close withdrawn nominations if there are more than one
@@ -321,7 +324,10 @@ class Candidate:
 
         old_text = self.page.get(get_redirect=True)
         if not old_text:
-            out("Warning - %s has no content" % self.page, color="lightred")
+            out(
+                '"%s" Warning: has no content' % self.cutTitle(),
+                color="lightred",
+            )
             return False
 
         if re.search(r"{{\s*FPC-closed-ignored.*}}", old_text):
