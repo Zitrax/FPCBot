@@ -431,15 +431,17 @@ class Candidate:
         return self._creationTime
 
     def statusString(self):
-        """Short status string about the candidate."""
+        """Returns a short string describing the status of the candidate."""
+        if reviewed := self.isReviewed():
+            return reviewed
+        if self.isWithdrawn():
+            return "Withdrawn"
         if self.isIgnored():
             return "Ignored"
-        elif self.isWithdrawn():
-            return "Withdrawn"
-        elif not self.isDone():
-            return "Active"
-        else:
-            return self._proString if self.isPassed() else self._conString
+        if self.isDone() or self.rulesOfFifthDay():
+            text = self._proString if self.isPassed() else self._conString
+            return text.capitalize()
+        return "Active"
 
     def daysOld(self):
         """Find the number of days this nomination has existed."""
@@ -494,6 +496,20 @@ class Candidate:
             self.countVotes()
 
         return self._pro >= 7 and (self._pro >= 2 * self._con)
+
+    def isReviewed(self):
+        """
+        Returns a short string for use with statusString(),
+        indicating whether the nomination has already been closed and reviewed
+        or has been closed and counted, but is still waiting for the review;
+        if neither the one nor the other applies, returns False.
+        """
+        wikitext = self.page.get(get_redirect=True)
+        if self._ReviewedR.search(wikitext):
+            return "Reviewed"
+        if self._CountedR.search(wikitext):
+            return "Counted"
+        return False
 
     def isIgnored(self):
         """Some nominations currently require manual check."""
