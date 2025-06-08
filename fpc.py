@@ -137,11 +137,11 @@ class Candidate:
         pass
 
     def isSet(self):
-        """Check if the nomination page has "/[Ss]et/" in it, if yes it must be a set nomination."""
-        if re.search(r"/[Ss]et", self.page.title()):
-            return True
-        else:
-            return False
+        """
+        Check whether this candidate is a set nomination or not;
+        the name of the nomination subpage for a set must contain "/[Ss]et/".
+        """
+        return re.search(r"/ *[Ss]et */", self.page.title()) is not None
 
     def setFiles(self):
         """
