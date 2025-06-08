@@ -408,7 +408,7 @@ class Candidate:
             timestamp = self.page.oldest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
             out(
-                "Could not ascertain creation time of nomination, "
+                f"Could not ascertain creation time of '{self.page.title()}', "
                 "returning now()",
                 color="lightred",
             )
