@@ -8,16 +8,27 @@ and adds newly promoted featured pictures to the gallery pages.
 
 Programmed by Daniel78 at Commons.
 
-Command line options:
+The script is based on Pywikibot.  Therefore you can use it with
+Pywikibot options (so-called global options); to list them,
+use '-help:global' or run 'pwb.py -help'.
 
--test           Perform a testrun against an old log.
--close          Close and add results to the nominations.
--info           Just print the vote count info about the current nominations.
--park           Park closed and verified candidates.
+In addition, the script understands the following
+command line arguments for tasks and (local) options:
+
+Tasks:
+
+-help           Print this help and exit.
+-info           Print status and vote count info about current nominations.
+-close          Close, count votes and add results to finished nominations.
+-park           Park closed and verified nominations.
+-test           Test vote counting against an old log.
+
+Options:
+
 -auto           Do not ask before commiting edits to articles.
 -dry            Do not submit any edits, just print them.
 -threads        Use threads to speed things up
-                (can't be used in interactive mode).
+                (must be used with '-auto' and/or '-dry').
 -fpc            Handle the featured candidates (if neither -fpc
                 nor -delist is used all candidates are handled).
 -delist         Handle the delisting candidates (if neither -fpc
