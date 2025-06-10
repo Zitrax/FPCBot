@@ -1927,45 +1927,55 @@ def main(*args):
     # Define local constants and default values
     candidates_page = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2025"
-    worked = False
     delist = False
     fpc = False
 
+    # Acquire CLI arguments, let Pywikibot handle the global arguments
+    # (including '-help') and get the rest as a simple list
+    override_args = args if args else None
+    try:
+        local_args = pywikibot.handle_args(args=override_args, do_help=True)
+    except ConnectionError:
+        out(
+            "Error - can't connect to the Commons server, aborting.",
+            color="lightred",
+        )
+        sys.exit()
+
+    # Pywikibot can create the site object only after handling the arguments
+    G_Site = pywikibot.Site()
+
     # First look for arguments which act as options for all tasks
-    i = 1
-    for arg in sys.argv[1:]:
-        if arg == "-auto":
-            G_Auto = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-dry":
-            G_Dry = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-threads":
-            G_Threads = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-delist":
-            delist = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-fpc":
-            fpc = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-notime":
-            G_LogNoTime = True
-            sys.argv.remove(arg)
-            continue
-        elif arg == "-match":
-            if i + 1 < len(sys.argv):
-                G_MatchPattern = sys.argv.pop(i + 1)
-                sys.argv.remove(arg)
-                continue
-            else:
-                out("Warning - '-match' need a pattern, aborting.", color="lightred")
-                sys.exit(0)
+    task_args = []
+    i = 0
+    while i < len(local_args):
+        arg = local_args[i]
+        match arg:
+            case "-auto":
+                G_Auto = True
+            case "-dry":
+                G_Dry = True
+            case "-threads":
+                G_Threads = True
+            case "-delist":
+                delist = True
+            case "-fpc":
+                fpc = True
+            case "-notime":
+                G_LogNoTime = True
+            case "-match":
+                # So the next argument must be the pattern string
+                try:
+                    G_MatchPattern = local_args[i + 1]
+                except IndexError:
+                    out(
+                        "Error - '-match' must be followed by a pattern, aborting.",
+                        color="lightred",
+                    )
+                    sys.exit()
+                i += 1  # Skip the pattern argument.
+            case _:
+                task_args.append(arg)
         i += 1
 
     # If neither -fpc nor -delist is used we handle all candidates
@@ -1975,72 +1985,72 @@ def main(*args):
 
     # We can't use the interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
-        out("Warning - '-threads' must be run with '-dry' or '-auto'", color="lightred")
-        sys.exit(0)
+        out(
+            "Error - '-threads' must be used with '-dry' or '-auto'.",
+            color="lightred",
+        )
+        sys.exit()
 
-    args = pywikibot.handle_args(*args)
-    G_Site = pywikibot.Site()
-
-    # Abort on unknown arguments
-    for arg in args:
-        if arg not in {
-            "-test",
-            "-close",
-            "-info",
-            "-park",
-            "-threads",
-            "-fpc",
-            "-delist",
-            "-help",
-            "-notime",
-            "-match",
-            "-auto",
-            "-dry",
-        }:
-            out(
-                "Warning - unknown argument '%s'; aborting, see -help." % arg,
-                color="lightred",
-            )
-            sys.exit(0)
+    # Check task arguments
+    if not task_args:
+        out(
+            "Error - you need to specify at least one task "
+            "like '-info', '-close', '-park', etc.; see '-help'.",
+            color="lightred",
+        )
+        sys.exit()
+    if invalid_args := set(task_args) - {"-test", "-info", "-close", "-park"}:
+        # To present a helpful error message, abort before handling even
+        # the first argument and report all invalid arguments at once.
+        formatted = ", ".join(f"'{arg}'" for arg in sorted(invalid_args))
+        out(
+            f"Error - unknown argument(s) {formatted}; aborting, see '-help'.",
+            color="lightred",
+        )
+        sys.exit()
 
     # Call the appropriate functions to perform the desired tasks
-    for arg in args:
-        worked = True
-        if arg == "-test":
-            if delist:
-                out("-test not supported for delisting candidates")
-            if fpc:
-                checkCandidates(Candidate.compareResultToCount, testLog, delist=False)
-        elif arg == "-close":
-            if delist:
-                out("Closing delist candidates...", color="lightblue")
-                checkCandidates(Candidate.closePage, candidates_page, delist=True)
-            if fpc:
-                out("Closing fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.closePage, candidates_page, delist=False)
-        elif arg == "-info":
-            if delist:
-                out("Gathering info about delist candidates...", color="lightblue")
-                checkCandidates(Candidate.printAllInfo, candidates_page, delist=True)
-            if fpc:
-                out("Gathering info about fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.printAllInfo, candidates_page, delist=False)
-        elif arg == "-park":
-            if G_Threads and G_Auto:
+    for arg in task_args:
+        match arg:
+            case "-test":
+                if delist:
+                    out("Task '-test' not supported for delisting candidates")
+                if fpc:
+                    checkCandidates(Candidate.compareResultToCount, testLog, delist=False)
+            case "-close":
+                if delist:
+                    out("Closing delist candidates...", color="lightblue")
+                    checkCandidates(Candidate.closePage, candidates_page, delist=True)
+                if fpc:
+                    out("Closing FP candidates...", color="lightblue")
+                    checkCandidates(Candidate.closePage, candidates_page, delist=False)
+            case "-info":
+                if delist:
+                    out("Gathering info about delist candidates...", color="lightblue")
+                    checkCandidates(Candidate.printAllInfo, candidates_page, delist=True)
+                if fpc:
+                    out("Gathering info about FP candidates...", color="lightblue")
+                    checkCandidates(Candidate.printAllInfo, candidates_page, delist=False)
+            case "-park":
+                if G_Threads and G_Auto:
+                    out(
+                        "Auto-parking using threads is disabled for now...",
+                        color="lightyellow",
+                    )
+                    sys.exit()
+                if delist:
+                    out("Parking delist candidates...", color="lightblue")
+                    checkCandidates(Candidate.park, candidates_page, delist=True)
+                if fpc:
+                    out("Parking FP candidates...", color="lightblue")
+                    checkCandidates(Candidate.park, candidates_page, delist=False)
+            case _:
+                # This means we have forgotten to update the invalid_args test.
                 out(
-                    "Auto parking using threads is disabled for now...",
-                    color="lightyellow",
+                    f"Error - unknown argument '{arg}'; aborting, see '-help'.",
+                    color="lightred",
                 )
-                sys.exit(0)
-            if delist:
-                out("Parking delist candidates...", color="lightblue")
-                checkCandidates(Candidate.park, candidates_page, delist=True)
-            if fpc:
-                out("Parking fpc candidates...", color="lightblue")
-                checkCandidates(Candidate.park, candidates_page, delist=False)
-
-    if not worked:
-        out("Warning - you need to specify an argument, see -help.", color="lightred")
+                sys.exit()
 
 
 def signal_handler(signal, frame):
