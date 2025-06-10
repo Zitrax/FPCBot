@@ -1904,6 +1904,19 @@ G_Site = None
 
 
 def main(*args):
+    """
+    This function is the main entry point of the bot program.
+    It encapsulates the program's primary behavior --
+    parsing and checking command-line arguments, defining global variables,
+    selecting the desired tasks and calling the appropriate functions.
+
+    @param *args: If you run this script in the usual way as bot program,
+    this function is called without any arguments and uses the CLI arguments.
+    However for test purposes etc. one could consider to import the script
+    like a module and to call this method from Python code;
+    in this case pass strings with the same values as the CLI arguments,
+    then the '*args' packs all these values into a single tuple.
+    """
     global G_Auto
     global G_Dry
     global G_Threads
@@ -1911,14 +1924,14 @@ def main(*args):
     global G_MatchPattern
     global G_Site
 
+    # Define local constants and default values
     candidates_page = "Commons:Featured picture candidates/candidate_list"
     testLog = "Commons:Featured_picture_candidates/Log/January_2025"
-
     worked = False
     delist = False
     fpc = False
 
-    # First look for arguments that should be set for all operations
+    # First look for arguments which act as options for all tasks
     i = 1
     for arg in sys.argv[1:]:
         if arg == "-auto":
@@ -1955,11 +1968,12 @@ def main(*args):
                 sys.exit(0)
         i += 1
 
+    # If neither -fpc nor -delist is used we handle all candidates
     if not delist and not fpc:
         delist = True
         fpc = True
 
-    # Can not use interactive mode with threads
+    # We can't use the interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
         out("Warning - '-threads' must be run with '-dry' or '-auto'", color="lightred")
         sys.exit(0)
@@ -1989,6 +2003,7 @@ def main(*args):
             )
             sys.exit(0)
 
+    # Call the appropriate functions to perform the desired tasks
     for arg in args:
         worked = True
         if arg == "-test":
