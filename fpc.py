@@ -81,8 +81,26 @@ class Candidate(abc.ABC):
         CountedR,
         VerifiedR,
     ):
-        """Page is a pywikibot.Page object ."""
-        # Later perhaps this can be cleaned up by letting the subclasses keep the variables
+        """
+        Although this is an abstract base class, the initializer is used
+        to set instance variables to the passed values or to default values.
+
+        @param page      A pywikibot.Page object for the nomination subpage.
+        @param ProR      A compiled regex (re.Pattern) to find positive votes.
+        @param ConR      A compiled regex (re.Pattern) to find negative votes.
+        @param NeuR      A compiled regex (re.Pattern) to find neutral votes.
+        @param ProString A string expressing a positive result.
+        @param ConString A string expressing a negative result.
+        @param ReviewedR A compiled regex (re.Pattern) for finding
+                         a reviewed results template.
+        @param CountedR  A compiled regex (re.Pattern) for finding
+                         an unreviewed results template.
+        @param VerifiedR A compiled regex (re.Pattern) used to analyse
+                         the contents of a reviewed results template.
+        """
+        # Later perhaps this can be cleaned up by letting the subclasses
+        # keep the variables or (better?!) by using class constants
+        # which are adapted by the subclasses.
         self.page = page
         self._pro = 0
         self._con = 0
@@ -1362,9 +1380,13 @@ class FPCandidate(Candidate):
     """A candidate up for promotion."""
 
     def __init__(self, page):
-        """Constructor."""
-        Candidate.__init__(
-            self,
+        """
+        The initializer calls the superclass initializer in order to set
+        instance variables to the appropriate values for this class.
+
+        @param page A pywikibot.Page object for the nomination subpage.
+        """
+        super().__init__(
             page,
             SupportR,
             OpposeR,
@@ -1444,8 +1466,13 @@ class DelistCandidate(Candidate):
     """A delisting candidate."""
 
     def __init__(self, page):
-        Candidate.__init__(
-            self,
+        """
+        The initializer calls the superclass initializer in order to set
+        instance variables to the appropriate values for this class.
+
+        @param page A pywikibot.Page object for the nomination subpage.
+        """
+        super().__init__(
             page,
             DelistR,
             KeepR,
