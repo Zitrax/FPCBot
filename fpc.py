@@ -39,6 +39,7 @@ Options:
 
 # Standard library imports
 import sys
+import abc
 import signal
 import datetime
 import time
@@ -48,11 +49,6 @@ import threading
 # Third-party imports
 import pywikibot
 from pywikibot import config
-
-
-class NotImplementedException(Exception):
-
-    """Not implemented."""
 
 
 class ThreadCheckCandidate(threading.Thread):
@@ -65,11 +61,12 @@ class ThreadCheckCandidate(threading.Thread):
         self.check(self.candidate)
 
 
-class Candidate:
+class Candidate(abc.ABC):
     """
-    This is one picture candidate
-
-    This class just serves as base for the DelistCandidate and FPCandidate classes
+    Abstract base class for featured picture candidates/nominations,
+    bundles all common properties and methods.
+    The individual candidates/nominations are represented by instances
+    of the concrete subclasses.
     """
 
     def __init__(
@@ -402,13 +399,21 @@ class Candidate:
 
         return re.sub(r"(===.*)(===)", r"\1%s\2" % status, text, count=1)
 
+    @abc.abstractmethod
     def getResultString(self):
-        """Must be implemented by the subclasses (Text to add to closed pages)."""
-        raise NotImplementedException()
+        """
+        Returns the results template to be added when closing a nomination.
+        Must be implemented by the subclasses.
+        """
+        pass
 
+    @abc.abstractmethod
     def getCloseCommitComment(self):
-        """Must be implemened by the subclasses (Commit comment for closed pages)."""
-        raise NotImplementedException()
+        """
+        Returns the commit comment to be used when closing a nomination.
+        Must be implemented by the subclasses.
+        """
+        pass
 
     def creationTime(self):
         """
@@ -1302,9 +1307,13 @@ class Candidate:
             )
             return
 
+    @abc.abstractmethod
     def handlePassedCandidate(self, results):
-        """Must be implemented by subclass (do the park procedure for passing candidate)."""
-        raise NotImplementedException()
+        """
+        Handle the parking procedure for a passed candidate.
+        Must be implemented by the subclasses.
+        """
+        pass
 
     @staticmethod
     def commit(old_text, new_text, page, comment):
