@@ -1723,6 +1723,7 @@ def commit(old_text, new_text, page, comment):
             "Do you want to accept these changes to '%s' with comment '%s' ?"
             % (page.title(), comment),
             [("yes", "y"), ("no", "n"), ("quit", "q")],
+            automatic_quit=False,
         )
 
     if choice == "y":
