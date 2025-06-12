@@ -379,7 +379,7 @@ class Candidate(abc.ABC):
         if self.imageCount() <= 1:
             new_text = self.fixHeader(new_text)
 
-        self.commit(
+        commit(
             old_text,
             new_text,
             self.page,
@@ -780,7 +780,7 @@ class Candidate(abc.ABC):
             re.MULTILINE,
         )
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
-        self.commit(old_text, new_text, page, "Added [[%s]]" % file)
+        commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def addToGalleryPage(self, gallery, files):
         """
@@ -887,7 +887,7 @@ class Candidate(abc.ABC):
                 + old_text[gallery_end_pos:]
             )
             message = f"Added {files_for_msg} to the 'Unsorted' section"
-        self.commit(old_text, new_text, page, message)
+        commit(old_text, new_text, page, message)
 
     def getImagePage(self):
         """Get the image page itself."""
@@ -955,7 +955,7 @@ class Candidate(abc.ABC):
                     + "\n{{Assessments|featured=1%s}}\n" % comnom
                     + old_text[end:]
                 )
-            self.commit(old_text, new_text, current_page, "FPC promotion")
+            commit(old_text, new_text, current_page, "FPC promotion")
 
     def addToCurrentMonth(self, files):
         """
@@ -1046,7 +1046,7 @@ class Candidate(abc.ABC):
             old_text,
         )
 
-        self.commit(old_text, new_text, page, "Added [[%s]]" % file)
+        commit(old_text, new_text, page, "Added [[%s]]" % file)
 
     def notifyNominator(self, files):
         """
@@ -1092,7 +1092,7 @@ class Candidate(abc.ABC):
                 subpage,
             )
             try:
-                self.commit(
+                commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
             except pywikibot.exceptions.LockedPageError as error:
@@ -1119,7 +1119,7 @@ class Candidate(abc.ABC):
         )
 
         try:
-            self.commit(
+            commit(
                 old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
             )
         except pywikibot.exceptions.LockedPageError as error:
@@ -1189,7 +1189,7 @@ class Candidate(abc.ABC):
             )
 
             try:
-                self.commit(
+                commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
             except pywikibot.exceptions.LockedPageError as error:
@@ -1232,7 +1232,7 @@ class Candidate(abc.ABC):
             )
         else:
             new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
-            self.commit(
+            commit(
                 old_log_text,
                 new_log_text,
                 log_page,
@@ -1252,7 +1252,7 @@ class Candidate(abc.ABC):
                 color="lightred",
             )
         else:
-            self.commit(
+            commit(
                 old_cand_text,
                 new_cand_text,
                 candidate_page,
@@ -1311,7 +1311,7 @@ class Candidate(abc.ABC):
         # If the suffix to the title has not been added, add it now
         new_text = self.fixHeader(text, vres[3])
         if new_text != text:
-            self.commit(text, new_text, self.page, "Fixed header")
+            commit(text, new_text, self.page, "Fixed header")
 
         if vres[3] == "yes":
             self.handlePassedCandidate(vres)
@@ -1332,48 +1332,6 @@ class Candidate(abc.ABC):
         Must be implemented by the subclasses.
         """
         pass
-
-    @staticmethod
-    def commit(old_text, new_text, page, comment):
-        """
-        This will commit new_text to the page
-        and unless running in automatic mode it
-        will show you the diff and ask you to accept it.
-
-        @param old_text Used to show the diff
-        @param new_text Text to be submitted as the new page
-        @param page Page to submit the new text to
-        @param comment The edit comment
-        """
-
-        out("\n About to commit changes to: '%s'" % page.title())
-
-        # Show the diff
-        lines_of_context = 0 if (G_Auto and not G_Dry) else 3
-        pywikibot.showDiff(
-            old_text,
-            new_text,
-            context=lines_of_context,
-        )
-
-        if G_Dry:
-            choice = "n"
-        elif G_Auto:
-            choice = "y"
-        else:
-            choice = pywikibot.bot.input_choice(
-                "Do you want to accept these changes to '%s' with comment '%s' ?"
-                % (page.title(), comment),
-                [("yes", "y"), ("no", "n"), ("quit", "q")],
-            )
-
-        if choice == "y":
-            page.put(new_text, summary=comment, watch=None, minor=False)
-        elif choice == "q":
-            out("Aborting.")
-            sys.exit(0)
-        else:
-            out("Changes to '%s' ignored" % page.title())
 
 
 class FPCandidate(Candidate):
@@ -1525,7 +1483,7 @@ class DelistCandidate(Candidate):
                         % (now.year, now.month, now.day, results[1], results[0]),
                         old_text,
                     )
-                    self.commit(
+                    commit(
                         old_text, new_text, ref, "Delisted [[%s]]" % self.fileName()
                     )
                 else:
@@ -1536,7 +1494,7 @@ class DelistCandidate(Candidate):
                         "",
                         old_text,
                     )
-                    self.commit(
+                    commit(
                         old_text, new_text, ref, "Removing [[%s]]" % self.fileName()
                     )
 
@@ -1559,7 +1517,7 @@ class DelistCandidate(Candidate):
             new_text,
         )
 
-        self.commit(old_text, new_text, imagePage, "Delisted")
+        commit(old_text, new_text, imagePage, "Delisted")
 
 
 def wikipattern(s):
@@ -1732,6 +1690,48 @@ def findEndOfTemplate(text, template):
             cp = ns + 2
     # Apparently we never found it
     return 0
+
+
+def commit(old_text, new_text, page, comment):
+    """
+    This will commit new_text to the page
+    and unless running in automatic mode it
+    will show you the diff and ask you to accept it.
+
+    @param old_text Used to show the diff
+    @param new_text Text to be submitted as the new page
+    @param page Page to submit the new text to
+    @param comment The edit comment
+    """
+
+    out("\n About to commit changes to: '%s'" % page.title())
+
+    # Show the diff
+    lines_of_context = 0 if (G_Auto and not G_Dry) else 3
+    pywikibot.showDiff(
+        old_text,
+        new_text,
+        context=lines_of_context,
+    )
+
+    if G_Dry:
+        choice = "n"
+    elif G_Auto:
+        choice = "y"
+    else:
+        choice = pywikibot.bot.input_choice(
+            "Do you want to accept these changes to '%s' with comment '%s' ?"
+            % (page.title(), comment),
+            [("yes", "y"), ("no", "n"), ("quit", "q")],
+        )
+
+    if choice == "y":
+        page.put(new_text, summary=comment, watch=None, minor=False)
+    elif choice == "q":
+        out("Aborting.")
+        sys.exit(0)
+    else:
+        out("Changes to '%s' ignored" % page.title())
 
 
 # Data and regexps used by the bot
