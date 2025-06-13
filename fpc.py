@@ -1546,38 +1546,85 @@ def out(text, newline=True, date=False, color=None):
     pywikibot.stdout(f"{dstr}{text}", newline=newline)
 
 
-def findCandidates(page_url, delist):
-    """Finds all candidates on the main FPC page."""
-    page = pywikibot.Page(G_Site, page_url)
+def findCandidates(page_name, delist):
+    """
+    Returns a list with candidate objects for all nomination subpages,
+    either from the page with the current candidates or from a log page
+    with closed nominations.
+    The list retains the original order of entries, omits damaged links
+    and resolves redirects to renamed nomination subpages.
+
+    @param page_name The name either of the page with the current candidates
+        or of the log page that we want to check.
+    @param delist    Specify True to get only delist nominations,
+        False to get only FP nominations.
+    """
+    # Extract nomination subpage names
+    out(
+        f"Extracting {'delist' if delist else 'FP'} candidates, "
+        "checking for redirects..."
+    )
+    page = pywikibot.Page(G_Site, page_name)
+    wikitext = page.get(get_redirect=True)
+    without_comments = re.sub(r"<!--.+?-->", "", wikitext, flags=re.DOTALL)
+    subpage_names = re.findall(
+        r"\{\{ *(Commons:Featured[ _]picture[ _]candidates */[^\n}]+?)\}\}",
+        without_comments,
+    )
+    candidate_class = DelistCandidate if delist else FPCandidate
     candidates = []
-    templates = page.templates()
-    for template in templates:
-        title = template.title()
-        if title.startswith(candPrefix):
-            # out("Adding '%s' (delist=%s)" % (title,delist))
-            if delist and "/removal/" in title:
-                candidates.append(DelistCandidate(template))
-            elif not delist and "/removal/" not in title:
-                candidates.append(FPCandidate(template))
-        else:
-            pass
-            # out("Skipping '%s'" % title)
+
+    for subpage_name in subpage_names:
+        # Skip nominations which are not of the expected type
+        if bool(re.search(r"/ *[Rr]emoval */", subpage_name)) != delist:
+            continue
+        subpage = pywikibot.Page(G_Site, subpage_name)
+        # Check if nomination exists (filter out damaged links)
+        if not subpage.exists():
+            out(
+                f"Warning - nomination '{subpage.title()}' not found, ignoring",
+                color="lightred",
+            )
+            continue
+        # Check for redirects and and resolve them
+        if subpage.isRedirectPage():
+            try:
+                subpage = subpage.getRedirectTarget()
+            except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
+                # Circular or invalid redirect
+                out(
+                    "Warning - invalid nomination redirect page "
+                    f"'{subpage.title()}', ignoring",
+                    color="lightred",
+                )
+                continue
+        # OK, seems the nomination is fine -- append candidate object
+        candidates.append(candidate_class(subpage))
     return candidates
 
 
-def checkCandidates(check, page, delist):
+def checkCandidates(check, page, delist, descending=True):
     """
-    Calls a function on each candidate found on the specified page
+    Calls a function on each candidate found on the specified page.
 
-    @param check  A function in Candidate to call on each candidate
-    @param page   A page containing all candidates
-    @param delist Boolean, telling whether this is delistings of fpcs
+    @param check      A method of the Candidate class which should be called
+        on each candidate.
+    @param page       A page which includes all nominations as templates;
+        i.e. either the page with the list of current candidates
+        or a log page that we want to check for test purposes.
+    @param delist     Specify True to get only delist nominations,
+        False to get only FP nominations.
+    @param descending Specify True if the page puts the newest entries first,
+        False if it runs from the oldest to the newest entry.
+        So we can always handle the candidates in chronological order.
     """
 
     if not G_Site.logged_in():
         G_Site.login()
 
     candidates = findCandidates(page, delist)
+    if descending:
+        candidates.reverse()
 
     def containsPattern(candidate):
         return candidate.cleanTitle().lower().find(G_MatchPattern.lower()) != -1
@@ -1585,8 +1632,7 @@ def checkCandidates(check, page, delist):
     candidates = list(filter(containsPattern, candidates))
 
     tot = len(candidates)
-    i = 1
-    for candidate in candidates:
+    for i, candidate in enumerate(candidates, start=1):
 
         if not G_Threads:
             out("(%03d/%03d) " % (i, tot), newline=False, date=True)
@@ -1604,7 +1650,6 @@ def checkCandidates(check, page, delist):
         except pywikibot.exceptions.LockedPageError as error:
             out("Page is locked '%s'" % error, color="lightred")
 
-        i += 1
         if G_Abort:
             break
 
@@ -2053,7 +2098,13 @@ def main(*args):
                 if delist:
                     out("Task '-test' not supported for delisting candidates")
                 if fpc:
-                    checkCandidates(Candidate.compareResultToCount, testLog, delist=False)
+                    out("Recounting votes for FP candidates...", color="lightblue")
+                    checkCandidates(
+                        Candidate.compareResultToCount,
+                        testLog,
+                        delist=False,
+                        descending=False,
+                    )
             case "-close":
                 if delist:
                     out("Closing delist candidates...", color="lightblue")
