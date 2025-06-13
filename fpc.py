@@ -1537,8 +1537,10 @@ def findCandidates(page_name, delist):
     Returns a list with candidate objects for all nomination subpages,
     either from the page with the current candidates or from a log page
     with closed nominations.
-    The list retains the original order of entries, omits damaged links
-    and resolves redirects to renamed nomination subpages.
+    The list retains the original order of entries and omits damaged links.
+    If we find redirects to renamed nomination subpages, they are resolved
+    (so the returned candidate objects point to the actual nominations)
+    and the page with the list of candidates is updated.
 
     @param page_name The name either of the page with the current candidates
         or of the log page that we want to check.
@@ -1551,17 +1553,18 @@ def findCandidates(page_name, delist):
         "checking for redirects..."
     )
     page = pywikibot.Page(G_Site, page_name)
-    wikitext = page.get(get_redirect=True)
-    without_comments = re.sub(r"<!--.+?-->", "", wikitext, flags=re.DOTALL)
-    subpage_names = re.findall(
-        r"\{\{ *(Commons:Featured[ _]picture[ _]candidates */[^\n}]+?)\}\}",
+    old_text = page.get(get_redirect=True)
+    without_comments = re.sub(r"<!--.+?-->", "", old_text, flags=re.DOTALL)
+    subpage_entries = re.findall(
+        r"(\{\{ *(Commons:Featured[ _]picture[ _]candidates */[^\n}]+?)\}\})",
         without_comments,
     )
     candidate_class = DelistCandidate if delist else FPCandidate
     match_pattern = G_MatchPattern.lower()
     candidates = []
+    redirects = []
 
-    for subpage_name in subpage_names:
+    for full_entry, subpage_name in subpage_entries:
         # Skip nominations which are not of the expected type
         if bool(re.search(r"/ *[Rr]emoval */", subpage_name)) != delist:
             continue
@@ -1590,8 +1593,21 @@ def findCandidates(page_name, delist):
                     color="lightred",
                 )
                 continue
+            new_name = subpage.title()
+            out(f"Nomination '{subpage_name}' has been renamed to '{new_name}'")
+            redirects.append((full_entry, f'{{{{{new_name}}}}}'))
         # OK, seems the nomination is fine -- append candidate object
         candidates.append(candidate_class(subpage))
+
+    # If we have found any redirects, update the candidates page
+    if redirects:
+        new_text = old_text
+        for full_entry, new_entry in redirects:
+            new_text = new_text.replace(full_entry, new_entry, count=1)
+        message = (
+            f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
+        )
+        commit(old_text, new_text, page, message)
     return candidates
 
 
