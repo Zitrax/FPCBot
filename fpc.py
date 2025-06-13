@@ -1623,6 +1623,9 @@ def checkCandidates(check, page, delist, descending=True):
         G_Site.login()
 
     candidates = findCandidates(page, delist)
+    if not candidates:
+        out(f"No {'delist' if delist else 'FP'} candidates found.")
+        return
     if descending:
         candidates.reverse()
 
