@@ -176,23 +176,9 @@ class Candidate(abc.ABC):
         on the nomination subpage.
         If we can't identify any files the result is an empty list.
         """
-        # Get the Wikitext of the nomination subpage
-        if self.page.isRedirectPage():
-            # The set nomination subpage has been renamed, leaving a redirect.
-            try:
-                target_page = self.page.getRedirectTarget()
-            except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
-                # Circular or invalid redirect
-                out(
-                    "Warning - invalid nomination redirect page "
-                    f"'{self.page.title()}'",
-                    color="lightred",
-                )
-                return []
-            wikitext = target_page.get(get_redirect=True)
-        else:
-            wikitext = self.page.get(get_redirect=True)
-        # Extract the contents of the <gallery>...</gallery> element
+        # Get wikitext of the nomination subpage and extract
+        # the contents of the <gallery>...</gallery> element
+        wikitext = self.page.get(get_redirect=True)
         match = re.search(
             r"<gallery[^>]*>(.+?)</gallery>",
             wikitext,
