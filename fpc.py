@@ -1572,12 +1572,18 @@ def findCandidates(page_name, delist):
         without_comments,
     )
     candidate_class = DelistCandidate if delist else FPCandidate
+    match_pattern = G_MatchPattern.lower()
     candidates = []
 
     for subpage_name in subpage_names:
         # Skip nominations which are not of the expected type
         if bool(re.search(r"/ *[Rr]emoval */", subpage_name)) != delist:
             continue
+        # Skip nominations which do not match the '-match' argument
+        if match_pattern:
+            comparison_name = PrefixR.sub("", subpage_name).lower()
+            if match_pattern not in comparison_name:
+                continue
         subpage = pywikibot.Page(G_Site, subpage_name)
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
@@ -1624,15 +1630,13 @@ def checkCandidates(check, page, delist, descending=True):
 
     candidates = findCandidates(page, delist)
     if not candidates:
-        out(f"No {'delist' if delist else 'FP'} candidates found.")
+        out(
+            f"Found no {'delist' if delist else 'FP'} candidates"
+            f"{' matching the -match argument' if G_MatchPattern else ''}."
+        )
         return
     if descending:
         candidates.reverse()
-
-    def containsPattern(candidate):
-        return candidate.cleanTitle().lower().find(G_MatchPattern.lower()) != -1
-
-    candidates = list(filter(containsPattern, candidates))
 
     tot = len(candidates)
     for i, candidate in enumerate(candidates, start=1):
