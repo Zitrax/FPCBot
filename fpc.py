@@ -1267,8 +1267,10 @@ class Candidate(abc.ABC):
             return
 
         # First look for verified results
+        # (leaving out stricken or commented results which have been corrected)
         text = self.page.get(get_redirect=True)
-        results = re.findall(self._VerifiedR, text)
+        redacted_text = filter_content(text)
+        results = re.findall(self._VerifiedR, redacted_text)
 
         if not results:
             out("%s: (ignoring, no verified results)" % self.cutTitle())
