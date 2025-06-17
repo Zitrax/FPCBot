@@ -1247,71 +1247,83 @@ class Candidate(abc.ABC):
 
     def park(self):
         """
-        This will do everything that is needed to park a closed candidate
-
-        1. Check whether the count is verified or not
-        2. If verified and featured:
-          * Add page to 'Commons:Featured pictures, list'
-          * Add to subpage of 'Commons:Featured pictures, list'
-          * Add {{Assessments|featured=1}} or just the parameter if the template is already there
-            to the picture page (should also handle subpages)
-          * Add the picture to the 'Commons:Featured_pictures/chronological/current_month'
-          * Add the template {{FPpromotion|File:XXXXX.jpg}} to the Talk Page of the nominator.
-        3. If featured or not move it from 'Commons:Featured picture candidates/candidate list'
-           to the log, f.ex. 'Commons:Featured picture candidates/Log/August 2009'
+        Check that the candidate has exactly one valid verified result,
+        that the image file(s) exist and that there are no other obstacles.
+        If yes, park the candidate -- i.e., if the nomination was successful,
+        promote the new FP(s) or delist the former FP respectively;
+        else, if it has failed, just archive the nomination.
         """
 
-        # First make a check that the page actually exist:
+        # Check that the nomination subpage actually exists
         if not self.page.exists():
-            out("%s: (no such page?!)" % self.cutTitle())
+            out(
+                "%s: (Warning: no such page?!)" % self.cutTitle(),
+                color="lightred",
+            )
             return
 
         # First look for verified results
         # (leaving out stricken or commented results which have been corrected)
         text = self.page.get(get_redirect=True)
         redacted_text = filter_content(text)
-        results = re.findall(self._VerifiedR, redacted_text)
-
+        results = self._VerifiedR.findall(redacted_text)
+        # Stop if there is not exactly one valid verified result
         if not results:
             out("%s: (ignoring, no verified results)" % self.cutTitle())
             return
-
         if len(results) > 1:
-            out("%s: (ignoring, several verified results ?)" % self.cutTitle())
+            out("%s: (ignoring, several verified results?)" % self.cutTitle())
             return
-
         if self.isWithdrawn():
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
-
         if self.isFPX():
             out("%s: (ignoring, was FPXed)" % self.cutTitle())
             return
 
-        # Check if the image page exist, if not we ignore this candidate
-        if not pywikibot.Page(G_Site, self.fileName()).exists():
-            out("%s: (WARNING: ignoring, can't find image page)" % self.cutTitle())
-            return
-
-        # Ok we should now have a candidate with verified results that we can park
-        vres = results[0]
-
-        # If the suffix to the title has not been added, add it now
-        new_text = self.fixHeader(text, vres[3])
-        if new_text != text:
-            commit(text, new_text, self.page, "Fixed header")
-
-        if vres[3] == "yes":
-            self.handlePassedCandidate(vres)
-        elif vres[3] == "no":
-            # Non Featured picure
-            self.moveToLog(self._conString)
-        else:
+        # Check that the image page(s) exist, if not ignore this candidate
+        if self.isSet():
+            set_files = self.setFiles()
+            if not set_files:
+                out(
+                    "%s: (Warning: found no images in set)" % self.cutTitle(),
+                    color="lightred",
+                )
+                return
+            for file in set_files:
+                if not pywikibot.Page(G_Site, file).exists():
+                    out(
+                        "%s: (Warning: can't find set image '%s')"
+                        % (self.cutTitle(), file),
+                        color="lightred",
+                    )
+                    return
+        elif not pywikibot.Page(G_Site, self.fileName()).exists():
             out(
-                "%s: (ignoring, unknown verified feature status '%s')"
-                % (self.cutTitle(), vres[3])
+                "%s: (Warning: can't find image page)" % self.cutTitle(),
+                color="lightred",
             )
             return
+
+        # We should now have a candidate with verified result that we can park
+        verified_result = results[0]
+        success = verified_result[3]
+        if success in {"yes", "no"}:
+            # If the suffix to the title has not been added, add it now
+            new_text = self.fixHeader(text, success)
+            if new_text != text:
+                commit(text, new_text, self.page, "Fixed header")
+            # Park the candidate
+            if success == "yes":
+                self.handlePassedCandidate(verified_result)
+            else:
+                self.moveToLog(self._conString)
+        else:
+            out(
+                "%s: (Warning: unknown verified feature status '%s')"
+                % (self.cutTitle(), success),
+                color="lightred",
+            )
 
     @abc.abstractmethod
     def handlePassedCandidate(self, results):
