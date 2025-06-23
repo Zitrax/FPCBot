@@ -120,6 +120,7 @@ class Candidate(abc.ABC):
         self._imgCount = None
         self._fileName = None
         self._alternative = None
+        self._setFiles = None
         self._listPageName = None
 
     def printAllInfo(self):
@@ -176,6 +177,9 @@ class Candidate(abc.ABC):
         on the nomination subpage.
         If we can't identify any files the result is an empty list.
         """
+        # Use cached result if possible
+        if self._setFiles is not None:
+            return self._setFiles
         # Get wikitext of the nomination subpage and extract
         # the contents of the <gallery>...</gallery> element
         wikitext = self.page.get(get_redirect=True)
@@ -224,6 +228,7 @@ class Candidate(abc.ABC):
                 f"'{self.page.title()}'",
                 color="lightred",
             )
+        self._setFiles = files_list
         return files_list
 
     def findGalleryOfFile(self):
