@@ -753,8 +753,7 @@ class Candidate(abc.ABC):
         if re.search(wikipattern(file), old_text):
             out(
                 "Skipping addToFeaturedList for '%s', page already listed."
-                % self.cleanTitle(),
-                color="lightred",
+                % self.cleanTitle()
             )
             return
 
@@ -991,8 +990,7 @@ class Candidate(abc.ABC):
         if re.search(wikipattern(file), old_text):
             out(
                 "Skipping addToCurrentMonth for '%s', page already listed."
-                % self.cleanTitle(),
-                color="lightred",
+                % self.cleanTitle()
             )
             return
 
@@ -1054,9 +1052,11 @@ class Candidate(abc.ABC):
         try:
             old_text = talk_page.get(get_redirect=True)
         except pywikibot.exceptions.NoPageError:
+            # Undefined user talk pages are uncommon because every new user
+            # is welcomed by an automatic message.  So better stop here.
             out(
                 "notifyNominator: No such page '%s' but ignoring..." % talk_link,
-                color="lightred",
+                color="lightyellow",
             )
             return
 
@@ -1099,8 +1099,7 @@ class Candidate(abc.ABC):
         if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
             out(
                 "Skipping notifyNominator for '%s', page already listed at '%s'."
-                % (self.cleanTitle(), talk_link),
-                color="lightred",
+                % (self.cleanTitle(), talk_link)
             )
             return
 
@@ -1139,9 +1138,11 @@ class Candidate(abc.ABC):
             try:
                 old_text = talk_page.get(get_redirect=True)
             except pywikibot.exceptions.NoPageError:
+                # Undefined user talk pages are uncommon because every new user
+                # is welcomed by an automatic message.  So better stop here.
                 out(
                     "notifyUploader: No such page '%s' but ignoring..." % talk_link,
-                    color="lightred",
+                    color="lightyellow",
                 )
                 return
 
@@ -1154,8 +1155,7 @@ class Candidate(abc.ABC):
             if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
                 out(
                     "Skipping notifyUploader for '%s', page already listed at '%s'."
-                    % (self.cleanTitle(), talk_link),
-                    color="lightred",
+                    % (self.cleanTitle(), talk_link)
                 )
                 return
 
@@ -1218,8 +1218,7 @@ class Candidate(abc.ABC):
         if re.search(wikipattern(self.page.title()), old_log_text):
             out(
                 "Skipping add in moveToLog for '%s', page already there"
-                % self.cleanTitle(),
-                color="lightred",
+                % self.cleanTitle()
             )
         else:
             new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
@@ -1239,8 +1238,8 @@ class Candidate(abc.ABC):
 
         if old_cand_text == new_cand_text:
             out(
-                "Skipping remove in moveToLog for '%s', no change." % self.cleanTitle(),
-                color="lightred",
+                "Skipping remove in moveToLog for '%s', no change."
+                % self.cleanTitle()
             )
         else:
             commit(
@@ -2124,7 +2123,10 @@ def main(*args):
         match arg:
             case "-test":
                 if delist:
-                    out("Task '-test' not supported for delisting candidates")
+                    out(
+                        "Task '-test' not supported for delisting candidates",
+                        color="lightyellow",
+                    )
                 if fpc:
                     out("Recounting votes for FP candidates...", color="lightblue")
                     checkCandidates(
