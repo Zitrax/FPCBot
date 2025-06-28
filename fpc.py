@@ -190,7 +190,7 @@ class Candidate(abc.ABC):
         )
         if not match:
             out(
-                "Warning - no <gallery> found in set nomination "
+                "Error - no <gallery> found in set nomination "
                 f"'{self.page.title()}'",
                 color="lightred",
             )
@@ -224,7 +224,7 @@ class Candidate(abc.ABC):
             ]
         else:
             out(
-                "Warning - no images found in set nomination "
+                "Error - no images found in set nomination "
                 f"'{self.page.title()}'",
                 color="lightred",
             )
@@ -251,19 +251,17 @@ class Candidate(abc.ABC):
         Counts all the votes for this nomination
         and subtracts eventual striked out votes
         """
-
         if self._votesCounted:
             return
 
         text = self.page.get(get_redirect=True)
         if text:
             text = filter_content(text)
-
             self._pro = len(re.findall(self._proR, text))
             self._con = len(re.findall(self._conR, text))
             self._neu = len(re.findall(self._neuR, text))
         else:
-            out("Warning - %s has no content" % self.page, color="lightred")
+            out(f"Error - '{self.page.title()}' has no content", color="lightred")
 
         self._votesCounted = True
 
@@ -305,7 +303,7 @@ class Candidate(abc.ABC):
         # First make sure that the page actually exists
         if not self.page.exists():
             out(
-                '"%s" Warning: no such page?!' % self.cutTitle(),
+                '"%s" Error: no such page?!' % self.cutTitle(),
                 color="lightred",
             )
             return False
@@ -342,7 +340,7 @@ class Candidate(abc.ABC):
         old_text = self.page.get(get_redirect=True)
         if not old_text:
             out(
-                '"%s" Warning: has no content' % self.cutTitle(),
+                '"%s" Error: has no content' % self.cutTitle(),
                 color="lightred",
             )
             return False
@@ -693,7 +691,7 @@ class Candidate(abc.ABC):
         match = re.search(r"/ *([Ss]et/(.+))$", self.page.title())
         if not match:
             out(
-                "Warning - called cleanSetTitle() on a nomination "
+                f"Error - called cleanSetTitle() on '{self.page.title()}' "
                 "which does not look like a set",
                 color="lightred",
             )
@@ -866,8 +864,8 @@ class Candidate(abc.ABC):
             if gallery_end_pos < 0:
                 # Ouch, the page does not contain a single <gallery></gallery>
                 out(
-                    f"Skipping addToGalleryPage() for '{clean_title}', "
-                    "no 'Unsorted' section found - not a valid gallery page?",
+                    "Error - found no 'Unsorted' section on "
+                    f"'{full_page_name}', can't add '{clean_title}'.",
                     color="lightred",
                 )
                 return
@@ -1261,7 +1259,7 @@ class Candidate(abc.ABC):
         # Check that the nomination subpage actually exists
         if not self.page.exists():
             out(
-                "%s: (Warning: no such page?!)" % self.cutTitle(),
+                "%s: (Error: no such page?!)" % self.cutTitle(),
                 color="lightred",
             )
             return
@@ -1290,21 +1288,21 @@ class Candidate(abc.ABC):
             set_files = self.setFiles()
             if not set_files:
                 out(
-                    "%s: (Warning: found no images in set)" % self.cutTitle(),
+                    "%s: (Error: found no images in set)" % self.cutTitle(),
                     color="lightred",
                 )
                 return
             for file in set_files:
                 if not pywikibot.Page(G_Site, file).exists():
                     out(
-                        "%s: (Warning: can't find set image '%s')"
+                        "%s: (Error: can't find set image '%s')"
                         % (self.cutTitle(), file),
                         color="lightred",
                     )
                     return
         elif not pywikibot.Page(G_Site, self.fileName()).exists():
             out(
-                "%s: (Warning: can't find image page)" % self.cutTitle(),
+                "%s: (Error: can't find image page)" % self.cutTitle(),
                 color="lightred",
             )
             return
@@ -1324,7 +1322,7 @@ class Candidate(abc.ABC):
                 self.moveToLog(self._conString)
         else:
             out(
-                "%s: (Warning: unknown verified feature status '%s')"
+                "%s: (Error: unknown verified feature status '%s')"
                 % (self.cutTitle(), success),
                 color="lightred",
             )
@@ -1595,7 +1593,7 @@ def findCandidates(page_name, delist):
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
             out(
-                f"Warning - nomination '{subpage.title()}' not found, ignoring",
+                f"Error - nomination '{subpage.title()}' not found, ignoring",
                 color="lightred",
             )
             continue
@@ -1606,7 +1604,7 @@ def findCandidates(page_name, delist):
             except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
                 # Circular or invalid redirect
                 out(
-                    "Warning - invalid nomination redirect page "
+                    "Error - invalid nomination redirect page "
                     f"'{subpage.title()}', ignoring",
                     color="lightred",
                 )
