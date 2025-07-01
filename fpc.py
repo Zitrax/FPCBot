@@ -145,7 +145,7 @@ class Candidate(abc.ABC):
                 )
             )
         except pywikibot.exceptions.NoPageError:
-            out("%s: -- No such page -- " % self.cutTitle(), color="lightred")
+            error("%s: -- No such page -- " % self.cutTitle())
 
     def nominator(self, link=True):
         """Return the link to the user that nominated this candidate."""
@@ -189,10 +189,9 @@ class Candidate(abc.ABC):
             flags=re.DOTALL,
         )
         if not match:
-            out(
+            error(
                 "Error - no <gallery> found in set nomination "
-                f"'{self.page.title()}'",
-                color="lightred",
+                f"'{self.page.title()}'"
             )
             return []
         text_inside_gallery = match.group(1)
@@ -223,10 +222,9 @@ class Candidate(abc.ABC):
                 for filename in files_list
             ]
         else:
-            out(
+            error(
                 "Error - no images found in set nomination "
-                f"'{self.page.title()}'",
-                color="lightred",
+                f"'{self.page.title()}'"
             )
         self._setFiles = files_list
         return files_list
@@ -261,7 +259,7 @@ class Candidate(abc.ABC):
             self._con = len(re.findall(self._conR, text))
             self._neu = len(re.findall(self._neuR, text))
         else:
-            out(f"Error - '{self.page.title()}' has no content", color="lightred")
+            error(f"Error - '{self.page.title()}' has no content")
 
         self._votesCounted = True
 
@@ -302,10 +300,7 @@ class Candidate(abc.ABC):
 
         # First make sure that the page actually exists
         if not self.page.exists():
-            out(
-                '"%s" Error: no such page?!' % self.cutTitle(),
-                color="lightred",
-            )
+            error('"%s" Error: no such page?!' % self.cutTitle())
             return False
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
@@ -339,10 +334,7 @@ class Candidate(abc.ABC):
 
         old_text = self.page.get(get_redirect=True)
         if not old_text:
-            out(
-                '"%s" Error: has no content' % self.cutTitle(),
-                color="lightred",
-            )
+            error('"%s" Error: has no content' % self.cutTitle())
             return False
 
         if re.search(r"{{\s*FPC-closed-ignored.*}}", old_text):
@@ -436,10 +428,9 @@ class Candidate(abc.ABC):
         try:
             timestamp = self.page.oldest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
-            out(
+            error(
                 f"Could not ascertain creation time of '{self.page.title()}', "
-                "returning now()",
-                color="lightred",
+                "returning now()"
             )
             return datetime.datetime.now(datetime.UTC)
         # MediaWiki timestamps are always stored in UTC,
@@ -690,10 +681,9 @@ class Candidate(abc.ABC):
         """
         match = re.search(r"/ *([Ss]et/(.+))$", self.page.title())
         if not match:
-            out(
+            error(
                 f"Error - called cleanSetTitle() on '{self.page.title()}' "
-                "which does not look like a set",
-                color="lightred",
+                "which does not look like a set"
             )
             return self.page.title()
         title = match.group(1) if keep_set else match.group(2)
@@ -863,10 +853,9 @@ class Candidate(abc.ABC):
             gallery_end_pos = old_text.rfind("</gallery>")
             if gallery_end_pos < 0:
                 # Ouch, the page does not contain a single <gallery></gallery>
-                out(
+                error(
                     "Error - found no 'Unsorted' section on "
-                    f"'{full_page_name}', can't add '{clean_title}'.",
-                    color="lightred",
+                    f"'{full_page_name}', can't add '{clean_title}'."
                 )
                 return
             new_text = (
@@ -1052,9 +1041,9 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.NoPageError:
             # Undefined user talk pages are uncommon because every new user
             # is welcomed by an automatic message.  So better stop here.
-            out(
-                "notifyNominator: No such page '%s' but ignoring..." % talk_link,
-                color="lightyellow",
+            warn(
+                "notifyNominator: No such page '%s' but ignoring..."
+                % talk_link
             )
             return
 
@@ -1084,11 +1073,10 @@ class Candidate(abc.ABC):
                 commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
-            except pywikibot.exceptions.LockedPageError as error:
-                out(
-                    "Page is locked '%s', but ignoring since it's just the user notification."
-                    % error,
-                    color="lightyellow",
+            except pywikibot.exceptions.LockedPageError as exc:
+                warn(
+                    "Page is locked '%s', but ignoring since it's just "
+                    "the user notification." % exc
                 )
             return
         else:
@@ -1110,11 +1098,10 @@ class Candidate(abc.ABC):
             commit(
                 old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
             )
-        except pywikibot.exceptions.LockedPageError as error:
-            out(
-                "Page is locked '%s', but ignoring since it's just the user notification."
-                % error,
-                color="lightyellow",
+        except pywikibot.exceptions.LockedPageError as exc:
+            warn(
+                "Page is locked '%s', but ignoring since it's just "
+                "the user notification." % exc
             )
 
     def notifyUploader(self, files):
@@ -1138,9 +1125,9 @@ class Candidate(abc.ABC):
             except pywikibot.exceptions.NoPageError:
                 # Undefined user talk pages are uncommon because every new user
                 # is welcomed by an automatic message.  So better stop here.
-                out(
-                    "notifyUploader: No such page '%s' but ignoring..." % talk_link,
-                    color="lightyellow",
+                warn(
+                    "notifyUploader: No such page '%s' but ignoring..."
+                    % talk_link
                 )
                 return
 
@@ -1181,11 +1168,10 @@ class Candidate(abc.ABC):
                 commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
-            except pywikibot.exceptions.LockedPageError as error:
-                out(
-                    "Page is locked '%s', but ignoring since it's just the user notification."
-                    % error,
-                    color="lightyellow",
+            except pywikibot.exceptions.LockedPageError as exc:
+                warn(
+                    "Page is locked '%s', but ignoring since it's just "
+                    "the user notification." % exc
                 )
 
     def moveToLog(self, reason=None):
@@ -1258,10 +1244,7 @@ class Candidate(abc.ABC):
 
         # Check that the nomination subpage actually exists
         if not self.page.exists():
-            out(
-                "%s: (Error: no such page?!)" % self.cutTitle(),
-                color="lightred",
-            )
+            error("%s: (Error: no such page?!)" % self.cutTitle())
             return
 
         # First look for verified results
@@ -1287,24 +1270,17 @@ class Candidate(abc.ABC):
         if self.isSet():
             set_files = self.setFiles()
             if not set_files:
-                out(
-                    "%s: (Error: found no images in set)" % self.cutTitle(),
-                    color="lightred",
-                )
+                error("%s: (Error: found no images in set)" % self.cutTitle())
                 return
             for file in set_files:
                 if not pywikibot.Page(G_Site, file).exists():
-                    out(
+                    error(
                         "%s: (Error: can't find set image '%s')"
-                        % (self.cutTitle(), file),
-                        color="lightred",
+                        % (self.cutTitle(), file)
                     )
                     return
         elif not pywikibot.Page(G_Site, self.fileName()).exists():
-            out(
-                "%s: (Error: can't find image page)" % self.cutTitle(),
-                color="lightred",
-            )
+            error("%s: (Error: can't find image page)" % self.cutTitle())
             return
 
         # We should now have a candidate with verified result that we can park
@@ -1323,8 +1299,7 @@ class Candidate(abc.ABC):
         else:
             out(
                 "%s: (Error: unknown verified feature status '%s')"
-                % (self.cutTitle(), success),
-                color="lightred",
+                % (self.cutTitle(), success)
             )
 
     @abc.abstractmethod
@@ -1536,16 +1511,42 @@ def wikipattern(s):
 assert re.escape(" ") == r"\ "
 
 
-def out(text, newline=True, date=False, color=None):
-    """Just output some text to the console or log."""
-    if color:
-        text = f"<<{color}>>{text}<<default>>"
+def out(text, newline=True, date=False, heading=False):
+    """Output information or status messages to the console or log."""
+    if heading:
+        text = f"<<lightblue>>{text}<<default>>"
     dstr = (
         f"{datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}: "
         if date and not G_LogNoTime
         else ""
     )
     pywikibot.stdout(f"{dstr}{text}", newline=newline)
+
+
+def warn(text, newline=True):
+    """
+    Output a warning to the console or log.  We use this if something
+    does not work as expected, but it's probably not necessary to take action.
+
+    TODO: Consider to use pywikibot.warning() instead of pywikibot.stdout(),
+    but first clarify whether any log settings need to be be changed
+    on the server then.
+    """
+    pywikibot.stdout(f"<<lightyellow>>{text}<<default>>", newline=newline)
+
+
+def error(text, newline=True):
+    """
+    Output an error message to the console or log.  We use this
+    if something does not work and it's probably necessary to take action,
+    e.g. to fix the wikitext of a nomination or gallery page, etc.,
+    or to improve the code of the bot program.
+
+    TODO: Consider to use pywikibot.error() instead of pywikibot.stdout(),
+    but first clarify whether any log settings need to be be changed
+    on the server then.
+    """
+    pywikibot.stdout(f"<<lightred>>{text}<<default>>", newline=newline)
 
 
 def findCandidates(page_name, delist):
@@ -1592,9 +1593,8 @@ def findCandidates(page_name, delist):
         subpage = pywikibot.Page(G_Site, subpage_name)
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
-            out(
-                f"Error - nomination '{subpage.title()}' not found, ignoring",
-                color="lightred",
+            error(
+                f"Error - nomination '{subpage.title()}' not found, ignoring"
             )
             continue
         # Check for redirects and and resolve them
@@ -1603,10 +1603,9 @@ def findCandidates(page_name, delist):
                 subpage = subpage.getRedirectTarget()
             except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
                 # Circular or invalid redirect
-                out(
+                error(
                     "Error - invalid nomination redirect page "
-                    f"'{subpage.title()}', ignoring",
-                    color="lightred",
+                    f"'{subpage.title()}', ignoring"
                 )
                 continue
             new_name = subpage.title()
@@ -1670,10 +1669,10 @@ def checkCandidates(check, page, delist, descending=True):
                 thread.start()
             else:
                 check(candidate)
-        except pywikibot.exceptions.NoPageError as error:
-            out("No such page '%s'" % error, color="lightred")
-        except pywikibot.exceptions.LockedPageError as error:
-            out("Page is locked '%s'" % error, color="lightred")
+        except pywikibot.exceptions.NoPageError as exc:
+            error("No such page '%s'" % exc)
+        except pywikibot.exceptions.LockedPageError as exc:
+            error("Page is locked '%s'" % exc)
 
         if G_Abort:
             break
@@ -2043,10 +2042,7 @@ def main(*args):
     try:
         local_args = pywikibot.handle_args(args=override_args, do_help=True)
     except ConnectionError:
-        out(
-            "Error - can't connect to the Commons server, aborting.",
-            color="lightred",
-        )
+        error("Error - can't connect to the Commons server, aborting.")
         sys.exit()
 
     # Pywikibot can create the site object only after handling the arguments
@@ -2075,9 +2071,9 @@ def main(*args):
                 try:
                     G_MatchPattern = local_args[i + 1]
                 except IndexError:
-                    out(
-                        "Error - '-match' must be followed by a pattern, aborting.",
-                        color="lightred",
+                    error(
+                        "Error - '-match' must be followed by a pattern, "
+                        "aborting."
                     )
                     sys.exit()
                 i += 1  # Skip the pattern argument.
@@ -2092,27 +2088,22 @@ def main(*args):
 
     # We can't use the interactive mode with threads
     if G_Threads and (not G_Dry and not G_Auto):
-        out(
-            "Error - '-threads' must be used with '-dry' or '-auto'.",
-            color="lightred",
-        )
+        error("Error - '-threads' must be used with '-dry' or '-auto'.")
         sys.exit()
 
     # Check task arguments
     if not task_args:
-        out(
+        error(
             "Error - you need to specify at least one task "
-            "like '-info', '-close', '-park', etc.; see '-help'.",
-            color="lightred",
+            "like '-info', '-close', '-park', etc.; see '-help'."
         )
         sys.exit()
     if invalid_args := set(task_args) - {"-test", "-info", "-close", "-park"}:
         # To present a helpful error message, abort before handling even
         # the first argument and report all invalid arguments at once.
         formatted = ", ".join(f"'{arg}'" for arg in sorted(invalid_args))
-        out(
-            f"Error - unknown argument(s) {formatted}; aborting, see '-help'.",
-            color="lightred",
+        error(
+            f"Error - unknown argument(s) {formatted}; aborting, see '-help'."
         )
         sys.exit()
 
@@ -2121,12 +2112,9 @@ def main(*args):
         match arg:
             case "-test":
                 if delist:
-                    out(
-                        "Task '-test' not supported for delisting candidates",
-                        color="lightyellow",
-                    )
+                    warn("Task '-test' not supported for delisting candidates")
                 if fpc:
-                    out("Recounting votes for FP candidates...", color="lightblue")
+                    out("Recounting votes for FP candidates...", heading=True)
                     checkCandidates(
                         Candidate.compareResultToCount,
                         testLog,
@@ -2135,36 +2123,32 @@ def main(*args):
                     )
             case "-close":
                 if delist:
-                    out("Closing delist candidates...", color="lightblue")
+                    out("Closing delist candidates...", heading=True)
                     checkCandidates(Candidate.closePage, candidates_page, delist=True)
                 if fpc:
-                    out("Closing FP candidates...", color="lightblue")
+                    out("Closing FP candidates...", heading=True)
                     checkCandidates(Candidate.closePage, candidates_page, delist=False)
             case "-info":
                 if delist:
-                    out("Gathering info about delist candidates...", color="lightblue")
+                    out("Gathering info about delist candidates...", heading=True)
                     checkCandidates(Candidate.printAllInfo, candidates_page, delist=True)
                 if fpc:
-                    out("Gathering info about FP candidates...", color="lightblue")
+                    out("Gathering info about FP candidates...", heading=True)
                     checkCandidates(Candidate.printAllInfo, candidates_page, delist=False)
             case "-park":
                 if G_Threads and G_Auto:
-                    out(
-                        "Auto-parking using threads is disabled for now...",
-                        color="lightyellow",
-                    )
+                    warn("Auto-parking using threads is disabled for now...")
                     sys.exit()
                 if delist:
-                    out("Parking delist candidates...", color="lightblue")
+                    out("Parking delist candidates...", heading=True)
                     checkCandidates(Candidate.park, candidates_page, delist=True)
                 if fpc:
-                    out("Parking FP candidates...", color="lightblue")
+                    out("Parking FP candidates...", heading=True)
                     checkCandidates(Candidate.park, candidates_page, delist=False)
             case _:
                 # This means we have forgotten to update the invalid_args test.
-                out(
-                    f"Error - unknown argument '{arg}'; aborting, see '-help'.",
-                    color="lightred",
+                error(
+                    f"Error - unknown argument '{arg}'; aborting, see '-help'."
                 )
                 sys.exit()
 
