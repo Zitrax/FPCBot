@@ -679,14 +679,14 @@ class Candidate(abc.ABC):
         'Commons:Featured picture candidates/' and (optionally)
         without the 'Set/' part.  Strips leading/trailing whitespace.
         """
-        match = re.search(r"/ *([Ss]et/(.+))$", self.page.title())
-        if not match:
+        title = self.page.title()
+        if match := re.search(r"/ *([Ss]et */(.+))$", title):
+            title = match.group(1) if keep_set else match.group(2)
+        else:
             error(
-                f"Error - called cleanSetTitle() on '{self.page.title()}' "
-                "which does not look like a set"
+                f"Error - called cleanSetTitle() on '{title}' "
+                "which does not look like a set."
             )
-            return self.page.title()
-        title = match.group(1) if keep_set else match.group(2)
         return title.strip()
 
     def fileName(self, alternative=True):
