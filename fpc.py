@@ -1010,7 +1010,7 @@ class Candidate(abc.ABC):
                 str(len(files)),
             )
         else:
-            file_title = self.cleanTitle()
+            file_title = self.cleanTitle(alternative=True)
 
         new_text = re.sub(
             "</gallery>",
