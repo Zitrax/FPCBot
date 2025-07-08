@@ -801,7 +801,7 @@ class Candidate(abc.ABC):
         if self.isSet():
             clean_title = self.cleanSetTitle(keep_set=False)
         else:
-            clean_title = self.cleanTitle()
+            clean_title = self.cleanTitle(alternative=True)
 
         # Check if some files are already on the page.
         # This can happen if the process has previously been interrupted.
@@ -813,7 +813,7 @@ class Candidate(abc.ABC):
         if not new_files:
             # Not a single file needs to be added, so we can stop here.
             out(
-                f"Skipping addToGalleryPage() for '{clean_title}', "
+                f"Skipping addToGalleryPage() for '{self.page.title()}', "
                 "file(s) already listed."
             )
             return
