@@ -658,14 +658,20 @@ class Candidate(abc.ABC):
         )
         return title[0:50].ljust(50)
 
-    def cleanTitle(self, keepExtension=False):
+    def cleanTitle(self, alternative=False, keepExtension=False):
         """
-        Returns a title string without prefix and extension
-        Note that this always operates on the original title and that
-        a possible change by the alternative parameter is not considered,
-        but maybe it should be ?
+        Returns the title of the nomination subpage, i.e. normally the name
+        of the nominated image, without prefix and (optionally) w/o extension.
+        If the 'alternative' parameter is set to True, we operate
+        on the 'alternative' filename instead (this is effective *only*
+        if the property 'self._alternative' is defined, i.e. during
+        the parking procedure of a successful FP candidate).
         """
-        title = PrefixR.sub("", self.page.title())
+        if alternative and self._alternative:
+            title = re.sub(r"^(?:[Ff]ile|[Ii]mage): *", "", self._alternative)
+        else:
+            title = PrefixR.sub("", self.page.title(), count=1)
+        title = title.rstrip()
         # We must also remove the trailing '/2', '/3' etc. of repeated noms:
         title = re.sub(r"/ *[0-9]+$", "", title)
         if keepExtension:
