@@ -1188,55 +1188,54 @@ class Candidate(abc.ABC):
 
         This is ==STEP 7== of the parking procedure.
         """
+        subpage_name = self.page.title()
+        why = f" ({reason})" if reason else ""
 
-        why = (" (%s)" % reason) if reason else ""
-
-        # Add to log
-        # (Note FIXME, we must probably create this page if it does not exist)
+        # Find and read the log page for this month
+        # (if it does not exist yet it is just created from scratch)
         now = datetime.datetime.now(datetime.UTC)
         year = now.year
         month = now.strftime("%B")  # Full local month name, here: English
         log_link = f"Commons:Featured picture candidates/Log/{month} {year}"
         log_page = pywikibot.Page(G_Site, log_link)
-
-        # If the page does not exist we just create it ( put does that automatically )
         try:
             old_log_text = log_page.get(get_redirect=True)
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
-        if re.search(wikipattern(self.page.title()), old_log_text):
+        # Append nomination to the log page
+        if re.search(wikipattern(subpage_name), old_log_text):
+            # This can happen if the process has previously been interrupted.
             out(
-                "Skipping add in moveToLog for '%s', page already there"
-                % self.cleanTitle()
+                f"Skipping add in moveToLog() for '{subpage_name}', "
+                "candidate is already in the log."
             )
         else:
-            new_log_text = old_log_text + "\n{{%s}}" % self.page.title()
+            new_log_text = old_log_text + "\n{{" + subpage_name + "}}"
             commit(
                 old_log_text,
                 new_log_text,
                 log_page,
-                "Adding [[%s]]%s" % (self.fileName(), why),
+                f"Added [[{subpage_name}]]{why}",
             )
 
-        # Remove from current list
-        candidate_page = pywikibot.Page(G_Site, self._listPageName)
-        old_cand_text = candidate_page.get(get_redirect=True)
-        new_cand_text = re.sub(
-            r"{{\s*%s\s*}}.*?\n?" % wikipattern(self.page.title()), "", old_cand_text
-        )
-
+        # Remove nomination from the list of current nominations
+        candidates_list_page = pywikibot.Page(G_Site, self._listPageName)
+        old_cand_text = candidates_list_page.get(get_redirect=True)
+        pattern = r" *\{\{\s*" + wikipattern(subpage_name) + r"\s*\}\} *\n?"
+        new_cand_text = re.sub(pattern, "", old_cand_text, count=1)
         if old_cand_text == new_cand_text:
+            # This can happen if the process has previously been interrupted.
             out(
-                "Skipping remove in moveToLog for '%s', no change."
-                % self.cleanTitle()
+                f"Skipping remove in moveToLog() for '{subpage_name}', "
+                "candidate not found in list."
             )
         else:
             commit(
                 old_cand_text,
                 new_cand_text,
-                candidate_page,
-                "Removing [[%s]]%s" % (self.fileName(), why),
+                candidates_list_page,
+                f"Removed [[{subpage_name}]]{why}",
             )
 
     def park(self):
