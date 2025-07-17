@@ -125,12 +125,13 @@ class Candidate(abc.ABC):
 
     def printAllInfo(self):
         """
-        Console output of all information sought after
+        Print the name, status, vote counts and other information
+        for this candidate, as part of an overview of all open candiates.
         """
         try:
             self.countVotes()
             out(
-                "%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%d Im:%02d W:%s (%s)"
+                "%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%02d Im:%02d W:%s (%s)"
                 % (
                     self.cutTitle(),
                     self._pro,
@@ -140,7 +141,7 @@ class Candidate(abc.ABC):
                     self.daysSinceLastEdit(),
                     self.sectionCount(),
                     self.imageCount(),
-                    self.isWithdrawn(),
+                    "True " if self.isWithdrawn() else "False",
                     self.statusString(),
                 )
             )
