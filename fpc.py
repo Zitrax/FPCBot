@@ -1118,14 +1118,33 @@ class Candidate(abc.ABC):
 
         This is ==STEP 6== of the parking procedure.
 
+        To understand this method and how it differs from notifyNominator(),
+        please keep in mind that all files in a set nomination have the same
+        nominator, but they may have been uploaded by different users.
+        That's very unusual and discouraged by the current FPC rules,
+        but the bot stills supports that special case.  Therefore this method
+        handles the files one by one, unlike notifyNominator().
+
         @param files List with filename(s) of the featured picture or set.
         """
+        undefined_or_locked_talk_pages = set()
+        nominator_name = self.nominator(link=False)
         for file in files:
-            # Check if nominator and uploaders are same, avoiding adding a template twice
-            if self.nominator() == uploader(file, link=True):
+            # Check if nominator and uploader are the same user,
+            # to avoid adding two templates to the same talk page
+            uploader_name = uploader(file, link=False)
+            if nominator_name == uploader_name:
+                out(
+                    f"Skipping notifyUploader() for '{file}', "
+                    "uploader is identical to nominator."
+                )
                 continue
 
-            talk_link = "User_talk:%s" % uploader(file, link=False)
+            # Find and read the uploader's talk page
+            talk_link = "User talk:" + uploader_name
+            if talk_link in undefined_or_locked_talk_pages:
+                # Don't load or report undefined or locked talk pages twice
+                continue
             talk_page = pywikibot.Page(G_Site, talk_link)
             try:
                 old_text = talk_page.get(get_redirect=True)
@@ -1133,27 +1152,17 @@ class Candidate(abc.ABC):
                 # Undefined user talk pages are uncommon because every new user
                 # is welcomed by an automatic message.  So better stop here.
                 warn(
-                    "notifyUploader: No such page '%s' but ignoring..."
-                    % talk_link
+                    f"The user talk page '{talk_link}' is undefined, "
+                    "but ignoring since it's just the uploader notification."
                 )
-                return
-
-            fn_or = self.fileName(alternative=False)  # Original filename
-            fn_al = self.fileName(alternative=True)  # Alternative filename
-
-            # First check if we are already on the page,
-            # in that case skip. Can happen if the process
-            # have been previously interrupted.
-            if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
-                out(
-                    "Skipping notifyUploader for '%s', page already listed at '%s'."
-                    % (self.cleanTitle(), talk_link)
-                )
-                return
+                undefined_or_locked_talk_pages.add(talk_link)
+                continue
 
             # We need the 'subpage' parameter for sets or if the alternative
             # filename differs from the original filename.
             # NB that in this case we must keep the 'Set/' prefix.
+            fn_or = self.fileName(alternative=False)  # Original filename
+            fn_al = self.fileName(alternative=True)  # Alternative filename
             if self.isSet():
                 subpage = "|subpage=" + self.cleanSetTitle(keep_set=True)
                 fn_al = file
@@ -1161,25 +1170,34 @@ class Candidate(abc.ABC):
                 subpage = "|subpage=" + fn_or
             else:
                 subpage = ""
+            template = f"{{{{FPpromotedUploader|{fn_al}{subpage}}}}}"
 
+            # Check if there already is a promotion template for the file
+            # on the user talk page.  If yes, we skip that file,
+            # but continue to check the other files (for set nominations).
+            if re.search(wikipattern(template), old_text):
+                out(
+                    f"Skipping notifyUploader() for '{file}', "
+                    f"promotion template is already present at '{talk_link}'."
+                )
+                continue
+
+            # Update the description and commit the new text
             new_text = (
-                old_text
-                + "\n\n== FP Promotion ==\n{{FPpromotedUploader|%s%s}} /~~~~"
-                % (
-                    fn_al,
-                    subpage,
-                )
+                f"{old_text.rstrip()}\n"
+                "\n"
+                "== FP Promotion ==\n"
+                f"{template} /~~~~"
             )
-
+            message = f"FPC promotion of [[{fn_al}]]"
             try:
-                commit(
-                    old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
-                )
-            except pywikibot.exceptions.LockedPageError as exc:
+                commit(old_text, new_text, talk_page, message)
+            except pywikibot.exceptions.LockedPageError:
                 warn(
-                    "Page is locked '%s', but ignoring since it's just "
-                    "the user notification." % exc
+                    f"The user talk page '{talk_link}' is locked, "
+                    "but ignoring since it's just the uploader notification."
                 )
+                undefined_or_locked_talk_pages.add(talk_link)
 
     def moveToLog(self, reason=None):
         """
