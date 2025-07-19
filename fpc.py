@@ -742,13 +742,12 @@ class Candidate(abc.ABC):
         page = pywikibot.Page(G_Site, listpage)
         old_text = page.get(get_redirect=True)
 
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
+        # First check if the image is already on the page.
+        # This can happen if the process has previously been interrupted.
         if re.search(wikipattern(file), old_text):
             out(
-                "Skipping addToFeaturedList for '%s', page already listed."
-                % self.cleanTitle()
+                "Skipping addToFeaturedList() for '%s', "
+                "image is already listed." % file
             )
             return
 
@@ -815,7 +814,7 @@ class Candidate(abc.ABC):
             # Not a single file needs to be added, so we can stop here.
             out(
                 f"Skipping addToGalleryPage() for '{self.page.title()}', "
-                "file(s) already listed."
+                "image(s) already listed."
             )
             return
         # Format the new entries and a summary for the message
@@ -921,11 +920,13 @@ class Candidate(abc.ABC):
                     + old_text[match.end(0):]
                 )
                 if new_text == old_text:
+                    # Old and new template are identical, so skip this file,
+                    # but continue to check other files (for set nominations)
                     out(
-                        "No change in addAssessments, '%s' already featured."
-                        % self.cleanTitle()
+                        "Skipping addAssessments() for '%s', "
+                        "image is already featured." % file
                     )
-                    return
+                    continue
             else:
                 # There is no assessments template so just add it
                 if re.search(r"\{\{(?:|\s*)[Ll]ocation", old_text):
@@ -978,13 +979,12 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.NoPageError:
             old_text = ""
 
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
+        # First check if the image is already on the page.
+        # This can happen if the process has previously been interrupted.
         if re.search(wikipattern(file), old_text):
             out(
-                "Skipping addToCurrentMonth for '%s', page already listed."
-                % self.cleanTitle()
+                "Skipping addToCurrentMonth() for '%s', "
+                "image is already listed." % file
             )
             return
 
@@ -1040,7 +1040,7 @@ class Candidate(abc.ABC):
 
         @param files List with filename(s) of the featured picture or set.
         """
-        talk_link = "User_talk:%s" % self.nominator(link=False)
+        talk_link = "User talk:%s" % self.nominator(link=False)
         talk_page = pywikibot.Page(G_Site, talk_link)
 
         try:
@@ -1049,8 +1049,8 @@ class Candidate(abc.ABC):
             # Undefined user talk pages are uncommon because every new user
             # is welcomed by an automatic message.  So better stop here.
             warn(
-                "notifyNominator: No such page '%s' but ignoring..."
-                % talk_link
+                "The user talk page '%s' is undefined, but ignoring "
+                "since it's just the nominator notification." % talk_link
             )
             return
 
@@ -1080,10 +1080,10 @@ class Candidate(abc.ABC):
                 commit(
                     old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
                 )
-            except pywikibot.exceptions.LockedPageError as exc:
+            except pywikibot.exceptions.LockedPageError:
                 warn(
-                    "Page is locked '%s', but ignoring since it's just "
-                    "the user notification." % exc
+                    "The user talk page '%s' is locked, but ignoring "
+                    "since it's just the nominator notification." % talk_link
                 )
             return
         else:
@@ -1091,8 +1091,8 @@ class Candidate(abc.ABC):
 
         if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
             out(
-                "Skipping notifyNominator for '%s', page already listed at '%s'."
-                % (self.cleanTitle(), talk_link)
+                "Skipping notifyNominator() for '%s', promotion template "
+                "is already present at '%s'." % (self.page.title(), talk_link)
             )
             return
 
@@ -1105,10 +1105,10 @@ class Candidate(abc.ABC):
             commit(
                 old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
             )
-        except pywikibot.exceptions.LockedPageError as exc:
+        except pywikibot.exceptions.LockedPageError:
             warn(
-                "Page is locked '%s', but ignoring since it's just "
-                "the user notification." % exc
+                "The user talk page '%s' is locked, but ignoring "
+                "since it's just the nominator notification." % talk_link
             )
 
     def notifyUploader(self, files):
