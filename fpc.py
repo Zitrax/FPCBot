@@ -659,7 +659,7 @@ class Candidate(abc.ABC):
         )
         return title[0:50].ljust(50)
 
-    def cleanTitle(self, alternative=False, keepExtension=False):
+    def cleanTitle(self, alternative=True, keepExtension=False):
         """
         Returns the title of the nomination subpage, i.e. normally the name
         of the nominated image, without prefix and (optionally) w/o extension.
