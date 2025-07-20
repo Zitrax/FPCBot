@@ -951,22 +951,19 @@ class Candidate(abc.ABC):
 
         @param files List with filename(s) of the featured picture or set.
         """
-        # For set nominations just use the first file.
-        file = files[0]
+        # For set nominations just use the first file
+        filename = files[0]
 
         # Extract voting results
-        FinalVotesR = re.compile(
-            r"FPC-results-reviewed\|support=([0-9]{0,3})\|oppose=([0-9]{0,3})\|neutral=([0-9]{0,3})\|"
-        )
-        NomPagetext = self.page.get(get_redirect=True)
-        matches = FinalVotesR.finditer(NomPagetext)
-        for m in matches:
-            if m is None:
-                ws = wo = wn = "x"
-            else:
-                ws = m.group(1)
-                wo = m.group(2)
-                wn = m.group(3)
+        nom_page_text = self.page.get(get_redirect=True)
+        match = VerifiedResultR.search(nom_page_text)
+        try:
+            ws = match.group(1)
+            wo = match.group(2)
+            wn = match.group(3)
+        except AttributeError:
+            error(f"Error - no verified result found in '{self.page.title()}'")
+            return
 
         # Get the current monthly overview page
         now = datetime.datetime.now(datetime.UTC)
@@ -979,57 +976,57 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.NoPageError:
             old_text = ""
 
-        # First check if the image is already on the page.
-        # This can happen if the process has previously been interrupted.
-        if re.search(wikipattern(file), old_text):
-            out(
-                "Skipping addToCurrentMonth() for '%s', "
-                "image is already listed." % file
+        if old_text:
+            # First check if the image is already on the page.
+            # This can happen if the process has previously been interrupted.
+            if re.search(wikipattern(filename), old_text):
+                out(
+                    f"Skipping addToCurrentMonth() for '{filename}', "
+                    "image is already listed."
+                )
+                return
+            # Find the number of entries in the gallery
+            match = re.search(
+                r"<gallery\b[^>]*>(\n.*)</gallery>",
+                old_text,
+                flags=re.DOTALL,
             )
-            return
-
-        # Find the number of lines in the gallery, if AttributeError set count as 1
-        m = re.search(r"(?ms)<gallery>(.*)</gallery>", old_text)
-        try:
-            count = m.group(0).count("\n")
-        except AttributeError:
-            count = 1
-
-        # We just need to append to the bottom of the gallery
-        # with an added title
-        # TODO: We lack a good way to find the creator, so it is left out at the moment
-        if count == 1:
+            try:
+                # Because of the obligatory NL after '<gallery>' even
+                # an empty gallery must yield a count of 1, as we need it.
+                count = match.group(1).count("\n")
+            except AttributeError:
+                error(f"Error - no valid <gallery> element in '{monthpage}'")
+                return
+        else:
+            # The page does not exist yet (new month) or is empty,
+            # so create its contents from scratch.
             old_text = (
                 "{{FPArchiveChrono}}\n"
+                "\n"
                 f"== {month} {year} ==\n"
                 "<gallery>\n</gallery>"
             )
+            count = 1
 
+        # Assemble the new entry and append it to the end of the gallery
         if self.isSet():
-            file_title = "'''%s''' - a set of %s files" % (
-                self.cleanSetTitle(keep_set=False),
-                str(len(files)),
-            )
+            set_name = self.cleanSetTitle(keep_set=False)
+            title = f"Set: {set_name} ({len(files)} files)"
+            message = f"Added set [[{self.page.title()}|{set_name}]]"
         else:
-            file_title = self.cleanTitle(alternative=True)
-
-        new_text = re.sub(
+            title = self.cleanTitle(alternative=True)
+            message = f"Added [[{filename}]]"
+        new_text = old_text.replace(
             "</gallery>",
-            "%s|%d '''%s''' <br> uploaded by %s, nominated by %s,<br> {{s|%s}}, {{o|%s}}, {{n|%s}} \n</gallery>"
-            % (
-                file,
-                count,
-                file_title,
-                uploader(file),
-                self.nominator(),
-                ws,
-                wo,
-                wn,
-            ),
-            old_text,
+            f"{filename}|[[{self.page.title()}|{count}]] '''{title}'''<br> "
+            f"uploaded by {uploader(filename)}, "
+            f"nominated by {self.nominator()},<br> "
+            f"{{{{s|{ws}}}}}, {{{{o|{wo}}}}}, {{{{n|{wn}}}}}\n"
+            "</gallery>",
+            count=1,
         )
-
-        commit(old_text, new_text, page, "Added [[%s]]" % file)
+        commit(old_text, new_text, page, message)
 
     def notifyNominator(self, files):
         """
