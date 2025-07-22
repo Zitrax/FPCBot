@@ -900,7 +900,7 @@ class Candidate(abc.ABC):
             if self.isSet():
                 comnom = "|com-nom=" + self.cleanSetTitle(keep_set=False)
             elif fn_al != fn_or:
-                comnom = "|com-nom=" + fn_or.replace("File:", "")
+                comnom = "|com-nom=" + fn_or.replace("File:", "", 1)
             else:
                 comnom = ""
 
@@ -1025,7 +1025,7 @@ class Candidate(abc.ABC):
             f"nominated by {self.nominator()},<br> "
             f"{{{{s|{ws}}}}}, {{{{o|{wo}}}}}, {{{{n|{wn}}}}}\n"
             "</gallery>",
-            count=1,
+            1,
         )
         commit(old_text, new_text, page, message)
 
@@ -1652,7 +1652,7 @@ def findCandidates(page_name, delist):
     if redirects:
         new_text = old_text
         for full_entry, new_entry in redirects:
-            new_text = new_text.replace(full_entry, new_entry, count=1)
+            new_text = new_text.replace(full_entry, new_entry, 1)
         message = (
             f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
         )
