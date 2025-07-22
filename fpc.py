@@ -1420,11 +1420,11 @@ class FPCandidate(Candidate):
             self.moveToLog(self._proString)
         except Exception as exc:
             # Report exception with stack trace on the FPC talk page
-            stack_trace = traceback.format_exc()
+            stack_trace = traceback.format_exc().rstrip()
             ask_for_help(
                 "Developers, please look into this uncaught exception "
                 "in the parking procedure:\n"
-                f" {stack_trace.rstrip().replace('\n', '\n ')}\n"
+                f"<pre>{stack_trace}</pre>\n"
                 "Thank you!"
             )
             # Raise the exception again to enable normal error logging
@@ -1816,7 +1816,6 @@ def ask_for_help(message):
         return  # Don't post the same message twice.
     new_text = old_text.rstrip() + (
         "\n\n== FPCBot asking for help ==\n"
-        "\n"
         f"{message} / ~~~~"
     )
     commit(old_text, new_text, talk_page, "Added request for help")
