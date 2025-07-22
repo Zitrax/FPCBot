@@ -45,6 +45,7 @@ import datetime
 import time
 import re
 import threading
+import traceback
 
 # Third-party imports
 import pywikibot
@@ -1409,13 +1410,25 @@ class FPCandidate(Candidate):
         if not files:
             out("%s: (ignoring, no file(s) found)" % self.cutTitle())
             return
-        self.addToFeaturedList(basic_gallery, files)
-        self.addToGalleryPage(full_gallery_link, files)
-        self.addAssessments(files)
-        self.addToCurrentMonth(files)
-        self.notifyNominator(files)
-        self.notifyUploader(files)
-        self.moveToLog(self._proString)
+        try:
+            self.addToFeaturedList(basic_gallery, files)
+            self.addToGalleryPage(full_gallery_link, files)
+            self.addAssessments(files)
+            self.addToCurrentMonth(files)
+            self.notifyNominator(files)
+            self.notifyUploader(files)
+            self.moveToLog(self._proString)
+        except Exception as exc:
+            # Report exception with stack trace on the FPC talk page
+            stack_trace = traceback.format_exc()
+            ask_for_help(
+                "Developers, please look into this uncaught exception "
+                "in the parking procedure:\n"
+                f" {stack_trace.rstrip().replace('\n', '\n ')}\n"
+                "Thank you!"
+            )
+            # Raise the exception again to enable normal error logging
+            raise exc
 
 
 class DelistCandidate(Candidate):
@@ -1780,6 +1793,33 @@ def findEndOfTemplate(text, template):
             cp = ns + 2
     # Apparently we never found it
     return 0
+
+
+def ask_for_help(message):
+    """
+    Adds a short notice to the FPC talk page, asking for help with a problem.
+    This is useful if the problem is very probably caused by a broken link,
+    a wikitext syntax error, etc. on a Commons page, i.e. issues a normal
+    human editor can correct easily.
+
+    @param message A concise description of the problem in one or two
+    short, but complete sentences; normally they should end with a request
+    to change this or that in order to help the bot.
+    """
+    talk_page_name = "Commons talk:Featured picture candidates"
+    talk_page = pywikibot.Page(G_Site, talk_page_name)
+    try:
+        old_text = talk_page.get()
+    except pywikibot.exceptions.PageRelatedError:
+        error(f"Error - could not read FPC talk page '{talk_page_name}'.")
+    if message in old_text:
+        return  # Don't post the same message twice.
+    new_text = old_text.rstrip() + (
+        "\n\n== FPCBot asking for help ==\n"
+        "\n"
+        f"{message} / ~~~~"
+    )
+    commit(old_text, new_text, talk_page, "Added request for help")
 
 
 def commit(old_text, new_text, page, comment):
