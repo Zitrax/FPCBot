@@ -1410,25 +1410,13 @@ class FPCandidate(Candidate):
         if not files:
             out("%s: (ignoring, no file(s) found)" % self.cutTitle())
             return
-        try:
-            self.addToFeaturedList(basic_gallery, files)
-            self.addToGalleryPage(full_gallery_link, files)
-            self.addAssessments(files)
-            self.addToCurrentMonth(files)
-            self.notifyNominator(files)
-            self.notifyUploader(files)
-            self.moveToLog(self._proString)
-        except Exception as exc:
-            # Report exception with stack trace on the FPC talk page
-            stack_trace = traceback.format_exc().rstrip()
-            ask_for_help(
-                "Developers, please look into this uncaught exception "
-                "in the parking procedure:\n"
-                f"<pre>{stack_trace}</pre>\n"
-                "Thank you!"
-            )
-            # Raise the exception again to enable normal error logging
-            raise exc
+        self.addToFeaturedList(basic_gallery, files)
+        self.addToGalleryPage(full_gallery_link, files)
+        self.addAssessments(files)
+        self.addToCurrentMonth(files)
+        self.notifyNominator(files)
+        self.notifyUploader(files)
+        self.moveToLog(self._proString)
 
 
 class DelistCandidate(Candidate):
@@ -1675,10 +1663,10 @@ def checkCandidates(check, page, delist, descending=True):
         False if it runs from the oldest to the newest entry.
         So we can always handle the candidates in chronological order.
     """
-
     if not G_Site.logged_in():
         G_Site.login()
 
+    # Find all current candidates
     candidates = findCandidates(page, delist)
     if not candidates:
         out(
@@ -1689,11 +1677,11 @@ def checkCandidates(check, page, delist, descending=True):
     if descending:
         candidates.reverse()
 
-    tot = len(candidates)
+    # Handle each candidate with the specified method
+    total = len(candidates)
     for i, candidate in enumerate(candidates, start=1):
-
         if not G_Threads:
-            out("(%03d/%03d) " % (i, tot), newline=False, date=True)
+            out(f"({i:03d}/{total:03d}) ", newline=False, date=True)
 
         try:
             if G_Threads:
@@ -1704,9 +1692,24 @@ def checkCandidates(check, page, delist, descending=True):
             else:
                 check(candidate)
         except pywikibot.exceptions.NoPageError as exc:
-            error("No such page '%s'" % exc)
+            error(f"Error - no such page: '{exc}'")
         except pywikibot.exceptions.LockedPageError as exc:
-            error("Page is locked '%s'" % exc)
+            error(f"Error - page is locked: '{exc}'")
+        except Exception as exc:
+            # Report exception with stack trace on the FPC talk page
+            stack_trace = traceback.format_exc().rstrip()
+            try:
+                subpage_link = f"[[{candidate.page.title()}]]"
+            except Exception:
+                subpage_link = f"the invalid nomination no. {i}"
+            ask_for_help(
+                f"The bot has stopped at {subpage_link} "
+                "because of an uncaught exception:\n"
+                f"<pre>{stack_trace}</pre>\n"
+                "Developers, please look into this."
+            )
+            # Raise the exception again to enable normal error logging
+            raise exc
 
         if G_Abort:
             break
