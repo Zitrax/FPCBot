@@ -798,7 +798,14 @@ class Candidate(abc.ABC):
         # Read the gallery page
         full_page_name = f"Commons:Featured pictures/{gallery_page_name}"
         page = pywikibot.Page(G_Site, full_page_name)
-        old_text = page.get(get_redirect=True)
+        try:
+            old_text = page.get(get_redirect=False)
+        except pywikibot.exceptions.NoPageError:
+            error(f"Error - gallery page '{full_page_name}' does not exist.")
+            return
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"Error - can't read gallery page '{full_page_name}': {exc}")
+            return
         if self.isSet():
             clean_title = self.cleanSetTitle(keep_set=False)
         else:
@@ -871,6 +878,7 @@ class Candidate(abc.ABC):
                 + old_text[gallery_end_pos:]
             )
             message = f"Added {files_for_msg} to the 'Unsorted' section"
+            warn("No valid section, adding images to the 'Unsorted' section.")
         commit(old_text, new_text, page, message)
 
     def getImagePage(self):
@@ -1263,10 +1271,11 @@ class Candidate(abc.ABC):
         promote the new FP(s) or delist the former FP respectively;
         else, if it has failed, just archive the nomination.
         """
+        cut_title = self.cutTitle()
 
         # Check that the nomination subpage actually exists
         if not self.page.exists():
-            error("%s: (Error: no such page?!)" % self.cutTitle())
+            error(f"{cut_title}: (Error: no such page?!)")
             return
 
         # First look for verified results
@@ -1276,33 +1285,33 @@ class Candidate(abc.ABC):
         results = self._VerifiedR.findall(redacted_text)
         # Stop if there is not exactly one valid verified result
         if not results:
-            out("%s: (ignoring, no verified results)" % self.cutTitle())
+            out(f"{cut_title}: (ignoring, no verified results)")
             return
         if len(results) > 1:
-            out("%s: (ignoring, several verified results?)" % self.cutTitle())
+            error(f"{cut_title}: (Error: several verified results?)")
             return
         if self.isWithdrawn():
-            out("%s: (ignoring, was withdrawn)" % self.cutTitle())
+            out(f"{cut_title}: (ignoring, was withdrawn)")
             return
         if self.isFPX():
-            out("%s: (ignoring, was FPXed)" % self.cutTitle())
+            out(f"{cut_title}: (ignoring, was FPXed)")
             return
 
         # Check that the image page(s) exist, if not ignore this candidate
         if self.isSet():
             set_files = self.setFiles()
             if not set_files:
-                error("%s: (Error: found no images in set)" % self.cutTitle())
+                error(f"{cut_title}: (Error: found no images in set)")
                 return
-            for file in set_files:
-                if not pywikibot.Page(G_Site, file).exists():
+            for filename in set_files:
+                if not pywikibot.Page(G_Site, filename).exists():
                     error(
-                        "%s: (Error: can't find set image '%s')"
-                        % (self.cutTitle(), file)
+                        f"{cut_title}: (Error: can't find "
+                        f"set image '{filename}')"
                     )
                     return
         elif not pywikibot.Page(G_Site, self.fileName()).exists():
-            error("%s: (Error: can't find image page)" % self.cutTitle())
+            error(f"{cut_title}: (Error: can't find image page)")
             return
 
         # We should now have a candidate with verified result that we can park
@@ -1319,9 +1328,9 @@ class Candidate(abc.ABC):
             else:
                 self.moveToLog(self._conString)
         else:
-            out(
-                "%s: (Error: unknown verified feature status '%s')"
-                % (self.cutTitle(), success)
+            error(
+                f"{cut_title}: (Error: invalid verified "
+                f"success status '{success}')"
             )
 
     @abc.abstractmethod
@@ -1385,30 +1394,36 @@ class FPCandidate(Candidate):
         inserts the {{Assessments}} template into the description page(s),
         notifies nominator and uploader, etc.
         """
+        cut_title = self.cutTitle()
+
         # Some methods need the full gallery link with section anchor,
         # others only the gallery page name or even just the basic gallery.
         full_gallery_link = results[4].strip()
         gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
         if not gallery_page:
-            out("%s: (ignoring, gallery not defined)" % self.cutTitle())
+            error(f"{cut_title}: (ignoring, gallery not defined)")
             return
         basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
 
-        # Check if we have an alternative for a multi image
+        # If there is more than one image, search for the selected alternative
         if self.imageCount() > 1:
-            if len(results) > 5 and len(results[5]):
-                if not pywikibot.Page(G_Site, results[5]).exists():
-                    out("%s: (ignoring, specified alternative not found)" % results[5])
-                else:
-                    self._alternative = results[5]
+            if len(results) > 5 and results[5]:
+                alternative = results[5]
+                if not pywikibot.Page(G_Site, alternative).exists():
+                    error(
+                        f"{cut_title}: (ignoring, specified alternative "
+                        f"'{alternative}' not found)"
+                    )
+                    return
+                self._alternative = alternative
             else:
-                out("%s: (ignoring, alternative not set)" % self.cutTitle())
+                error(f"{cut_title}: (ignoring, alternative not set)")
                 return
 
         # Promote the new featured picture(s)
         files = self.setFiles() if self.isSet() else [self.fileName()]
         if not files:
-            out("%s: (ignoring, no file(s) found)" % self.cutTitle())
+            error(f"{cut_title}: (ignoring, no file(s) found)")
             return
         self.addToFeaturedList(basic_gallery, files)
         self.addToGalleryPage(full_gallery_link, files)
@@ -1592,12 +1607,19 @@ def findCandidates(page_name, delist):
         "checking for redirects..."
     )
     page = pywikibot.Page(G_Site, page_name)
-    old_text = page.get(get_redirect=True)
+    try:
+        old_text = page.get(get_redirect=False)
+    except pywikibot.exceptions.PageRelatedError as exc:
+        error(f"Error - can't read candidate list '{page_name}': {exc}.")
+        return []
     without_comments = re.sub(r"<!--.+?-->", "", old_text, flags=re.DOTALL)
     subpage_entries = re.findall(
         r"(\{\{ *(Commons:Featured[ _]picture[ _]candidates */[^\n}]+?)\}\})",
         without_comments,
     )
+    if not subpage_entries:
+        error(f"Error - no candidates found in '{page_name}'.")
+        return []
     candidate_class = DelistCandidate if delist else FPCandidate
     match_pattern = G_MatchPattern.lower()
     candidates = []
@@ -1615,19 +1637,17 @@ def findCandidates(page_name, delist):
         subpage = pywikibot.Page(G_Site, subpage_name)
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
-            error(
-                f"Error - nomination '{subpage.title()}' not found, ignoring"
-            )
+            error(f"Error - nomination '{subpage_name}' not found, ignoring.")
             continue
         # Check for redirects and and resolve them
         if subpage.isRedirectPage():
             try:
                 subpage = subpage.getRedirectTarget()
-            except (pywikibot.exceptions.CircularRedirectError, RuntimeError):
-                # Circular or invalid redirect
+            except pywikibot.exceptions.PageRelatedError:
+                # Circular or invalid redirect etc.
                 error(
                     "Error - invalid nomination redirect page "
-                    f"'{subpage.title()}', ignoring"
+                    f"'{subpage_name}', ignoring."
                 )
                 continue
             new_name = subpage.title()
