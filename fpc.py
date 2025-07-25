@@ -767,7 +767,7 @@ class Candidate(abc.ABC):
         new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
         commit(old_text, new_text, page, "Added [[%s]]" % file)
 
-    def addToGalleryPage(self, gallery, files):
+    def addToGalleryPage(self, gallery_link, files):
         """
         Adds the new featured picture (resp. all files from a set nomination)
         to the appropriate featured picture gallery page.
@@ -775,23 +775,19 @@ class Candidate(abc.ABC):
 
         This is ==STEP 2== of the parking procedure.
 
-        @param gallery The gallery link with the name of the gallery page
+        @param gallery_link The gallery link with the name of the gallery page
         and (optionally) a section anchor which denotes the target section
         on that page.
         @param files List with filename(s) of the featured picture or set.
         """
-        # The calling code must guarantee that gallery link and files list
-        # are not empty.  An assertion can help us to catch bugs:
-        assert gallery and files
-
         # Replace all underscores and non-breaking spaces by plain spaces
         # (underscores are present if users just copy the gallery link,
         # NBSP can be entered by accident with some keyboard settings,
         # e.g. on macOS or Linux)
-        gallery = gallery.replace("_", " ").replace("\u00A0", " ")
+        gallery_link = gallery_link.replace("_", " ").replace("\u00A0", " ")
         # Split the gallery link into gallery page name and section anchor
         # (the latter can be empty)
-        link_parts = gallery.split("#", maxsplit=1)
+        link_parts = gallery_link.split("#", maxsplit=1)
         gallery_page_name = link_parts[0].strip()
         section = link_parts[1].strip() if len(link_parts) > 1 else ""
 
