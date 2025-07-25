@@ -303,6 +303,11 @@ class Candidate(abc.ABC):
         # First make sure that the page actually exists
         if not self.page.exists():
             error('"%s" Error: no such page?!' % self.cutTitle())
+            ask_for_help(
+                list_includes_missing_subpage.format(
+                    list=self._listPageName, subpage=self.page.title()
+                )
+            )
             return False
 
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
@@ -337,6 +342,10 @@ class Candidate(abc.ABC):
         old_text = self.page.get(get_redirect=True)
         if not old_text:
             error('"%s" Error: has no content' % self.cutTitle())
+            ask_for_help(
+                f"The nomination subpage [[{self.page.title()}]] "
+                f"seems to be empty. {please_fix_hint}"
+            )
             return False
 
         if re.search(r"{{\s*FPC-closed-ignored.*}}", old_text):
@@ -780,6 +789,8 @@ class Candidate(abc.ABC):
         on that page.
         @param files List with filename(s) of the featured picture or set.
         """
+        subpage_name = self.page.title()
+
         # Replace all underscores and non-breaking spaces by plain spaces
         # (underscores are present if users just copy the gallery link,
         # NBSP can be entered by accident with some keyboard settings,
@@ -798,9 +809,20 @@ class Candidate(abc.ABC):
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.NoPageError:
             error(f"Error - gallery page '{full_page_name}' does not exist.")
+            ask_for_help(
+                f"The gallery page [[{full_page_name}]] which was specified "
+                f"by the nomination [[{subpage_name}]] does not exist. "
+                f"{please_check_gallery_and_sort_fps}"
+            )
             return
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read gallery page '{full_page_name}': {exc}")
+            ask_for_help(
+                "The bot could not read the gallery page "
+                f"[[{full_page_name}]] which was specified "
+                f"by the nomination [[{subpage_name}]]: {exc} "
+                f"{please_check_gallery_and_sort_fps}"
+            )
             return
         if self.isSet():
             clean_title = self.cleanSetTitle(keep_set=False)
@@ -817,7 +839,7 @@ class Candidate(abc.ABC):
         if not new_files:
             # Not a single file needs to be added, so we can stop here.
             out(
-                f"Skipping addToGalleryPage() for '{self.page.title()}', "
+                f"Skipping addToGalleryPage() for '{subpage_name}', "
                 "image(s) already listed."
             )
             return
@@ -867,6 +889,12 @@ class Candidate(abc.ABC):
                     "Error - found no 'Unsorted' section on "
                     f"'{full_page_name}', can't add '{clean_title}'."
                 )
+                ask_for_help(
+                    f"The gallery page [[{full_page_name}]] which was "
+                    f"specified by the nomination [[{subpage_name}]] "
+                    "seems to be invalid or broken. "
+                    f"{please_check_gallery_and_sort_fps}"
+                )
                 return
             new_text = (
                 old_text[:gallery_end_pos]
@@ -875,6 +903,18 @@ class Candidate(abc.ABC):
             )
             message = f"Added {files_for_msg} to the 'Unsorted' section"
             warn("No valid section, adding images to the 'Unsorted' section.")
+            problem = (
+                f"does not point to a valid section on [[{full_page_name}]]"
+                if section else
+                "does not contain a section anchor"
+            )
+            ask_for_help(
+                f"The gallery link ''{gallery_link}'' in the nomination "
+                f"[[{subpage_name}]] {problem}. "
+                "Therefore one or more new featured pictures are added "
+                f"to the ''Unsorted'' section of [[{full_page_name}]]. "
+                "Please sort the images into the correct section."
+            )
         commit(old_text, new_text, page, message)
 
     def getImagePage(self):
@@ -968,6 +1008,11 @@ class Candidate(abc.ABC):
             wn = match.group(3)
         except AttributeError:
             error(f"Error - no verified result found in '{self.page.title()}'")
+            ask_for_help(
+                f"The nomination [[{self.page.title()}]] is closed, "
+                "but does not contain a valid verified result. "
+                f"{please_fix_hint}"
+            )
             return
 
         # Get the current monthly overview page
@@ -1002,6 +1047,11 @@ class Candidate(abc.ABC):
                 count = match.group(1).count("\n")
             except AttributeError:
                 error(f"Error - no valid <gallery> element in '{monthpage}'")
+                ask_for_help(
+                    f"The monthly overview page [[{monthpage}]] is missing "
+                    "a <code><nowiki><gallery></nowiki></code> element. "
+                    "Please check the page."
+                )
                 return
         else:
             # The page does not exist yet (new month) or is empty,
@@ -1267,11 +1317,17 @@ class Candidate(abc.ABC):
         promote the new FP(s) or delist the former FP respectively;
         else, if it has failed, just archive the nomination.
         """
+        subpage_name = self.page.title()
         cut_title = self.cutTitle()
 
         # Check that the nomination subpage actually exists
         if not self.page.exists():
             error(f"{cut_title}: (Error: no such page?!)")
+            ask_for_help(
+                list_includes_missing_subpage.format(
+                    list=self._listPageName, subpage=subpage_name
+                )
+            )
             return
 
         # First look for verified results
@@ -1285,6 +1341,11 @@ class Candidate(abc.ABC):
             return
         if len(results) > 1:
             error(f"{cut_title}: (Error: several verified results?)")
+            ask_for_help(
+                f"The nomination [[{subpage_name}]] seems to contain "
+                "more than one verified result. "
+                "Please remove (or cross out) all but one of the results."
+            )
             return
         if self.isWithdrawn():
             out(f"{cut_title}: (ignoring, was withdrawn)")
@@ -1298,6 +1359,11 @@ class Candidate(abc.ABC):
             set_files = self.setFiles()
             if not set_files:
                 error(f"{cut_title}: (Error: found no images in set)")
+                ask_for_help(
+                    f"The set nomination [[{subpage_name}]] seems to contain "
+                    "no images. Perhaps the formatting is damaged. "
+                    f"{please_fix_hint}"
+                )
                 return
             for filename in set_files:
                 if not pywikibot.Page(G_Site, filename).exists():
@@ -1305,9 +1371,19 @@ class Candidate(abc.ABC):
                         f"{cut_title}: (Error: can't find "
                         f"set image '{filename}')"
                     )
+                    ask_for_help(
+                        f"The set nomination [[{subpage_name}]] lists the "
+                        f"file [[:{filename}]], but that file does not exist. "
+                        f"Perhaps the file has been renamed. {please_fix_hint}"
+                    )
                     return
         elif not pywikibot.Page(G_Site, self.fileName()).exists():
             error(f"{cut_title}: (Error: can't find image page)")
+            ask_for_help(
+                f"The nomination [[{subpage_name}]] is about the image "
+                f"[[:{self.fileName()}]], but that file does not exist. "
+                f"Perhaps the file has been renamed. {please_fix_hint}"
+            )
             return
 
         # We should now have a candidate with verified result that we can park
@@ -1327,6 +1403,11 @@ class Candidate(abc.ABC):
             error(
                 f"{cut_title}: (Error: invalid verified "
                 f"success status '{success}')"
+            )
+            ask_for_help(
+                f"The verified success status <code>{success}</code> "
+                f"in the results template of [[{subpage_name}]] "
+                f"is invalid. {please_fix_hint}"
             )
 
     @abc.abstractmethod
@@ -1390,6 +1471,7 @@ class FPCandidate(Candidate):
         inserts the {{Assessments}} template into the description page(s),
         notifies nominator and uploader, etc.
         """
+        subpage_name = self.page.title()
         cut_title = self.cutTitle()
 
         # Some methods need the full gallery link with section anchor,
@@ -1398,6 +1480,10 @@ class FPCandidate(Candidate):
         gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
         if not gallery_page:
             error(f"{cut_title}: (ignoring, gallery not defined)")
+            ask_for_help(
+                f"The gallery link in the nomination [[{subpage_name}]] "
+                f"is empty or broken. {please_fix_hint}"
+            )
             return
         basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
 
@@ -1410,16 +1496,30 @@ class FPCandidate(Candidate):
                         f"{cut_title}: (ignoring, specified alternative "
                         f"'{alternative}' not found)"
                     )
+                    ask_for_help(
+                        f"Cannot find the alternative [[:{alternative}]] "
+                        f"specified by the nomination [[{subpage_name}]]. "
+                        f"{please_fix_hint}"
+                    )
                     return
                 self._alternative = alternative
             else:
                 error(f"{cut_title}: (ignoring, alternative not set)")
+                ask_for_help(
+                    f"The nomination [[{subpage_name}]] contains several "
+                    "images, but does not specify the selected alternative. "
+                    f"{please_fix_hint}"
+                )
                 return
 
         # Promote the new featured picture(s)
         files = self.setFiles() if self.isSet() else [self.fileName()]
         if not files:
             error(f"{cut_title}: (ignoring, no file(s) found)")
+            ask_for_help(
+                "Cannot find the featured file(s) in the nomination "
+                f"[[{subpage_name}]]. {please_fix_hint}"
+            )
             return
         self.addToFeaturedList(basic_gallery, files)
         self.addToGalleryPage(full_gallery_link, files)
@@ -1607,6 +1707,10 @@ def findCandidates(page_name, delist):
         old_text = page.get(get_redirect=False)
     except pywikibot.exceptions.PageRelatedError as exc:
         error(f"Error - can't read candidate list '{page_name}': {exc}.")
+        ask_for_help(
+            f"There was an error reading the candidate list [[{page_name}]]: "
+            f"{exc} This is a serious problem, please check the page."
+        )
         return []
     without_comments = re.sub(r"<!--.+?-->", "", old_text, flags=re.DOTALL)
     subpage_entries = re.findall(
@@ -1615,6 +1719,11 @@ def findCandidates(page_name, delist):
     )
     if not subpage_entries:
         error(f"Error - no candidates found in '{page_name}'.")
+        ask_for_help(
+            f"The candidate list [[{page_name}]] does not appear "
+            "to contain a single nomination. That is a bit peculiar. "
+            "Please check whether this is correct or not."
+        )
         return []
     candidate_class = DelistCandidate if delist else FPCandidate
     match_pattern = G_MatchPattern.lower()
@@ -1634,6 +1743,11 @@ def findCandidates(page_name, delist):
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
             error(f"Error - nomination '{subpage_name}' not found, ignoring.")
+            ask_for_help(
+                list_includes_missing_subpage.format(
+                    list=page_name, subpage=subpage_name
+                )
+            )
             continue
         # Check for redirects and and resolve them
         if subpage.isRedirectPage():
@@ -1644,6 +1758,10 @@ def findCandidates(page_name, delist):
                 error(
                     "Error - invalid nomination redirect page "
                     f"'{subpage_name}', ignoring."
+                )
+                ask_for_help(
+                    f"The nomination subpage [[{subpage_name}]] "
+                    f"contains an invalid redirect. {please_fix_hint}"
                 )
                 continue
             new_name = subpage.title()
@@ -1709,8 +1827,10 @@ def checkCandidates(check, page, delist, descending=True):
                 check(candidate)
         except pywikibot.exceptions.NoPageError as exc:
             error(f"Error - no such page: '{exc}'")
+            ask_for_help(f"{exc} Please check this.")
         except pywikibot.exceptions.LockedPageError as exc:
             error(f"Error - page is locked: '{exc}'")
+            ask_for_help(f"{exc} Please check this.")
         except Exception as exc:
             # Report exception with stack trace on the FPC talk page
             stack_trace = traceback.format_exc().rstrip()
@@ -1989,9 +2109,24 @@ keep_templates = (
     "保留",
 )
 
-#
-# Compiled regular expressions follows
-#
+
+# Shared messages
+
+please_fix_hint = (
+    "Please check and fix this so that the bot can process the nomination."
+)
+please_check_gallery_and_sort_fps = (
+    "Please check that gallery page and add the new featured picture(s) "
+    "from the nomination to the appropriate gallery page."
+)
+list_includes_missing_subpage = (
+    "The candidate list [[{list}]] includes the nomination [[{subpage}]], "
+    "but that page does not exist. Perhaps the page has been renamed "
+    "and the list needs to be updated. " + please_fix_hint
+)
+
+
+# Compiled regular expressions
 
 # Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
 # or to replace both by the standard 'File:' namespace.
