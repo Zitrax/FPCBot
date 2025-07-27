@@ -1839,6 +1839,9 @@ def checkCandidates(check, page, delist, descending=True):
         except Exception as exc:
             # Report exception with stack trace on the FPC talk page
             stack_trace = traceback.format_exc().rstrip()
+            stack_trace = re.sub(  # Abbreviate file paths to filenames
+                r'(File ").+?/([^/\n]+\.py")', r"\1\2", stack_trace
+            )
             try:
                 subpage_link = f"[[{candidate.page.title()}]]"
             except Exception:
