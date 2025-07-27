@@ -904,16 +904,21 @@ class Candidate(abc.ABC):
             message = f"Added {files_for_msg} to the 'Unsorted' section"
             warn("No valid section, adding images to the 'Unsorted' section.")
             problem = (
-                f"does not point to a valid section on [[{full_page_name}]]"
+                f"does not point to a valid section on [[{full_page_name}]]. "
+                "(The section after the <code>#</code> in a gallery link "
+                "is valid if and only if it corresponds letter for letter "
+                "to a subheading which is immediately followed "
+                "by a <code><nowiki><gallery></nowiki></code> element.)"
                 if section else
-                "does not contain a section anchor"
+                f"does not specify the section on [[{full_page_name}]] "
+                "to which the image(s) should be added."
             )
             ask_for_help(
                 f"The gallery link ''{gallery_link}'' in the nomination "
-                f"[[{subpage_name}]] {problem}. "
+                f"[[{subpage_name}]] {problem} "
                 "Therefore one or more new featured pictures are added "
                 f"to the ''Unsorted'' section of [[{full_page_name}]]. "
-                "Please sort the images into the correct section."
+                "Please sort these images into the correct section."
             )
         commit(old_text, new_text, page, message)
 
