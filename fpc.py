@@ -1963,7 +1963,8 @@ def ask_for_help(message):
         return  # Don't post the same message twice.
     new_text = old_text.rstrip() + (
         "\n\n== FPCBot asking for help ==\n"
-        f"{message} / ~~~~"
+        "[[File:Robot icon.svg|64px|left|link=User:FPCBot]]\n"
+        f"{message} Thank you! / ~~~~"
     )
     commit(old_text, new_text, talk_page, "Added request for help")
 
