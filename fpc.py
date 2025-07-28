@@ -990,7 +990,7 @@ class Candidate(abc.ABC):
                     + "\n{{Assessments|featured=1%s}}\n" % comnom
                     + old_text[end:]
                 )
-            commit(old_text, new_text, current_page, "FPC promotion")
+            commit(old_text, new_text, current_page, "FP promotion")
 
     def addToCurrentMonth(self, files):
         """
@@ -1135,7 +1135,7 @@ class Candidate(abc.ABC):
             )
             try:
                 commit(
-                    old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
+                    old_text, new_text, talk_page, "FP promotion of [[%s]]" % fn_al
                 )
             except pywikibot.exceptions.LockedPageError:
                 warn(
@@ -1160,7 +1160,7 @@ class Candidate(abc.ABC):
 
         try:
             commit(
-                old_text, new_text, talk_page, "FPC promotion of [[%s]]" % fn_al
+                old_text, new_text, talk_page, "FP promotion of [[%s]]" % fn_al
             )
         except pywikibot.exceptions.LockedPageError:
             warn(
@@ -1246,7 +1246,7 @@ class Candidate(abc.ABC):
                 "== FP Promotion ==\n"
                 f"{template} /~~~~"
             )
-            message = f"FPC promotion of [[{fn_al}]]"
+            message = f"FP promotion of [[{fn_al}]]"
             try:
                 commit(old_text, new_text, talk_page, message)
             except pywikibot.exceptions.LockedPageError:
