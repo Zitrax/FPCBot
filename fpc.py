@@ -367,9 +367,9 @@ class Candidate(abc.ABC):
 
         new_text = old_text + result
 
-        # Add the featured status to the header
+        # Append a keyword for the result to the heading
         if self.imageCount() <= 1:
-            new_text = self.fixHeader(new_text)
+            new_text = self.fixHeading(new_text)
 
         commit(
             old_text,
@@ -381,33 +381,49 @@ class Candidate(abc.ABC):
 
         return True
 
-    def fixHeader(self, text, value=None):
+    def fixHeading(self, text, value=None):
         """
-        Will append the featured status to the header of the candidate
-        Will return the new text
-        @param value If specified ("yes" or "no" string will be based on it, otherwise isPassed() is used)
+        Appends a keyword -- '(not) featured', '(not) delisted' --
+        for the result to the heading of the nomination subpage.
+        Reports if the nomination does not start correctly with a heading.
+        Returns the modified wikitext of the nomination subpage.
+
+        @param text  The complete wikitext of the nomination subpage.
+        @param value If specified as 'yes' or 'no' (the value of the 'featured'
+            or 'delisted' parameter from the reviewed results template),
+            the keyword is based on this value, otherwise we call isPassed().
         """
-
-        # Check if they are alredy there
-        if re.match(r"===.*(%s|%s)===" % (self._proString, self._conString), text):
-            return text
-
-        status = ""
-
-        if value:
-            if value == "yes":
-                status = ", %s" % self._proString
-            elif value == "no":
-                status = ", %s" % self._conString
-
-        if len(status) < 1:
-            status = (
-                ", %s" % self._proString
-                if self.isPassed()
-                else ", %s" % self._conString
+        # Determine the keyword
+        match value:
+            case "yes":
+                success = True
+            case "no":
+                success = False
+            case _:
+                success = self.isPassed()
+        keyword = self._proString if success else self._conString
+        # Check if the nomination correctly starts with a level 3+ heading
+        text = text.lstrip()  # Silently remove irritating whitespace.
+        match = re.match(r"===(.+?)===", text)
+        if not match:
+            warn(
+                f"Nomination '{self.page.title()}' does not start "
+                f"with a heading; can't add '{keyword}' to the title."
             )
-
-        return re.sub(r"(===.*)(===)", r"\1%s\2" % status, text, count=1)
+            ask_for_help(
+                f"The nomination [[{self.page.title()}]] does not start with "
+                "the usual <code><nowiki>===...===</nowiki></code> heading. "
+                "Please check if there is any rubbish at the beginning "
+                "and remove it, fix the heading if necessary, "
+                f"and add <code>, {keyword}</code> at the end of the heading."
+            )
+            return text
+        # Check whether the heading already contains the keyword or not
+        heading = match.group(1).strip()
+        if heading.endswith(keyword):
+            return text
+        # Add the keyword to the heading
+        return text.replace(heading, f"{heading}, {keyword}", 1)
 
     @abc.abstractmethod
     def getResultString(self):
@@ -1395,8 +1411,8 @@ class Candidate(abc.ABC):
         verified_result = results[0]
         success = verified_result[3]
         if success in {"yes", "no"}:
-            # If the suffix to the title has not been added, add it now
-            new_text = self.fixHeader(text, success)
+            # If the keyword has not yet been added to the heading, add it now
+            new_text = self.fixHeading(text, success)
             if new_text != text:
                 commit(text, new_text, self.page, "Fixed header")
             # Park the candidate
