@@ -363,9 +363,7 @@ class Candidate(abc.ABC):
         if self.imageCount() <= 1:
             self.countVotes()
 
-        result = self.getResultString()
-
-        new_text = old_text + result
+        new_text = old_text.rstrip() + "\n\n" + self.getResultString()
 
         # Append a keyword for the result to the heading
         if self.imageCount() <= 1:
@@ -1464,15 +1462,28 @@ class FPCandidate(Candidate):
         self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
+        """
+        Returns the results template to be added when closing a nomination.
+        Implementation for FP candidates.
+        """
+        gallery = self.findGalleryOfFile()
         if self.imageCount() > 1:
-            return "\n\n{{FPC-results-unreviewed|support=X|oppose=X|neutral=X|featured=no|gallery=|alternative=|sig=<small>'''Note: this candidate has several alternatives, thus if featured the alternative parameter needs to be specified.'''</small> /~~~~)}}"
+            return (
+                "{{FPC-results-unreviewed"
+                "|support=X|oppose=X|neutral=X"
+                f"|featured=X|gallery={gallery}|alternative="
+                "|sig=<small>'''NB: this candidate has several alternatives. "
+                "Thus, if featured, the selected image needs to be specified "
+                "with the <code>alternative=...</code> parameter.'''</small> "
+                "/~~~~}}"
+            )
         else:
-            return "\n\n{{FPC-results-unreviewed|support=%d|oppose=%d|neutral=%d|featured=%s|gallery=%s|sig=~~~~}}" % (
-                self._pro,
-                self._con,
-                self._neu,
-                "yes" if self.isPassed() else "no",
-                self.findGalleryOfFile(),
+            return (
+                "{{FPC-results-unreviewed"
+                f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
+                f"|featured={'yes' if self.isPassed() else 'no'}"
+                f"|gallery={gallery}"
+                "|sig=~~~~}}"
             )
 
     def getCloseCommitComment(self):
@@ -1575,9 +1586,15 @@ class DelistCandidate(Candidate):
         self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
+        """
+        Returns the results template to be added when closing a nomination.
+        Implementation for delisting candidates.
+        """
         return (
-            "\n\n{{FPC-delist-results-unreviewed|delist=%d|keep=%d|neutral=%d|delisted=%s|sig=~~~~}}"
-            % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
+            "{{FPC-delist-results-unreviewed"
+            f"|delist={self._pro}|keep={self._con}|neutral={self._neu}"
+            f"|delisted={'yes' if self.isPassed() else 'no'}"
+            "|sig=~~~~}}"
         )
 
     def getCloseCommitComment(self):
