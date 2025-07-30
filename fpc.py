@@ -1472,9 +1472,10 @@ class FPCandidate(Candidate):
                 "{{FPC-results-unreviewed"
                 "|support=X|oppose=X|neutral=X"
                 f"|featured=X|gallery={gallery}|alternative="
-                "|sig=<small>'''NB: this candidate has several alternatives. "
-                "Thus, if featured, the selected image needs to be specified "
-                "with the <code>alternative=...</code> parameter.'''</small> "
+                "|sig=<small>'''Note: this candidate has several alternatives. "
+                "Thus, if featured, the code <code>alternative=</code> "
+                "in this template needs to be followed by the filename "
+                "of the chosen alternative.'''</small> "
                 "/~~~~}}"
             )
         else:
