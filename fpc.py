@@ -161,9 +161,22 @@ class Candidate(abc.ABC):
         else:
             return username
 
-    def creator(self):
-        """Return the link to the user that created the image, Not implemented yet."""
-        pass
+    def creator(self, link=True):
+        """
+        Returns the name of the user who has originally created the image.
+        There is no generally applicable way to determine the creator.
+        Therefore nominators should use the phrase
+            '{{Info}} ... created by [[User:...]]'
+        on the nomination subpage in order to identify the original creator.
+        We also allow the common variant 'created and <adverb?> uploaded by'.
+        If this phrase is present, the method returns the username
+        (if 'link' is True, as '[[User:...|...]]'), else just None.
+        """
+        wikitext = self.page.get(get_redirect=True)
+        if match := CreatorNameR.search(wikitext):
+            username = match.group(1).strip()
+            return f"[[User:{username}|{username}]]" if link else username
+        return None
 
     def isSet(self):
         """
@@ -1094,11 +1107,23 @@ class Candidate(abc.ABC):
         else:
             title = self.cleanTitle(alternative=True)
             message = f"Added [[{filename}]]"
+        creator_link = self.creator(link=True)
+        uploader_link = uploader(filename, link=True)
+        nominator_link = self.nominator(link=True)
+        if creator_link and creator_link != uploader_link:
+            # We omit the creator if the creator is identical to the uploader,
+            # but mention uploader and nominator separately even if they are
+            # one and the same, to keep the traditional format of the overview
+            # as far as possible in order to simplify statistical analysis.
+            creator_hint = f"created by {creator_link}, "
+        else:
+            creator_hint = ""
         new_text = old_text.replace(
             "</gallery>",
             f"{filename}|[[{self.page.title()}|{count}]] '''{title}'''<br> "
-            f"uploaded by {uploader(filename)}, "
-            f"nominated by {self.nominator()},<br> "
+            f"{creator_hint}"
+            f"uploaded by {uploader_link}, "
+            f"nominated by {nominator_link},<br> "
             f"{{{{s|{ws}}}}}, {{{{o|{wo}}}}}, {{{{n|{wn}}}}}\n"
             "</gallery>",
             1,
@@ -1185,9 +1210,13 @@ class Candidate(abc.ABC):
                 "since it's just the nominator notification." % talk_link
             )
 
-    def notifyUploader(self, files):
+    def notifyUploaderAndCreator(self, files):
         """
-        Add a FP promotion template to the uploader's talk page.
+        Add a FP promotion template to the talk page of the uploader and
+        (optionally) of the original creator.  (Sometimes the creator
+        is different from the uploader, e.g. when we promote a variant
+        of an image which has been retouched by another user.
+        In this case we notify also the original creator, if possible.)
         Should only be called on closed and verified candidates.
 
         This is ==STEP 6== of the parking procedure.
@@ -1198,80 +1227,109 @@ class Candidate(abc.ABC):
         That's very unusual and discouraged by the current FPC rules,
         but the bot stills supports that special case.  Therefore this method
         handles the files one by one, unlike notifyNominator().
+        (Theoretically we would also need to support different creators,
+        but at least for now we extract the creator name from the nomination,
+        therefore we can handle just a single creator per nomination.)
 
         @param files List with filename(s) of the featured picture or set.
         """
-        undefined_or_locked_talk_pages = set()
+        ignored_pages = set()
         nominator_name = self.nominator(link=False)
-        for file in files:
-            # Check if nominator and uploader are the same user,
+        creator_name = self.creator(link=False)
+        for filename in files:
+            # Check if nominator, uploader and creator are the same user,
             # to avoid adding two templates to the same talk page
-            uploader_name = uploader(file, link=False)
-            if nominator_name == uploader_name:
+            uploader_name = uploader(filename, link=False)
+            if uploader_name != nominator_name:
+                self._notifyUploaderAndCreator(
+                    filename, True, uploader_name, ignored_pages
+                )
+            else:
                 out(
-                    f"Skipping notifyUploader() for '{file}', "
+                    f"Skipping uploader notification for '{filename}', "
                     "uploader is identical to nominator."
                 )
-                continue
-
-            # Find and read the uploader's talk page
-            talk_link = "User talk:" + uploader_name
-            if talk_link in undefined_or_locked_talk_pages:
-                # Don't load or report undefined or locked talk pages twice
-                continue
-            talk_page = pywikibot.Page(G_Site, talk_link)
-            try:
-                old_text = talk_page.get(get_redirect=True)
-            except pywikibot.exceptions.NoPageError:
-                # Undefined user talk pages are uncommon because every new user
-                # is welcomed by an automatic message.  So better stop here.
-                warn(
-                    f"The user talk page '{talk_link}' is undefined, "
-                    "but ignoring since it's just the uploader notification."
+            if (
+                creator_name
+                and creator_name != nominator_name
+                and creator_name != uploader_name
+            ):
+                self._notifyUploaderAndCreator(
+                    filename, False, creator_name, ignored_pages
                 )
-                undefined_or_locked_talk_pages.add(talk_link)
-                continue
-
-            # We need the 'subpage' parameter for sets or if the alternative
-            # filename differs from the original filename.
-            # NB that in this case we must keep the 'Set/' prefix.
-            fn_or = self.fileName(alternative=False)  # Original filename
-            fn_al = self.fileName(alternative=True)  # Alternative filename
-            if self.isSet():
-                subpage = "|subpage=" + self.cleanSetTitle(keep_set=True)
-                fn_al = file
-            elif fn_al != fn_or:
-                subpage = "|subpage=" + fn_or
             else:
-                subpage = ""
-            template = f"{{{{FPpromotedUploader|{fn_al}{subpage}}}}}"
-
-            # Check if there already is a promotion template for the file
-            # on the user talk page.  If yes, we skip that file,
-            # but continue to check the other files (for set nominations).
-            if re.search(wikipattern(template), old_text):
                 out(
-                    f"Skipping notifyUploader() for '{file}', "
-                    f"promotion template is already present at '{talk_link}'."
+                    f"Skipping creator notification for '{filename}', "
+                    + (
+                        "creator is identical to nominator/uploader."
+                        if creator_name else
+                        "can't identify the creator."
+                    )
                 )
-                continue
 
-            # Update the description and commit the new text
-            new_text = (
-                f"{old_text.rstrip()}\n"
-                "\n"
-                "== FP Promotion ==\n"
-                f"{template} /~~~~"
+    def _notifyUploaderAndCreator(
+        self, filename, is_uploader, username, ignored_pages
+    ):
+        """Subroutine which implements the uploader/creator notification."""
+        if is_uploader:
+            role = "uploader"
+            tmpl_name = "FPpromotedUploader"
+        else:
+            role = "creator"
+            tmpl_name = "FPpromotedCreator"
+        ignoring = f"but ignoring since it's just the {role} notification."
+
+        # Find and read the user talk page
+        talk_link = "User talk:" + username
+        if talk_link in ignored_pages:
+            # Don't load or report undefined or locked talk pages twice
+            return
+        talk_page = pywikibot.Page(G_Site, talk_link)
+        try:
+            old_text = talk_page.get(get_redirect=True)
+        except pywikibot.exceptions.NoPageError:
+            # Undefined user talk pages are uncommon because every new user
+            # is welcomed by an automatic message.  So better stop here.
+            warn(f"The user talk page '{talk_link}' is undefined, {ignoring}")
+            ignored_pages.add(talk_link)
+            return
+
+        # We need the 'subpage' parameter for sets or if the alternative
+        # filename differs from the original filename.
+        # NB that in this case we must keep the 'Set/' or 'File:' prefix.
+        fn_or = self.fileName(alternative=False)  # Original filename
+        fn_al = self.fileName(alternative=True)  # Alternative filename
+        if self.isSet():
+            subpage_param = "|subpage=" + self.cleanSetTitle(keep_set=True)
+            fn_al = filename
+        elif fn_al != fn_or:
+            subpage_param = "|subpage=" + fn_or
+        else:
+            subpage_param = ""
+        template = f"{{{{{tmpl_name}|{fn_al}{subpage_param}}}}}"
+
+        # Check if there already is a promotion template for the file
+        # on the user talk page.  If yes, we skip that file.
+        if re.search(wikipattern(template), old_text):
+            out(
+                f"Skipping {role} notification for '{filename}', "
+                f"promotion template is already present at '{talk_link}'."
             )
-            message = f"FP promotion of [[{fn_al}]]"
-            try:
-                commit(old_text, new_text, talk_page, message)
-            except pywikibot.exceptions.LockedPageError:
-                warn(
-                    f"The user talk page '{talk_link}' is locked, "
-                    "but ignoring since it's just the uploader notification."
-                )
-                undefined_or_locked_talk_pages.add(talk_link)
+            return
+
+        # Update the description and commit the new text
+        new_text = (
+            f"{old_text.rstrip()}\n"
+            "\n"
+            "== FP Promotion ==\n"
+            f"{template} /~~~~"
+        )
+        message = f"FP promotion of [[{fn_al}]]"
+        try:
+            commit(old_text, new_text, talk_page, message)
+        except pywikibot.exceptions.LockedPageError:
+            warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
+            ignored_pages.add(talk_link)
 
     def moveToLog(self, reason=None):
         """
@@ -1562,7 +1620,7 @@ class FPCandidate(Candidate):
         self.addAssessments(files)
         self.addToCurrentMonth(files)
         self.notifyNominator(files)
-        self.notifyUploader(files)
+        self.notifyUploaderAndCreator(files)
         self.moveToLog(self._proString)
 
 
@@ -2251,6 +2309,12 @@ ImagesThumbR = re.compile(r"\|\s*thumb\b")
 # Finds the last image link on a page
 LastImageR = re.compile(
     r"(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)"
+)
+# Search nomination for the username of the original creator
+CreatorNameR = re.compile(
+    r"\{\{[Ii]nfo\}\}.+?"
+    r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
+    r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
 )
 
 # Auto reply yes to all questions
