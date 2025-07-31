@@ -916,7 +916,10 @@ class Candidate(abc.ABC):
                 + old_text[gallery_end_pos:]
             )
             message = f"Added {files_for_msg} to the 'Unsorted' section"
-            warn("No valid section, adding images to the 'Unsorted' section.")
+            warn(
+                f"{'Invalid' if section else 'No'} gallery section, "
+                "adding image(s) to the 'Unsorted' section."
+            )
             problem = (
                 f"does not point to a valid section on [[{full_page_name}]]. "
                 "(The section after the <code>#</code> in a gallery link "
