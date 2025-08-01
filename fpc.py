@@ -73,6 +73,7 @@ class Candidate(abc.ABC):
     def __init__(
         self,
         page,
+        listName,
         ProR,
         ConR,
         NeuR,
@@ -87,6 +88,7 @@ class Candidate(abc.ABC):
         to set instance variables to the passed values or to default values.
 
         @param page      A pywikibot.Page object for the nomination subpage.
+        @param listName  A string with the name of the candidate list page.
         @param ProR      A compiled regex (re.Pattern) to find positive votes.
         @param ConR      A compiled regex (re.Pattern) to find negative votes.
         @param NeuR      A compiled regex (re.Pattern) to find neutral votes.
@@ -103,6 +105,7 @@ class Candidate(abc.ABC):
         # keep the variables or (better?!) by using class constants
         # which are adapted by the subclasses.
         self.page = page
+        self._listPageName = listName
         self._pro = 0
         self._con = 0
         self._neu = 0
@@ -122,7 +125,6 @@ class Candidate(abc.ABC):
         self._fileName = None
         self._alternative = None
         self._setFiles = None
-        self._listPageName = None
         self._creator = None    # Username of the original creator
         self._uploader = {}     # Mapping: filename -> username of uploader
         self._nominator = None  # Username of the nominator
@@ -1524,7 +1526,7 @@ class Candidate(abc.ABC):
 class FPCandidate(Candidate):
     """A candidate up for promotion."""
 
-    def __init__(self, page):
+    def __init__(self, page, listName):
         """
         The initializer calls the superclass initializer in order to set
         instance variables to the appropriate values for this class.
@@ -1533,6 +1535,7 @@ class FPCandidate(Candidate):
         """
         super().__init__(
             page,
+            listName,
             SupportR,
             OpposeR,
             NeutralR,
@@ -1542,7 +1545,6 @@ class FPCandidate(Candidate):
             CountedTemplateR,
             VerifiedResultR,
         )
-        self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
         """
@@ -1649,7 +1651,7 @@ class FPCandidate(Candidate):
 class DelistCandidate(Candidate):
     """A delisting candidate."""
 
-    def __init__(self, page):
+    def __init__(self, page, listName):
         """
         The initializer calls the superclass initializer in order to set
         instance variables to the appropriate values for this class.
@@ -1658,6 +1660,7 @@ class DelistCandidate(Candidate):
         """
         super().__init__(
             page,
+            listName,
             DelistR,
             KeepR,
             NeutralR,
@@ -1667,7 +1670,6 @@ class DelistCandidate(Candidate):
             DelistCountedTemplateR,
             VerifiedDelistResultR,
         )
-        self._listPageName = "Commons:Featured picture candidates/candidate list"
 
     def getResultString(self):
         """
@@ -1804,7 +1806,7 @@ def error(text, newline=True):
     pywikibot.stdout(f"<<lightred>>{text}<<default>>", newline=newline)
 
 
-def findCandidates(page_name, delist):
+def findCandidates(list_page_name, delist):
     """
     Returns a list with candidate objects for all nomination subpages,
     either from the page with the current candidates or from a log page
@@ -1814,9 +1816,9 @@ def findCandidates(page_name, delist):
     (so the returned candidate objects point to the actual nominations)
     and the page with the list of candidates is updated.
 
-    @param page_name The name either of the page with the current candidates
-        or of the log page that we want to check.
-    @param delist    Specify True to get only delist nominations,
+    @param list_page_name The name either of the page with the list of
+        current candidates or of the log page that we want to check.
+    @param delist         Specify True to get only delist nominations,
         False to get only FP nominations.
     """
     # Extract nomination subpage names
@@ -1824,13 +1826,13 @@ def findCandidates(page_name, delist):
         f"Extracting {'delist' if delist else 'FP'} candidates, "
         "checking for redirects..."
     )
-    page = pywikibot.Page(G_Site, page_name)
+    page = pywikibot.Page(G_Site, list_page_name)
     try:
         old_text = page.get(get_redirect=False)
     except pywikibot.exceptions.PageRelatedError as exc:
-        error(f"Error - can't read candidate list '{page_name}': {exc}.")
+        error(f"Error - can't read candidate list '{list_page_name}': {exc}.")
         ask_for_help(
-            f"There was an error reading the candidate list [[{page_name}]]: "
+            f"The bot cannot read the candidate list [[{list_page_name}]]: "
             f"{exc} This is a serious problem, please check the page."
         )
         return []
@@ -1840,9 +1842,9 @@ def findCandidates(page_name, delist):
         without_comments,
     )
     if not subpage_entries:
-        error(f"Error - no candidates found in '{page_name}'.")
+        error(f"Error - no candidates found in '{list_page_name}'.")
         ask_for_help(
-            f"The candidate list [[{page_name}]] does not appear "
+            f"The candidate list [[{list_page_name}]] does not appear "
             "to contain a single nomination. That is a bit peculiar. "
             "Please check whether this is correct or not."
         )
@@ -1867,7 +1869,7 @@ def findCandidates(page_name, delist):
             error(f"Error - nomination '{subpage_name}' not found, ignoring.")
             ask_for_help(
                 list_includes_missing_subpage.format(
-                    list=page_name, subpage=subpage_name
+                    list=list_page_name, subpage=subpage_name
                 )
             )
             continue
@@ -1890,7 +1892,7 @@ def findCandidates(page_name, delist):
             out(f"Nomination '{subpage_name}' has been renamed to '{new_name}'")
             redirects.append((full_entry, f'{{{{{new_name}}}}}'))
         # OK, seems the nomination is fine -- append candidate object
-        candidates.append(candidate_class(subpage))
+        candidates.append(candidate_class(subpage, list_page_name))
 
     # If we have found any redirects, update the candidates page
     if redirects:
@@ -1904,13 +1906,13 @@ def findCandidates(page_name, delist):
     return candidates
 
 
-def checkCandidates(check, page, delist, descending=True):
+def checkCandidates(check, list_page_name, delist, descending=True):
     """
     Calls a function on each candidate found on the specified page.
 
     @param check      A method of the Candidate class which should be called
         on each candidate.
-    @param page       A page which includes all nominations as templates;
+    @param list_page_name The name of the page which includes all nominations;
         i.e. either the page with the list of current candidates
         or a log page that we want to check for test purposes.
     @param delist     Specify True to get only delist nominations,
@@ -1923,7 +1925,7 @@ def checkCandidates(check, page, delist, descending=True):
         G_Site.login()
 
     # Find all current candidates
-    candidates = findCandidates(page, delist)
+    candidates = findCandidates(list_page_name, delist)
     if not candidates:
         out(
             f"Found no {'delist' if delist else 'FP'} candidates"
@@ -2381,8 +2383,8 @@ def main(*args):
     global G_Site
 
     # Define local constants and default values
-    candidates_page = "Commons:Featured picture candidates/candidate_list"
-    testLog = "Commons:Featured_picture_candidates/Log/January_2025"
+    candidates_page = "Commons:Featured picture candidates/candidate list"
+    test_log = "Commons:Featured picture candidates/Log/January 2025"
     delist = False
     fpc = False
 
@@ -2467,7 +2469,7 @@ def main(*args):
                     out("Recounting votes for FP candidates...", heading=True)
                     checkCandidates(
                         Candidate.compareResultToCount,
-                        testLog,
+                        test_log,
                         delist=False,
                         descending=False,
                     )
