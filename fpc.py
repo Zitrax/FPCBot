@@ -123,6 +123,9 @@ class Candidate(abc.ABC):
         self._alternative = None
         self._setFiles = None
         self._listPageName = None
+        self._creator = None    # Username of the original creator
+        self._uploader = {}     # Mapping: filename -> username of uploader
+        self._nominator = None  # Username of the nominator
 
     def printAllInfo(self):
         """
@@ -149,34 +152,53 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.NoPageError:
             error("%s: -- No such page -- " % self.cutTitle())
 
-    def nominator(self, link=True):
-        """Return the link to the user that nominated this candidate."""
-        history = self.page.revisions(reverse=True, total=1)
-        for data in history:
-            username = data.user
-        if not history:
-            return "Unknown"
-        if link:
-            return "[[User:%s|%s]]" % (username, username)
-        else:
-            return username
-
-    def creator(self, link=True):
+    def creator(self, link):
         """
-        Returns the name of the user who has originally created the image.
+        Returns the name of the user who has originally created the image(s).
         There is no generally applicable way to determine the creator.
         Therefore nominators should use the phrase
             '{{Info}} ... created by [[User:...]]'
         on the nomination subpage in order to identify the original creator.
         We also allow the common variant 'created and <adverb?> uploaded by'.
         If this phrase is present, the method returns the username
-        (if 'link' is True, as '[[User:...|...]]'), else just None.
+        (if 'link' is True, a link to the user page), else just ''.
         """
-        wikitext = self.page.get(get_redirect=True)
-        if match := CreatorNameR.search(wikitext):
-            username = match.group(1).strip()
-            return f"[[User:{username}|{username}]]" if link else username
-        return None
+        if self._creator is None:
+            wikitext = self.page.get(get_redirect=True)
+            if match := CreatorNameR.search(wikitext):
+                self._creator = match.group(1).strip()
+            else:
+                self._creator = ""
+        if self._creator and link:
+            return user_page_link(self._creator)
+        return self._creator
+
+    def uploader(self, filename, link):
+        """
+        Returns the name of the user who has uploaded the original version
+        of the image; if link is True, returns a link to the user page.
+        (This method works differently than nominator() because all files of
+        a set must have the same nominator, but can have different uploaders.)
+        """
+        try:
+            username = self._uploader[filename]
+        except KeyError:
+            username = oldest_revision_user(pywikibot.Page(G_Site, filename))
+            self._uploader[filename] = username
+        if username:
+            return user_page_link(username) if link else username
+        return "Unknown"
+
+    def nominator(self, link):
+        """
+        Returns the name of the user who has created the nomination;
+        if link is True, returns a link to the nominator's user page.
+        """
+        if self._nominator is None:
+            self._nominator = oldest_revision_user(self.page)
+        if self._nominator:
+            return user_page_link(self._nominator) if link else self._nominator
+        return "Unknown"
 
     def isSet(self):
         """
@@ -1108,7 +1130,7 @@ class Candidate(abc.ABC):
             title = self.cleanTitle(alternative=True)
             message = f"Added [[{filename}]]"
         creator_link = self.creator(link=True)
-        uploader_link = uploader(filename, link=True)
+        uploader_link = self.uploader(filename, link=True)
         nominator_link = self.nominator(link=True)
         if creator_link and creator_link != uploader_link:
             # We omit the creator if the creator is identical to the uploader,
@@ -1239,7 +1261,7 @@ class Candidate(abc.ABC):
         for filename in files:
             # Check if nominator, uploader and creator are the same user,
             # to avoid adding two templates to the same talk page
-            uploader_name = uploader(filename, link=False)
+            uploader_name = self.uploader(filename, link=False)
             if uploader_name != nominator_name:
                 self._notifyUploaderAndCreator(
                     filename, True, uploader_name, ignored_pages
@@ -1981,18 +2003,22 @@ def strip_tag(text, tag):
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
 
 
-def uploader(file, link=True):
-    """Return the link to the user that uploaded the nominated image."""
-    page = pywikibot.Page(G_Site, file)
-    history = page.revisions(reverse=True, total=1)
-    for data in history:
-        username = data.user
-    if not history:
-        return "Unknown"
-    if link:
-        return "[[User:%s|%s]]" % (username, username)
-    else:
-        return username
+def user_page_link(username):
+    """Returns a link to the user page of the user."""
+    return f"[[User:{username}|{username}]]"
+
+
+def oldest_revision_user(page):
+    """
+    Returns the name of the user who has created the oldest (first) revision
+    of a page on Wikimedia Commons; on errors just returns ''.
+
+    @param page A pywikibot.Page object.
+    """
+    try:
+        return page.oldest_revision.user.strip()
+    except (pywikibot.exceptions.PageRelatedError, AttributeError):
+        return ""
 
 
 def findEndOfTemplate(text, template):
