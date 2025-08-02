@@ -589,7 +589,7 @@ class Candidate(abc.ABC):
 
     def isIgnored(self):
         """Some nominations currently require manual check."""
-        return self.imageCount() > 1
+        return self.imageCount() != 1
 
     def sectionCount(self):
         """Count the number of sections in this candidate."""
@@ -598,34 +598,25 @@ class Candidate(abc.ABC):
 
     def imageCount(self):
         """
-        Count the number of images that are displayed
-
-        Does not count images that are below a certain threshold
-        as they probably are just inline icons and not separate
-        edits of this candidate.
+        Counts the number of images in this nomination.
+        Ignores small images which are below a certain threshold
+        as they probably are just inline icons and not alternatives.
         """
-        if self._imgCount:
+        if self._imgCount is not None:
             return self._imgCount
-
         text = self.page.get(get_redirect=True)
-
-        matches = []
-        for m in re.finditer(ImagesR, text):
-            matches.append(m)
-
-        count = len(matches)
-
+        images = ImagesR.findall(text)
+        count = len(images)
         if count >= 2:
-            # We have several images, check if they are too small to be counted
-            for img in matches:
-
-                if re.search(ImagesThumbR, img.group(0)):
+            # We have several images, check if some of them are marked
+            # as thumbnails or are too small to be counted
+            for image_link, _ in images:
+                if ImagesThumbR.search(image_link):
                     count -= 1
                 else:
-                    s = re.search(ImagesSizeR, img.group(0))
-                    if s and (int(s.group(1)) <= 150):
+                    size = ImagesSizeR.search(image_link)
+                    if size and (int(size.group(1)) <= 150):
                         count -= 1
-
         self._imgCount = count
         return count
 
@@ -775,9 +766,8 @@ class Candidate(abc.ABC):
         self._fileName = PrefixR.sub("File:", self.page.title())
 
         if not pywikibot.Page(G_Site, self._fileName).exists():
-            match = re.search(ImagesR, self.page.get(get_redirect=True))
-            if match:
-                self._fileName = match.group(1)
+            if match := ImagesR.search(self.page.get(get_redirect=True)):
+                self._fileName = match.group(2)
 
         # Check if file was moved after nomination
         page = pywikibot.Page(G_Site, self._fileName)
@@ -2329,7 +2319,7 @@ WithdrawnR = re.compile(r"{{\s*(?:[wW]ithdrawn?|[fF]PD)\s*(\|.*)?}}", re.MULTILI
 # Nomination that contain the fpx template
 FpxR = re.compile(r"{{\s*FPX(\|.*)?}}", re.MULTILINE)
 # Counts the number of displayed images
-ImagesR = re.compile(r"\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\]")
+ImagesR = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
 # Look for a size specification of the image link
 ImagesSizeR = re.compile(r"\|.*?(\d+)\s*px")
 # Find if there is a thumb parameter specified
