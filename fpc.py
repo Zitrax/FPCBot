@@ -592,9 +592,10 @@ class Candidate(abc.ABC):
         return self.imageCount() != 1
 
     def sectionCount(self):
-        """Count the number of sections in this candidate."""
+        """Counts the number of sections in this nomination."""
         text = self.page.get(get_redirect=True)
-        return len(re.findall(SectionR, text))
+        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
+        return len(SectionR.findall(text))
 
     def imageCount(self):
         """
@@ -605,6 +606,7 @@ class Candidate(abc.ABC):
         if self._imgCount is not None:
             return self._imgCount
         text = self.page.get(get_redirect=True)
+        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
         images = ImagesR.findall(text)
         count = len(images)
         if count >= 2:
