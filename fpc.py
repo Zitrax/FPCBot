@@ -1970,23 +1970,34 @@ def checkCandidates(check, list_page_name, delist, descending=True):
 
 def filter_content(text):
     """
-    Will filter away content that should not be parsed.
+    Filter out all content that should not be taken into account
+    when counting votes etc.
 
     Currently this includes:
-    * The <s> tag for striking out votes
-    * The <nowiki> tag which is just for displaying syntax
-    * Image notes
-    * Html comments
-
+    * the <s> tag for striking out votes
+    * the <nowiki> tag which is just for displaying syntax
+    * image notes
+    * collapse boxes
+    * comments
     """
     text = strip_tag(text, "[Ss]")
     text = strip_tag(text, "[Nn]owiki")
     text = strip_tag(text, "[Ss]trike")
     text = strip_tag(text, "[Dd]el")
     text = re.sub(
-        r"(?s){{\s*[Ii]mageNote\s*\|.*?}}.*{{\s*[iI]mageNoteEnd.*?}}", "", text
+        r"\{\{\s*[Ii]mageNote\s*\|.*?\}\}.*?\{\{\s*[iI]mageNoteEnd.*?\}\}",
+        "",
+        text,
+        flags=re.DOTALL,
     )
-    text = re.sub(r"(?s)<!--.*?-->", "", text)
+    text = re.sub(
+        r"\{\{\s*[Cc](?:ollapse[ _]top|ot)\s*\|.*?\}\}.*?"
+        r"\{\{\s*[Cc](?:ollapse[ _]bottom|ob)\s*\}\}",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     return text
 
 
