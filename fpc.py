@@ -1155,76 +1155,81 @@ class Candidate(abc.ABC):
 
         @param files List with filename(s) of the featured picture or set.
         """
-        talk_link = "User talk:%s" % self.nominator(link=False)
+        # Get and read nominator talk page
+        talk_link = "User talk:" + self.nominator(link=False)
         talk_page = pywikibot.Page(G_Site, talk_link)
-
+        ignoring = "but ignoring since it's just the nominator notification."
         try:
             old_text = talk_page.get(get_redirect=True)
         except pywikibot.exceptions.NoPageError:
             # Undefined user talk pages are uncommon because every new user
             # is welcomed by an automatic message.  So better stop here.
-            warn(
-                "The user talk page '%s' is undefined, but ignoring "
-                "since it's just the nominator notification." % talk_link
-            )
+            warn(f"The user talk page '{talk_link}' is undefined, {ignoring}")
             return
-
-        fn_or = self.fileName(alternative=False)  # Original filename
-        fn_al = self.fileName(alternative=True)  # Alternative filename
-
-        # First check if we are already on the page,
-        # in that case skip. Can happen if the process
-        # have been previously interrupted.
-
-        # We add the subpage parameter if the original filename
-        # differs from the alternative filename.
-        subpage = "|subpage=%s" % fn_or if fn_or != fn_al else ""
-
-        # notification for set candidates should add a gallery to talk page and
-        # it should be special compared to usual promotions.
 
         if self.isSet():
-            if re.search(r"{{FPpromotionSet\|%s}}" % wikipattern(fn_al), old_text):
+            # Notifications for set nominations add a gallery to the talk page
+            # and use a special template with an appropriate message.
+            # The template links to the full name of the nomination subpage.
+            # Because set nominations cannot have alternative versions,
+            # we do not need the 'subpage' parameter.
+            nomination_link = self.page.title()
+            set_title = self.cleanSetTitle(keep_set=False)
+            template = f"{{{{FPpromotionSet|{nomination_link}}}}}"
+            # Check if there already is a promotion template on the talk page.
+            # This can happen if the process has previously been interrupted.
+            if re.search(wikipattern(template), old_text):
+                out(
+                    f"Skipping notifyNominator() for set '{set_title}', "
+                    f"promotion template is already present at '{talk_link}'."
+                )
                 return
-            new_text = old_text + "\n\n== Set Promoted to FP ==\n<gallery mode=packed heights=80px>\n%s\n</gallery>\n{{FPpromotionSet|%s%s}} /~~~~" % (
-                "\n".join(files),
-                fn_al,
-                subpage,
+            entries = "\n".join(files)
+            new_text = (
+                f"{old_text.rstrip()}\n"
+                "\n"
+                "== Set Promoted to FP ==\n"
+                "<gallery mode=packed heights=80px>\n"
+                f"{entries}\n"
+                "</gallery>\n"
+                f"{template} /~~~~"
             )
-            try:
-                commit(
-                    old_text, new_text, talk_page, "FP promotion of [[%s]]" % fn_al
-                )
-            except pywikibot.exceptions.LockedPageError:
-                warn(
-                    "The user talk page '%s' is locked, but ignoring "
-                    "since it's just the nominator notification." % talk_link
-                )
-            return
+            message = f"FP promotion of set [[{nomination_link}|{set_title}]]"
+
         else:
-            pass
-
-        if re.search(r"{{FPpromotion\|%s}}" % wikipattern(fn_or), old_text):
-            out(
-                "Skipping notifyNominator() for '%s', promotion template "
-                "is already present at '%s'." % (self.page.title(), talk_link)
+            # Single FP nomination
+            filename = files[0]
+            # We need the 'subpage' parameter if the name of the selected image
+            # differs from the name of the nomination subpage
+            # (because an alternative version was promoted etc.).
+            # NB: In this case we must keep the 'File:' prefix.
+            subpage_name = self.fileName(alternative=False)
+            subpage_param = (
+                f"|subpage={subpage_name}" if (filename != subpage_name)
+                else ""
             )
-            return
+            template = f"{{{{FPpromotion|{filename}{subpage_param}}}}}"
+            # Check if there already is a promotion template on the talk page.
+            # This can happen if the process has previously been interrupted.
+            if re.search(wikipattern(template), old_text):
+                out(
+                    f"Skipping notifyNominator() for '{filename}', "
+                    f"promotion template is already present at '{talk_link}'."
+                )
+                return
+            new_text = (
+                f"{old_text.rstrip()}\n"
+                "\n"
+                "== FP Promotion ==\n"
+                f"{template} /~~~~"
+            )
+            message = f"FP promotion of [[{filename}]]"
 
-        new_text = old_text + "\n\n== FP Promotion ==\n{{FPpromotion|%s%s}} /~~~~" % (
-            fn_al,
-            subpage,
-        )
-
+        # Commit the new text
         try:
-            commit(
-                old_text, new_text, talk_page, "FP promotion of [[%s]]" % fn_al
-            )
+            commit(old_text, new_text, talk_page, message)
         except pywikibot.exceptions.LockedPageError:
-            warn(
-                "The user talk page '%s' is locked, but ignoring "
-                "since it's just the nominator notification." % talk_link
-            )
+            warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
 
     def notifyUploaderAndCreator(self, files):
         """
