@@ -1278,7 +1278,7 @@ class Candidate(abc.ABC):
             # to avoid adding two templates to the same talk page
             uploader_name = self.uploader(filename, link=False)
             if uploader_name != nominator_name:
-                self._notifyUploaderAndCreator(
+                self._notifyUploaderOrCreator(
                     filename, True, uploader_name, ignored_pages, redirects
                 )
             else:
@@ -1291,7 +1291,7 @@ class Candidate(abc.ABC):
                 and creator_name != nominator_name
                 and creator_name != uploader_name
             ):
-                self._notifyUploaderAndCreator(
+                self._notifyUploaderOrCreator(
                     filename, False, creator_name, ignored_pages, redirects
                 )
             else:
@@ -1304,7 +1304,7 @@ class Candidate(abc.ABC):
                     )
                 )
 
-    def _notifyUploaderAndCreator(
+    def _notifyUploaderOrCreator(
         self, filename, is_uploader, username, ignored_pages, redirects
     ):
         """Subroutine which implements the uploader/creator notification."""
