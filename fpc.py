@@ -1160,12 +1160,27 @@ class Candidate(abc.ABC):
         talk_page = pywikibot.Page(G_Site, talk_link)
         ignoring = "but ignoring since it's just the nominator notification."
         try:
-            old_text = talk_page.get(get_redirect=True)
+            old_text = talk_page.get(get_redirect=False)
         except pywikibot.exceptions.NoPageError:
             # Undefined user talk pages are uncommon because every new user
             # is welcomed by an automatic message.  So better stop here.
             warn(f"The user talk page '{talk_link}' is undefined, {ignoring}")
             return
+        except pywikibot.exceptions.IsRedirectPageError:
+            # Try to resolve the redirect
+            try:
+                talk_page = talk_page.getRedirectTarget()
+                old_text = talk_page.get(get_redirect=False)
+            except pywikibot.exceptions.PageRelatedError:
+                # Circular, nested or invalid redirect etc.
+                warn(
+                    f"The user talk page '{talk_link}' was moved "
+                    f"and the redirect is invalid, {ignoring}"
+                )
+                return
+            new_talk_link = talk_page.title()
+            out(f"User talk page redirect: '{talk_link}' -> '{new_talk_link}'")
+            talk_link = new_talk_link  # Update the talk page name.
 
         if self.isSet():
             # Notifications for set nominations add a gallery to the talk page
@@ -1255,6 +1270,7 @@ class Candidate(abc.ABC):
         @param files List with filename(s) of the featured picture or set.
         """
         ignored_pages = set()
+        redirects = {}  # Mapping: old page name -> new page name
         nominator_name = self.nominator(link=False)
         creator_name = self.creator(link=False)
         for filename in files:
@@ -1263,7 +1279,7 @@ class Candidate(abc.ABC):
             uploader_name = self.uploader(filename, link=False)
             if uploader_name != nominator_name:
                 self._notifyUploaderAndCreator(
-                    filename, True, uploader_name, ignored_pages
+                    filename, True, uploader_name, ignored_pages, redirects
                 )
             else:
                 out(
@@ -1276,7 +1292,7 @@ class Candidate(abc.ABC):
                 and creator_name != uploader_name
             ):
                 self._notifyUploaderAndCreator(
-                    filename, False, creator_name, ignored_pages
+                    filename, False, creator_name, ignored_pages, redirects
                 )
             else:
                 out(
@@ -1289,7 +1305,7 @@ class Candidate(abc.ABC):
                 )
 
     def _notifyUploaderAndCreator(
-        self, filename, is_uploader, username, ignored_pages
+        self, filename, is_uploader, username, ignored_pages, redirects
     ):
         """Subroutine which implements the uploader/creator notification."""
         if is_uploader:
@@ -1305,15 +1321,34 @@ class Candidate(abc.ABC):
         if talk_link in ignored_pages:
             # Don't load or report undefined or locked talk pages twice
             return
+        talk_link = redirects.get(talk_link, talk_link)
         talk_page = pywikibot.Page(G_Site, talk_link)
         try:
-            old_text = talk_page.get(get_redirect=True)
+            old_text = talk_page.get(get_redirect=False)
         except pywikibot.exceptions.NoPageError:
             # Undefined user talk pages are uncommon because every new user
             # is welcomed by an automatic message.  So better stop here.
             warn(f"The user talk page '{talk_link}' is undefined, {ignoring}")
             ignored_pages.add(talk_link)
             return
+        except pywikibot.exceptions.IsRedirectPageError:
+            # Try to resolve the redirect
+            try:
+                talk_page = talk_page.getRedirectTarget()
+                old_text = talk_page.get(get_redirect=False)
+            except pywikibot.exceptions.PageRelatedError:
+                # Circular, nested or invalid redirect etc.
+                warn(
+                    f"The user talk page '{talk_link}' was moved "
+                    f"and the redirect is invalid, {ignoring}"
+                )
+                ignored_pages.add(talk_link)
+                return
+            # Record redirect to avoid repeated resolving, update variable
+            new_talk_link = talk_page.title()
+            redirects[talk_link] = new_talk_link
+            out(f"User talk page redirect: '{talk_link}' -> '{new_talk_link}'")
+            talk_link = new_talk_link
 
         # We need the 'subpage' parameter for sets or if the alternative
         # filename differs from the original filename.
