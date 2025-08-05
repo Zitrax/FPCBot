@@ -1185,12 +1185,12 @@ class Candidate(abc.ABC):
         if self.isSet():
             # Notifications for set nominations add a gallery to the talk page
             # and use a special template with an appropriate message.
-            # The template links to the full name of the nomination subpage.
+            # Since August 2025 we use an improved version of the template.
             # Because set nominations cannot have alternative versions,
             # we do not need the 'subpage' parameter.
             nomination_link = self.page.title()
             set_title = self.cleanSetTitle(keep_set=False)
-            template = f"{{{{FPpromotionSet|{nomination_link}}}}}"
+            template = f"{{{{FPpromotionSet2|{set_title}}}}}"
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
@@ -1199,12 +1199,14 @@ class Candidate(abc.ABC):
                     f"promotion template is already present at '{talk_link}'."
                 )
                 return
-            entries = "\n".join(files)
+            entries = "\n".join(
+                f"  {filename}|{bare_filename(filename)}" for filename in files
+            )
             new_text = (
                 f"{old_text.rstrip()}\n"
                 "\n"
                 "== Set Promoted to FP ==\n"
-                "<gallery mode=packed heights=80px>\n"
+                '<gallery mode="packed-hover" heights="80px">\n'
                 f"{entries}\n"
                 "</gallery>\n"
                 f"{template} /~~~~"
@@ -2046,6 +2048,20 @@ def filter_content(text):
 def strip_tag(text, tag):
     """Will simply take a tag and remove a specified tag."""
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
+
+
+def bare_filename(filename):
+    """
+    Returns the bare filename without 'File:' prefix and w/o file extension.
+    Useful if we need the bare filename not of the current candidate
+    (for that use Candidate.cleanTitle()), but of an arbitrary image file.
+    """
+    return re.sub(
+        r"^(?:[Ff]ile|[Ii]mage):(.+?)\.\w{2,4}$",
+        r"\1",
+        filename,
+        count=1,
+    ).strip()
 
 
 def user_page_link(username):
