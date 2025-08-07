@@ -778,6 +778,32 @@ class Candidate(abc.ABC):
 
         return self._fileName
 
+    def subpageName(self, keep_prefix=True):
+        """
+        Returns the name of the nomination subpage for this candidate
+        without the leading 'Commons:Featured picture candidates/'
+        (if you want to include it, just call 'self.page.title()' instead).
+        Adjust the 'keep_prefix' parameter to get tailor-made values
+        for the 'com-nom' and 'subpage' parameters of the {{Assessments}}
+        and user notification templates:
+        for {{Assessments}}, pass False to remove the 'File:'/'Image:',
+        'Set/' and 'removal/' prefixes (plus their combinations);
+        for the user notification templates, pass True to keep these parts
+        without any normalization.
+        A trailing '/2', '/3' ... (for repeated noms) is always retained.
+        """
+        name = self.page.title()
+        name = name.replace('_', ' ')
+        name = re.sub(wikipattern(candPrefix), "", name, count=1).strip()
+        if not keep_prefix:
+            name = re.sub(
+                r"^(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:) *",
+                "",
+                name,
+                count=1,
+            )
+        return name
+
     def addToFeaturedList(self, gallery, files):
         """
         Adds the new featured picture to the list with recently
@@ -983,33 +1009,24 @@ class Candidate(abc.ABC):
         @param files List with filename(s) of the featured picture or set.
         """
         AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
-        for file in files:
-            page = pywikibot.Page(G_Site, file)
+        subpage_name = self.subpageName(keep_prefix=False)
+        for filename in files:
+            page = pywikibot.Page(G_Site, filename)
             current_page = page
             old_text = page.get(get_redirect=True)
-            fn_or = self.fileName(alternative=False)  # Original filename
-            fn_al = self.fileName(alternative=True)  # Alternative filename
 
-            # We need the 'com-nom' parameter for sets or if the alternative
-            # filename differs from the original filename.
-            if self.isSet():
-                comnom = "|com-nom=" + self.cleanSetTitle(keep_set=False)
-            elif fn_al != fn_or:
-                comnom = "|com-nom=" + fn_or.replace("File:", "", 1)
-            else:
-                comnom = ""
-
-            # First check if there already is an assessments template on the page
-            match = re.search(AssR, old_text)
-            if match:
-                # Make sure to remove any existing com/features or subpage params
-                # TODO: 'subpage' is the old name of 'com-nom'. Can be removed later.
+            # Is there already an {{Assessments}} template for this file?
+            if match := re.search(AssR, old_text):
+                # There is already an {{Assessments}} template, so update it.
+                # We must remove any existing 'featured', 'com-nom', 'subpage'
+                # parameters because they are probably outdated.
+                # TODO: 'subpage' is an old name of 'com-nom', remove it later.
                 params = re.sub(r"\|\s*featured\s*=\s*\d+", "", match.group(1))
                 params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
-                params += "|featured=1"
-                params += comnom
-                if params[0] != "|":
+                params = params.strip()  # Required by the following test.
+                if params and params[0] != "|":
                     params = "|" + params
+                params += "|featured=1|com-nom=" + subpage_name
                 new_text = (
                     old_text[:match.start(0)]
                     + "{{Assessments%s}}" % params
@@ -1020,11 +1037,11 @@ class Candidate(abc.ABC):
                     # but continue to check other files (for set nominations)
                     out(
                         "Skipping addAssessments() for '%s', "
-                        "image is already featured." % file
+                        "image is already featured." % filename
                     )
                     continue
             else:
-                # There is no assessments template so just add it
+                # There is no {{Assessments}} template, so just add a new one
                 if re.search(r"\{\{(?:|\s*)[Ll]ocation", old_text):
                     end = findEndOfTemplate(old_text, "[Ll]ocation")
                 elif re.search(r"\{\{(?:|\s*)[Oo]bject[_\s][Ll]ocation", old_text):
@@ -1033,7 +1050,7 @@ class Candidate(abc.ABC):
                     end = findEndOfTemplate(old_text, "[Ii]nformation")
                 new_text = (
                     old_text[:end]
-                    + "\n{{Assessments|featured=1%s}}\n" % comnom
+                    + "\n{{Assessments|featured=1|com-nom=%s}}\n" % subpage_name
                     + old_text[end:]
                 )
             commit(old_text, new_text, current_page, "FP promotion")
@@ -1182,15 +1199,16 @@ class Candidate(abc.ABC):
             out(f"User talk page redirect: '{talk_link}' -> '{new_talk_link}'")
             talk_link = new_talk_link  # Update the talk page name.
 
+        subpage_name = self.subpageName(keep_prefix=True)
         if self.isSet():
             # Notifications for set nominations add a gallery to the talk page
             # and use a special template with an appropriate message.
             # Since August 2025 we use an improved version of the template.
-            # Because set nominations cannot have alternative versions,
-            # we do not need the 'subpage' parameter.
             nomination_link = self.page.title()
             set_title = self.cleanSetTitle(keep_set=False)
-            template = f"{{{{FPpromotionSet2|{set_title}}}}}"
+            template = (
+                f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
+            )
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
@@ -1216,16 +1234,7 @@ class Candidate(abc.ABC):
         else:
             # Single FP nomination
             filename = files[0]
-            # We need the 'subpage' parameter if the name of the selected image
-            # differs from the name of the nomination subpage
-            # (because an alternative version was promoted etc.).
-            # NB: In this case we must keep the 'File:' prefix.
-            subpage_name = self.fileName(alternative=False)
-            subpage_param = (
-                f"|subpage={subpage_name}" if (filename != subpage_name)
-                else ""
-            )
-            template = f"{{{{FPpromotion|{filename}{subpage_param}}}}}"
+            template = f"{{{{FPpromotion|{filename}|subpage={subpage_name}}}}}"
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
@@ -1352,19 +1361,9 @@ class Candidate(abc.ABC):
             out(f"User talk page redirect: '{talk_link}' -> '{new_talk_link}'")
             talk_link = new_talk_link
 
-        # We need the 'subpage' parameter for sets or if the alternative
-        # filename differs from the original filename.
-        # NB that in this case we must keep the 'Set/' or 'File:' prefix.
-        fn_or = self.fileName(alternative=False)  # Original filename
-        fn_al = self.fileName(alternative=True)  # Alternative filename
-        if self.isSet():
-            subpage_param = "|subpage=" + self.cleanSetTitle(keep_set=True)
-            fn_al = filename
-        elif fn_al != fn_or:
-            subpage_param = "|subpage=" + fn_or
-        else:
-            subpage_param = ""
-        template = f"{{{{{tmpl_name}|{fn_al}{subpage_param}}}}}"
+        # Assemble the template
+        subpage_name = self.subpageName(keep_prefix=True)
+        template = f"{{{{{tmpl_name}|{filename}|subpage={subpage_name}}}}}"
 
         # Check if there already is a promotion template for the file
         # on the user talk page.  If yes, we skip that file.
@@ -1382,7 +1381,7 @@ class Candidate(abc.ABC):
             "== FP Promotion ==\n"
             f"{template} /~~~~"
         )
-        message = f"FP promotion of [[{fn_al}]]"
+        message = f"FP promotion of [[{filename}]]"
         try:
             commit(old_text, new_text, talk_page, message)
         except pywikibot.exceptions.LockedPageError:
