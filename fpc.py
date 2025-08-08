@@ -706,91 +706,61 @@ class Candidate(abc.ABC):
         )
 
     def cutTitle(self):
-        """Returns a fixed width title."""
-        title = (
-            self.cleanSetTitle(keep_set=True) if self.isSet()
-            else PrefixR.sub("", self.page.title(), count=1)
-        )
+        """Returns a fixed width title for the nomination."""
+        title = self.subpageName(keep_prefix=False, keep_number=True)
+        # We skip 'removal/', 'File:' etc., but 'Set/' is informative
+        if self.isSet():
+            title = f"Set/{title}"
         return title[0:50].ljust(50)
 
-    def cleanTitle(self, alternative=True, keepExtension=False):
+    def fileName(self):
         """
-        Returns the title of the nomination subpage, i.e. normally the name
-        of the nominated image, without prefix and (optionally) w/o extension.
-        If the 'alternative' parameter is set to True, we operate
-        on the 'alternative' filename instead (this is effective *only*
-        if the property 'self._alternative' is defined, i.e. during
-        the parking procedure of a successful FP candidate).
+        Returns the filename of this candidate
+        (for set nominations, use setFiles() instead).
         """
-        if alternative and self._alternative:
-            title = re.sub(r"^(?:[Ff]ile|[Ii]mage): *", "", self._alternative)
-        else:
-            title = PrefixR.sub("", self.page.title(), count=1)
-        title = title.rstrip()
-        # We must also remove the trailing '/2', '/3' etc. of repeated noms:
-        title = re.sub(r"/ *[0-9]+$", "", title)
-        if keepExtension:
-            return title
-        else:
-            return re.sub(r"\.\w{2,4}\s*$", "", title)
-
-    def cleanSetTitle(self, keep_set=False):
-        """
-        Returns the title of a set nomination without the leading
-        'Commons:Featured picture candidates/' and (optionally)
-        without the 'Set/' part.  Strips leading/trailing whitespace.
-        """
-        title = self.page.title()
-        if match := re.search(r"/ *([Ss]et */(.+))$", title):
-            title = match.group(1) if keep_set else match.group(2)
-        else:
-            error(
-                f"Error - called cleanSetTitle() on '{title}' "
-                "which does not look like a set."
-            )
-        return title.strip()
-
-    def fileName(self, alternative=True):
-        """
-        Return only the filename of this candidate
-        This is first based on the title of the page but if that page is not found
-        then the first image link in the page is used.
-        Will return the new file name if moved.
-        @param alternative if false disregard any alternative and return the real filename
-        """
-        if alternative and self._alternative:
+        # Try the selected alternative or a cached result first
+        if self._alternative:
             return self._alternative
-
         if self._fileName:
             return self._fileName
 
-        # Remove nomination page prefix and use standard 'File:' namespace
-        self._fileName = PrefixR.sub("File:", self.page.title())
+        # Try to derive the filename from the name of the nomination subpage,
+        # using the standard 'File:' namespace
+        filename = PrefixR.sub("File:", self.page.title())
+        filename = re.sub(r" */ *\d+ *$", "", filename)  # Remove '/2' etc.
 
-        if not pywikibot.Page(G_Site, self._fileName).exists():
+        # If there is no file with that name, use the name of the first image
+        # on the nomination subpage instead
+        if not pywikibot.Page(G_Site, filename).exists():
             if match := ImagesR.search(self.page.get(get_redirect=True)):
-                self._fileName = match.group(2)
+                filename = match.group(2)
 
-        # Check if file was moved after nomination
-        page = pywikibot.Page(G_Site, self._fileName)
-        if page.isRedirectPage():
-            self._fileName = page.getRedirectTarget().title()
+        # Check if the image was renamed and try to resolve the redirect
+        page = pywikibot.Page(G_Site, filename)
+        if page.exists() and page.isRedirectPage():
+            filename = page.getRedirectTarget().title()
+        # TODO: Add more tests, catch exceptions, report missing files, etc.!
 
-        return self._fileName
+        filename = filename.replace('_', ' ')
+        self._fileName = filename
+        return filename
 
-    def subpageName(self, keep_prefix=True):
+    def subpageName(self, keep_prefix=True, keep_number=True):
         """
         Returns the name of the nomination subpage for this candidate
         without the leading 'Commons:Featured picture candidates/'
         (if you want to include it, just call 'self.page.title()' instead).
-        Adjust the 'keep_prefix' parameter to get tailor-made values
-        for the 'com-nom' and 'subpage' parameters of the {{Assessments}}
-        and user notification templates:
-        for {{Assessments}}, pass False to remove the 'File:'/'Image:',
-        'Set/' and 'removal/' prefixes (plus their combinations);
-        for the user notification templates, pass True to keep these parts
-        without any normalization.
-        A trailing '/2', '/3' ... (for repeated noms) is always retained.
+
+        Use 'keep_number=True' and adjust the 'keep_prefix' parameter
+        to get tailor-made values for the 'com-nom' and 'subpage' parameters
+        of the {{Assessments}} and user notification templates:
+        for {{Assessments}}, pass 'keep_prefix=False' to remove the 'Set/',
+        'removal/', and 'File:'/'Image:' prefixes (plus their combinations);
+        for the user notification templates, pass 'keep_prefix=True' to keep
+        these parts without any normalization.
+
+        Use 'keep_prefix=False, keep_number=False' to get a clean title
+        for the nomination, e.g. as title for a set nomination.
         """
         name = self.page.title()
         name = name.replace('_', ' ')
@@ -802,6 +772,8 @@ class Candidate(abc.ABC):
                 name,
                 count=1,
             )
+        if not keep_number:  # Remove trailing '.../2' etc. of repeated noms.
+            name = re.sub(r" */ *\d+ *$", "", name, count=1)
         return name
 
     def addToFeaturedList(self, gallery, files):
@@ -893,10 +865,6 @@ class Candidate(abc.ABC):
                 f"{please_check_gallery_and_sort_fps}"
             )
             return
-        if self.isSet():
-            clean_title = self.cleanSetTitle(keep_set=False)
-        else:
-            clean_title = self.cleanTitle(alternative=True)
 
         # Check if some files are already on the page.
         # This can happen if the process has previously been interrupted.
@@ -913,7 +881,10 @@ class Candidate(abc.ABC):
             )
             return
         # Format the new entries and a summary for the message
-        new_entries = "".join(f"{file}|{clean_title}\n" for file in new_files)
+        new_entries = "".join(
+            f"{filename}|{bare_filename(filename)}\n"
+            for filename in new_files
+        )
         files_for_msg = f"[[{new_files[0]}]]"
         if len(new_files) > 1:
             files_for_msg += f" and {len(new_files) - 1} more set file(s)"
@@ -956,7 +927,7 @@ class Candidate(abc.ABC):
                 # Ouch, the page does not contain a single <gallery></gallery>
                 error(
                     "Error - found no 'Unsorted' section on "
-                    f"'{full_page_name}', can't add '{clean_title}'."
+                    f"'{full_page_name}', can't add '{new_files[0]}'."
                 )
                 ask_for_help(
                     f"The gallery page [[{full_page_name}]] which was "
@@ -1009,7 +980,7 @@ class Candidate(abc.ABC):
         @param files List with filename(s) of the featured picture or set.
         """
         AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
-        subpage_name = self.subpageName(keep_prefix=False)
+        subpage_name = self.subpageName(keep_prefix=False, keep_number=True)
         for filename in files:
             page = pywikibot.Page(G_Site, filename)
             current_page = page
@@ -1134,11 +1105,11 @@ class Candidate(abc.ABC):
 
         # Assemble the new entry and append it to the end of the gallery
         if self.isSet():
-            set_name = self.cleanSetTitle(keep_set=False)
+            set_name = self.subpageName(keep_prefix=False, keep_number=False)
             title = f"Set: {set_name} ({len(files)} files)"
             message = f"Added set [[{self.page.title()}|{set_name}]]"
         else:
-            title = self.cleanTitle(alternative=True)
+            title = bare_filename(filename)
             message = f"Added [[{filename}]]"
         creator_link = self.creator(link=True)
         uploader_link = self.uploader(filename, link=True)
@@ -1199,13 +1170,13 @@ class Candidate(abc.ABC):
             out(f"User talk page redirect: '{talk_link}' -> '{new_talk_link}'")
             talk_link = new_talk_link  # Update the talk page name.
 
-        subpage_name = self.subpageName(keep_prefix=True)
+        subpage_name = self.subpageName(keep_prefix=True, keep_number=True)
         if self.isSet():
             # Notifications for set nominations add a gallery to the talk page
             # and use a special template with an appropriate message.
             # Since August 2025 we use an improved version of the template.
             nomination_link = self.page.title()
-            set_title = self.cleanSetTitle(keep_set=False)
+            set_title = self.subpageName(keep_prefix=False, keep_number=False)
             template = (
                 f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
             )
@@ -1362,7 +1333,7 @@ class Candidate(abc.ABC):
             talk_link = new_talk_link
 
         # Assemble the template
-        subpage_name = self.subpageName(keep_prefix=True)
+        subpage_name = self.subpageName(keep_prefix=True, keep_number=True)
         template = f"{{{{{tmpl_name}|{filename}|subpage={subpage_name}}}}}"
 
         # Check if there already is a promotion template for the file
@@ -1736,6 +1707,8 @@ class DelistCandidate(Candidate):
         # the chance that we are there is very small and even
         # if we are we will soon be rotated away anyway.
         # So just check and remove the candidate from any gallery pages
+        filename = self.fileName()
+        fn_pattern = wikipattern(filename.replace("File:", ""))
         references = self.getImagePage().getReferences(with_template_inclusion=False)
         for ref in references:
             if ref.title().startswith("Commons:Featured pictures/"):
@@ -1744,22 +1717,20 @@ class DelistCandidate(Candidate):
                     old_text = ref.get(get_redirect=True)
                     now = datetime.datetime.now(datetime.UTC)
                     new_text = re.sub(
-                        r"(([Ff]ile|[Ii]mage):%s.*)\n"
-                        % wikipattern(self.cleanTitle(keepExtension=True)),
+                        r"(([Ff]ile|[Ii]mage):%s.*)\n" % fn_pattern,
                         r"\1 '''Delisted %d-%02d-%02d (%s-%s)'''\n"
                         % (now.year, now.month, now.day, results[1], results[0]),
                         old_text,
                     )
-                    summary = f"Delisted [[{self.fileName()}]]"
+                    summary = f"Delisted [[{filename}]]"
                 else:
                     old_text = ref.get(get_redirect=True)
                     new_text = re.sub(
-                        r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n"
-                        % wikipattern(self.cleanTitle(keepExtension=True)),
+                        r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n" % fn_pattern,
                         "",
                         old_text,
                     )
-                    summary = f"Removed [[{self.fileName()}]]"
+                    summary = f"Removed [[{filename}]]"
                 if new_text != old_text:
                     commit(old_text, new_text, ref, summary)
 
@@ -2053,8 +2024,7 @@ def strip_tag(text, tag):
 def bare_filename(filename):
     """
     Returns the bare filename without 'File:' prefix and w/o file extension.
-    Useful if we need the bare filename not of the current candidate
-    (for that use Candidate.cleanTitle()), but of an arbitrary image file.
+    Useful for labels, image captions, etc.
     """
     return re.sub(
         r"^(?:[Ff]ile|[Ii]mage):(.+?)\.\w{2,4}$",
