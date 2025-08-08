@@ -1750,9 +1750,7 @@ class DelistCandidate(Candidate):
                         % (now.year, now.month, now.day, results[1], results[0]),
                         old_text,
                     )
-                    commit(
-                        old_text, new_text, ref, "Delisted [[%s]]" % self.fileName()
-                    )
+                    summary = f"Delisted [[{self.fileName()}]]"
                 else:
                     old_text = ref.get(get_redirect=True)
                     new_text = re.sub(
@@ -1761,9 +1759,9 @@ class DelistCandidate(Candidate):
                         "",
                         old_text,
                     )
-                    commit(
-                        old_text, new_text, ref, "Removing [[%s]]" % self.fileName()
-                    )
+                    summary = f"Removed [[{self.fileName()}]]"
+                if new_text != old_text:
+                    commit(old_text, new_text, ref, summary)
 
     def removeAssessments(self):
         """Remove FP status from an image."""
@@ -1784,7 +1782,10 @@ class DelistCandidate(Candidate):
             new_text,
         )
 
-        commit(old_text, new_text, imagePage, "Delisted")
+        # Commit the text of the page if it has changed
+        if new_text != old_text:
+            summary = f"Delisted per [[{self.page.title()}]]"
+            commit(old_text, new_text, imagePage, summary)
 
 
 def wikipattern(s):
