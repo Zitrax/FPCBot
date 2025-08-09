@@ -1680,6 +1680,17 @@ class DelistCandidate(Candidate):
         Returns the results template to be added when closing a nomination.
         Implementation for delisting candidates.
         """
+        if self.imageCount() != 1 or self.isSet():
+            # A delist-and-replace or a set delisting nomination
+            return (
+                "{{FPC-delist-results-unreviewed"
+                "|delist=X|keep=X|neutral=X|delisted=X"
+                "|sig=<small>'''Note: This appears to be a delist-and-replace "
+                "or set delisting nomination (or something else special). "
+                "It must therefore be counted and processed manually.'''"
+                "</small> ~~~~}}"
+            )
+        # A simple delisting nomination
         return (
             "{{FPC-delist-results-unreviewed"
             f"|delist={self._pro}|keep={self._con}|neutral={self._neu}"
@@ -1688,15 +1699,38 @@ class DelistCandidate(Candidate):
         )
 
     def getCloseCommitComment(self):
-        return "Closing for review (%d delist, %d keep, %d neutral, delisted=%s)" % (
-            self._pro,
-            self._con,
-            self._neu,
-            "yes" if self.isPassed() else "no",
+        """Implementation for delisting candidates."""
+        if self.imageCount() != 1 or self.isSet():
+            # A delist-and-replace or a set delisting nomination
+            return (
+                "Closing for review - looks like a delist-and-replace "
+                "or set delisting nomination, needs manual count"
+            )
+        # A simple delisting nomination
+        return (
+            "Closing for review "
+            f"({self._pro} delist, {self._con} keep, {self._neu} neutral, "
+            f"delisted={'yes' if self.isPassed() else 'no'})"
         )
 
     def handlePassedCandidate(self, results):
-        # Delistings does not care about the gallery
+        """
+        Handle the parking procedure for a passed delisting candidate:
+        remove the image from FP gallery pages, mark it as delisted
+        in the chronological archives, update the {{Assessents}} template
+        and remove FP categories from the image description page, etc.
+        """
+        if self.imageCount() != 1 or self.isSet():
+            # Support for delist-and-replace nominations and set delisting
+            # is yet to be implemented.  Therefore ask for help and abort.
+            ask_for_help(
+                "The bot is not yet able to handle delist-and-replace "
+                "nominations or set delisting nominations. "
+                "Therefore, please take care of the images "
+                f"from the nomination [[{self.page.title()}]] "
+                "and remove or replace them manually."
+            )
+            return
         self.removeFromFeaturedLists(results)
         self.removeAssessments()
         self.moveToLog(self._proString)
