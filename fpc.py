@@ -1709,12 +1709,18 @@ class DelistCandidate(Candidate):
         # So just check and remove the candidate from any gallery pages
         filename = self.fileName()
         fn_pattern = wikipattern(filename.replace("File:", ""))
-        references = self.getImagePage().getReferences(with_template_inclusion=False)
-        for ref in references:
-            if ref.title().startswith("Commons:Featured pictures/"):
-                if ref.title().startswith("Commons:Featured pictures/chronological"):
-                    out("Adding delist note to %s" % ref.title())
-                    old_text = ref.get(get_redirect=True)
+        file_page = pywikibot.FilePage(G_Site, title=filename)
+        if not file_page.exists():
+            error(f"Error - image '{filename}' not found.")
+            return
+        using_pages = file_page.using_pages(
+            namespaces=["Commons"], filterredir=False
+        )
+        for page in using_pages:
+            if page.title().startswith("Commons:Featured pictures/"):
+                if page.title().startswith("Commons:Featured pictures/chronological"):
+                    out("Adding delist note to %s" % page.title())
+                    old_text = page.get(get_redirect=True)
                     now = datetime.datetime.now(datetime.UTC)
                     new_text = re.sub(
                         r"(([Ff]ile|[Ii]mage):%s.*)\n" % fn_pattern,
@@ -1724,7 +1730,7 @@ class DelistCandidate(Candidate):
                     )
                     summary = f"Delisted [[{filename}]]"
                 else:
-                    old_text = ref.get(get_redirect=True)
+                    old_text = page.get(get_redirect=True)
                     new_text = re.sub(
                         r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n" % fn_pattern,
                         "",
@@ -1732,7 +1738,7 @@ class DelistCandidate(Candidate):
                     )
                     summary = f"Removed [[{filename}]]"
                 if new_text != old_text:
-                    commit(old_text, new_text, ref, summary)
+                    commit(old_text, new_text, page, summary)
 
     def removeAssessments(self):
         """Remove FP status from an image."""
