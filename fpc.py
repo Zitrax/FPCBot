@@ -1731,16 +1731,19 @@ class DelistCandidate(Candidate):
                 "and remove or replace them manually."
             )
             return
-        self.removeFromFeaturedLists(results)
+        self.removeFromGalleryPages(results)
         self.removeAssessments()
         self.moveToLog(self._proString)
 
-    def removeFromFeaturedLists(self, results):
-        """Remove a candidate from all featured lists."""
-        # We skip checking the page with the 4 newest images
-        # the chance that we are there is very small and even
-        # if we are we will soon be rotated away anyway.
-        # So just check and remove the candidate from any gallery pages
+    def removeFromGalleryPages(self, results):
+        """
+        Remove a delisted FP from the FP gallery pages and mark its entry
+        in the chronological archive as delisted.
+        """
+        # We skip checking the FP landing page with the newest FPs;
+        # the chance that the image is still there is very small,
+        # and even then that page will soon be updated anyway.
+        nomination_link = self.page.title()
         filename = self.fileName()
         fn_pattern = wikipattern(filename.replace("File:", ""))
         file_page = pywikibot.FilePage(G_Site, title=filename)
@@ -1751,28 +1754,71 @@ class DelistCandidate(Candidate):
             namespaces=["Commons"], filterredir=False
         )
         for page in using_pages:
-            if page.title().startswith("Commons:Featured pictures/"):
-                if page.title().startswith("Commons:Featured pictures/chronological"):
-                    out("Adding delist note to %s" % page.title())
-                    old_text = page.get(get_redirect=True)
+            page_name = page.title()
+            if not page_name.startswith("Commons:Featured pictures/"):
+                # Any other page -- don't remove the image here, of course.
+                continue
+            try:
+                old_text = page.get(get_redirect=False)
+            except pywikibot.exceptions.PageRelatedError as exc:
+                error(f"Error - could not read {page_name}: {exc}")
+                continue
+            if page_name.startswith("Commons:Featured pictures/chronological"):
+                # Chronological archive page: mark the image as delisted
+                out(f"Adding delist note to '{page_name}'...")
+                if match := re.search(
+                    r"((?:[Ff]ile|[Ii]mage):%s.*)\n" % fn_pattern, old_text
+                ):
+                    if re.search(r"[Dd]elisted", match.group(1)):
+                        out(f"Already marked as delisted on '{page_name}'.")
+                        continue
                     now = datetime.datetime.now(datetime.UTC)
-                    new_text = re.sub(
-                        r"(([Ff]ile|[Ii]mage):%s.*)\n" % fn_pattern,
-                        r"\1 '''Delisted %d-%02d-%02d (%s-%s)'''\n"
-                        % (now.year, now.month, now.day, results[1], results[0]),
-                        old_text,
+                    entry = (
+                        # Entries often end with trailing spaces, strip them
+                        f"{match.group(1).rstrip()} "
+                        f"'''[[{nomination_link}|Delisted]] {now:%Y-%m-%d} "
+                        f"({results[1]}\u2013{results[0]})'''"
                     )
-                    summary = f"Delisted [[{filename}]]"
+                    new_text = (
+                        old_text[:match.start(1)]
+                        + entry
+                        + old_text[match.end(1):]
+                    )
                 else:
-                    old_text = page.get(get_redirect=True)
-                    new_text = re.sub(
-                        r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n" % fn_pattern,
-                        "",
-                        old_text,
+                    # Did not find the image.  That's OK e.g. for the overview
+                    # pages which include the archives of each half year,
+                    # therefore don't print an error here.
+                    out(
+                        f"Did not find '{filename}' on '{page_name}'; "
+                        "that's OK if this is just a transclusion page etc."
                     )
-                    summary = f"Removed [[{filename}]]"
-                if new_text != old_text:
+                    continue
+                summary = f"Delisted [[{filename}]] per [[{nomination_link}]]"
+            else:
+                # FP gallery page: remove the entry (line) with the image
+                out(f"Removing delisted image from '{page_name}'...")
+                new_text, n = re.subn(
+                    r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n" % fn_pattern,
+                    "",
+                    old_text,
+                )
+                if n == 0:
+                    error(
+                        f"Error - could not remove '{filename}' "
+                        f"from '{page_name}'."
+                    )
+                    continue
+                summary = f"Removed [[{filename}]] per [[{nomination_link}]]"
+            if new_text != old_text:
+                try:
                     commit(old_text, new_text, page, summary)
+                except pywikibot.exceptions.LockedPageError:
+                    error(f"Error - page '{page_name}' is locked.")
+            else:
+                error(
+                    f"Error - removing/delisting '{filename}' "
+                    f"did not work on '{page_name}'."
+                )
 
     def removeAssessments(self):
         """Remove FP status from an image."""
