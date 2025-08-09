@@ -965,10 +965,6 @@ class Candidate(abc.ABC):
             )
         commit(old_text, new_text, page, message)
 
-    def getImagePage(self):
-        """Get the image page itself."""
-        return pywikibot.Page(G_Site, self.fileName())
-
     def addAssessments(self, files):
         """
         Adds the {{Assessments}} template to the description page
