@@ -1821,28 +1821,84 @@ class DelistCandidate(Candidate):
                 )
 
     def removeAssessments(self):
-        """Remove FP status from an image."""
-        imagePage = self.getImagePage()
-        old_text = imagePage.get(get_redirect=True)
+        """Remove FP status from the image description page."""
+        # Get and read image description page
+        filename = self.fileName()
+        image_page = pywikibot.Page(G_Site, filename)
+        try:
+            old_text = image_page.get(get_redirect=False)
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"Error - can't read '{filename}': {exc}")
+            return
+        subpage_name = self.subpageName(keep_prefix=False, keep_number=True)
 
-        # First check for the old {{Featured picture}} template
+        # Update the {{Assessments}} template
+        # We have to replace 'featured=1' by '=2' and to update the name
+        # of the nomination subpage in the 'com-nom'/'subpage' parameter
+        # to make sure that the link in the template correctly points
+        # to the delist nomination (and not to the original nomination).
+        # The replacement strings use the '\g<1>' notation because r'\12'
+        # would be misinterpreted as backreference to (non-existent) group 12,
+        # and the name of the nomination subpage could start with a figure.
+        if match := AssessmentsR.search(old_text):
+            params = match.group(1)
+            params, n = re.subn(
+                r"(\|\s*(?:com|featured)\s*=\s*)\d",
+                r"\g<1>2",
+                params,
+                count=1,
+            )
+            if n == 0:
+                params += "|featured=2"
+            params, n = re.subn(
+                r"(\|\s*)(?:com-nom|subpage)(\s*=\s*)[^{}|\n]+",
+                r"\g<1>com-nom\g<2>" + subpage_name,
+                params,
+                count=1,
+            )
+            if n == 0:
+                params += f"|com-nom={subpage_name}"
+            new_text = (
+                old_text[:match.start(1)]
+                + params
+                + old_text[match.end(1):]
+            )
+        else:
+            error(f"Error - no {{{{Assessments}}}} found on '{filename}'.")
+            return
+
+        # Remove 'Featured pictures of/from/by ...' categories.
+        # We must not touch project-specific categories like
+        # 'Featured pictures on Wikipedia, <language>'.
         new_text = re.sub(
-            r"{{[Ff]eatured[ _]picture}}", "{{Delisted picture}}", old_text
+            r"\[\[[Cc]ategory: *Featured pictures (?!on ).+?\]\] *\n?",
+            "",
+            new_text,
         )
-
-        # Then check for the assessments template
-        # The replacement string needs to use the octal value for the char '2' to
-        # not confuse python as '\12\2' would obviously not work
         new_text = re.sub(
-            r"({{[Aa]ssessments\s*\|.*(?:com|featured)\s*=\s*)1(.*?}})",
-            r"\1\062\2",
+            r"\[\[[Cc]ategory: *Featured (?:[a-z -]+)?"
+            r"photo(?:graphs|graphy|s).*?\]\] *\n?",
+            "",
+            new_text,
+        )
+        new_text = re.sub(
+            r"\[\[[Cc]ategory: *Featured (?:diagrams|maps).*?\]\] *\n?",
+            "",
             new_text,
         )
 
         # Commit the text of the page if it has changed
         if new_text != old_text:
             summary = f"Delisted per [[{self.page.title()}]]"
-            commit(old_text, new_text, imagePage, summary)
+            try:
+                commit(old_text, new_text, image_page, summary)
+            except pywikibot.exceptions.LockedPageError:
+                error(f"Error - '{filename}' is locked.")
+        else:
+            error(
+                f"Error - removing FP status from '{filename}' "
+                f"did not work."
+            )
 
 
 def wikipattern(s):
@@ -2452,6 +2508,11 @@ ImagesThumbR = re.compile(r"\|\s*thumb\b")
 # Finds the last image link on a page
 LastImageR = re.compile(
     r"(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)"
+)
+# Finds the {{Assessments}} template on an image description page
+# (sometimes people break it into several lines, so use '\s' and re.DOTALL)
+AssessmentsR = re.compile(
+    r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
 )
 # Search nomination for the username of the original creator
 CreatorNameR = re.compile(
