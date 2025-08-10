@@ -776,6 +776,300 @@ class Candidate(abc.ABC):
             name = re.sub(r" */ *\d+ *$", "", name, count=1)
         return name
 
+    def moveToLog(self, reason=None):
+        """
+        Remove this candidate from the list of current candidates
+        and add it to the log for the current month.
+        Should only be called on closed and verified candidates.
+
+        This is the last step of the parking procedure for FP candidates
+        as well as for delisting candidates.
+        """
+        subpage_name = self.page.title()
+        why = f" ({reason})" if reason else ""
+
+        # Find and read the log page for this month
+        # (if it does not exist yet it is just created from scratch)
+        now = datetime.datetime.now(datetime.UTC)
+        year = now.year
+        month = now.strftime("%B")  # Full local month name, here: English
+        log_link = f"Commons:Featured picture candidates/Log/{month} {year}"
+        log_page = pywikibot.Page(G_Site, log_link)
+        try:
+            old_log_text = log_page.get(get_redirect=True)
+        except pywikibot.exceptions.NoPageError:
+            old_log_text = ""
+
+        # Append nomination to the log page
+        if re.search(wikipattern(subpage_name), old_log_text):
+            # This can happen if the process has previously been interrupted.
+            out(
+                f"Skipping add in moveToLog() for '{subpage_name}', "
+                "candidate is already in the log."
+            )
+        else:
+            new_log_text = old_log_text + "\n{{" + subpage_name + "}}"
+            commit(
+                old_log_text,
+                new_log_text,
+                log_page,
+                f"Added [[{subpage_name}]]{why}",
+            )
+
+        # Remove nomination from the list of current nominations
+        candidates_list_page = pywikibot.Page(G_Site, self._listPageName)
+        old_cand_text = candidates_list_page.get(get_redirect=True)
+        pattern = r" *\{\{\s*" + wikipattern(subpage_name) + r"\s*\}\} *\n?"
+        new_cand_text = re.sub(pattern, "", old_cand_text, count=1)
+        if old_cand_text == new_cand_text:
+            # This can happen if the process has previously been interrupted.
+            out(
+                f"Skipping remove in moveToLog() for '{subpage_name}', "
+                "candidate not found in list."
+            )
+        else:
+            commit(
+                old_cand_text,
+                new_cand_text,
+                candidates_list_page,
+                f"Removed [[{subpage_name}]]{why}",
+            )
+
+    def park(self):
+        """
+        Check that the candidate has exactly one valid verified result,
+        that the image file(s) exist and that there are no other obstacles.
+        If yes, park the candidate -- i.e., if the nomination was successful,
+        promote the new FP(s) or delist the former FP respectively;
+        else, if it has failed, just archive the nomination.
+        """
+        subpage_name = self.page.title()
+        cut_title = self.cutTitle()
+
+        # Check that the nomination subpage actually exists
+        if not self.page.exists():
+            error(f"{cut_title}: (Error: no such page?!)")
+            ask_for_help(
+                list_includes_missing_subpage.format(
+                    list=self._listPageName, subpage=subpage_name
+                )
+            )
+            return
+
+        # First look for verified results
+        # (leaving out stricken or commented results which have been corrected)
+        text = self.page.get(get_redirect=True)
+        redacted_text = filter_content(text)
+        results = self._VerifiedR.findall(redacted_text)
+        # Stop if there is not exactly one valid verified result
+        if not results:
+            out(f"{cut_title}: (ignoring, no verified results)")
+            return
+        if len(results) > 1:
+            error(f"{cut_title}: (Error: several verified results?)")
+            ask_for_help(
+                f"The nomination [[{subpage_name}]] seems to contain "
+                "more than one verified result. "
+                "Please remove (or cross out) all but one of the results."
+            )
+            return
+        if self.isWithdrawn():
+            out(f"{cut_title}: (ignoring, was withdrawn)")
+            return
+        if self.isFPX():
+            out(f"{cut_title}: (ignoring, was FPXed)")
+            return
+
+        # Check that the image page(s) exist, if not ignore this candidate
+        if self.isSet():
+            set_files = self.setFiles()
+            if not set_files:
+                error(f"{cut_title}: (Error: found no images in set)")
+                ask_for_help(
+                    f"The set nomination [[{subpage_name}]] seems to contain "
+                    "no images. Perhaps the formatting is damaged. "
+                    f"{please_fix_hint}"
+                )
+                return
+            for filename in set_files:
+                if not pywikibot.Page(G_Site, filename).exists():
+                    error(
+                        f"{cut_title}: (Error: can't find "
+                        f"set image '{filename}')"
+                    )
+                    ask_for_help(
+                        f"The set nomination [[{subpage_name}]] lists the "
+                        f"file [[:{filename}]], but that file does not exist. "
+                        f"Perhaps the file has been renamed. {please_fix_hint}"
+                    )
+                    return
+        elif not pywikibot.Page(G_Site, self.fileName()).exists():
+            error(f"{cut_title}: (Error: can't find image page)")
+            ask_for_help(
+                f"The nomination [[{subpage_name}]] is about the image "
+                f"[[:{self.fileName()}]], but that file does not exist. "
+                f"Perhaps the file has been renamed. {please_fix_hint}"
+            )
+            return
+
+        # We should now have a candidate with verified result that we can park
+        verified_result = results[0]
+        success = verified_result[3]
+        if success in {"yes", "no"}:
+            # If the keyword has not yet been added to the heading, add it now
+            new_text = self.fixHeading(text, success)
+            if new_text != text:
+                commit(text, new_text, self.page, "Fixed header")
+            # Park the candidate
+            if success == "yes":
+                self.handlePassedCandidate(verified_result)
+            else:
+                self.moveToLog(self._conString)
+        else:
+            error(
+                f"{cut_title}: (Error: invalid verified "
+                f"success status '{success}')"
+            )
+            ask_for_help(
+                f"The verified success status <code>{success}</code> "
+                f"in the results template of [[{subpage_name}]] "
+                f"is invalid. {please_fix_hint}"
+            )
+
+    @abc.abstractmethod
+    def handlePassedCandidate(self, results):
+        """
+        Handle the parking procedure for a passed candidate.
+        Must be implemented by the subclasses.
+        """
+        pass
+
+
+class FPCandidate(Candidate):
+    """A candidate up for promotion."""
+
+    def __init__(self, page, listName):
+        """
+        The initializer calls the superclass initializer in order to set
+        instance variables to the appropriate values for this class.
+
+        @param page A pywikibot.Page object for the nomination subpage.
+        """
+        super().__init__(
+            page,
+            listName,
+            SupportR,
+            OpposeR,
+            NeutralR,
+            "featured",
+            "not featured",
+            ReviewedTemplateR,
+            CountedTemplateR,
+            VerifiedResultR,
+        )
+
+    def getResultString(self):
+        """
+        Returns the results template to be added when closing a nomination.
+        Implementation for FP candidates.
+        """
+        gallery = self.findGalleryOfFile()
+        if self.imageCount() > 1:
+            return (
+                "{{FPC-results-unreviewed"
+                "|support=X|oppose=X|neutral=X"
+                f"|featured=X|gallery={gallery}|alternative="
+                "|sig=<small>'''Note: this candidate has several alternatives. "
+                "Thus, if featured, the code <code>alternative=</code> "
+                "in this template needs to be followed by the filename "
+                "of the chosen alternative.'''</small> "
+                "/~~~~}}"
+            )
+        else:
+            return (
+                "{{FPC-results-unreviewed"
+                f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
+                f"|featured={'yes' if self.isPassed() else 'no'}"
+                f"|gallery={gallery}"
+                "|sig=~~~~}}"
+            )
+
+    def getCloseCommitComment(self):
+        """Implementation for delisting candidates."""
+        if self.imageCount() > 1:
+            return "Closing for review - contains alternatives, needs manual count"
+        else:
+            return (
+                "Closing for review (%d support, %d oppose, %d neutral, featured=%s)"
+                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
+            )
+
+    def handlePassedCandidate(self, results):
+        """
+        Promotes a new featured picture (or set of featured pictures):
+        adds it to the appropriate gallery page, to the monthly overview
+        and to the landing-page list of recent FPs,
+        inserts the {{Assessments}} template into the description page(s),
+        notifies nominator and uploader, etc.
+        """
+        subpage_name = self.page.title()
+        cut_title = self.cutTitle()
+
+        # Some methods need the full gallery link with section anchor,
+        # others only the gallery page name or even just the basic gallery.
+        full_gallery_link = results[4].strip()
+        gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
+        if not gallery_page:
+            error(f"{cut_title}: (ignoring, gallery not defined)")
+            ask_for_help(
+                f"The gallery link in the nomination [[{subpage_name}]] "
+                f"is empty or broken. {please_fix_hint}"
+            )
+            return
+        basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
+
+        # If there is more than one image, search for the selected alternative
+        if self.imageCount() > 1:
+            if len(results) > 5 and results[5]:
+                alternative = results[5]
+                if not pywikibot.Page(G_Site, alternative).exists():
+                    error(
+                        f"{cut_title}: (ignoring, specified alternative "
+                        f"'{alternative}' not found)"
+                    )
+                    ask_for_help(
+                        f"Cannot find the alternative [[:{alternative}]] "
+                        f"specified by the nomination [[{subpage_name}]]. "
+                        f"{please_fix_hint}"
+                    )
+                    return
+                self._alternative = alternative
+            else:
+                error(f"{cut_title}: (ignoring, alternative not set)")
+                ask_for_help(
+                    f"The nomination [[{subpage_name}]] contains several "
+                    "images, but does not specify the selected alternative. "
+                    f"{please_fix_hint}"
+                )
+                return
+
+        # Promote the new featured picture(s)
+        files = self.setFiles() if self.isSet() else [self.fileName()]
+        if not files:
+            error(f"{cut_title}: (ignoring, no file(s) found)")
+            ask_for_help(
+                "Cannot find the featured file(s) in the nomination "
+                f"[[{subpage_name}]]. {please_fix_hint}"
+            )
+            return
+        self.addToFeaturedList(basic_gallery, files)
+        self.addToGalleryPage(full_gallery_link, files)
+        self.addAssessments(files)
+        self.addToCurrentMonth(files)
+        self.notifyNominator(files)
+        self.notifyUploaderAndCreator(files)
+        self.moveToLog(self._proString)
+
     def addToFeaturedList(self, gallery, files):
         """
         Adds the new featured picture to the list with recently
@@ -1354,298 +1648,6 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.LockedPageError:
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
             ignored_pages.add(talk_link)
-
-    def moveToLog(self, reason=None):
-        """
-        Remove this candidate from the list of current candidates
-        and add it to the log for the current month.
-        Should only be called on closed and verified candidates.
-
-        This is ==STEP 7== of the parking procedure.
-        """
-        subpage_name = self.page.title()
-        why = f" ({reason})" if reason else ""
-
-        # Find and read the log page for this month
-        # (if it does not exist yet it is just created from scratch)
-        now = datetime.datetime.now(datetime.UTC)
-        year = now.year
-        month = now.strftime("%B")  # Full local month name, here: English
-        log_link = f"Commons:Featured picture candidates/Log/{month} {year}"
-        log_page = pywikibot.Page(G_Site, log_link)
-        try:
-            old_log_text = log_page.get(get_redirect=True)
-        except pywikibot.exceptions.NoPageError:
-            old_log_text = ""
-
-        # Append nomination to the log page
-        if re.search(wikipattern(subpage_name), old_log_text):
-            # This can happen if the process has previously been interrupted.
-            out(
-                f"Skipping add in moveToLog() for '{subpage_name}', "
-                "candidate is already in the log."
-            )
-        else:
-            new_log_text = old_log_text + "\n{{" + subpage_name + "}}"
-            commit(
-                old_log_text,
-                new_log_text,
-                log_page,
-                f"Added [[{subpage_name}]]{why}",
-            )
-
-        # Remove nomination from the list of current nominations
-        candidates_list_page = pywikibot.Page(G_Site, self._listPageName)
-        old_cand_text = candidates_list_page.get(get_redirect=True)
-        pattern = r" *\{\{\s*" + wikipattern(subpage_name) + r"\s*\}\} *\n?"
-        new_cand_text = re.sub(pattern, "", old_cand_text, count=1)
-        if old_cand_text == new_cand_text:
-            # This can happen if the process has previously been interrupted.
-            out(
-                f"Skipping remove in moveToLog() for '{subpage_name}', "
-                "candidate not found in list."
-            )
-        else:
-            commit(
-                old_cand_text,
-                new_cand_text,
-                candidates_list_page,
-                f"Removed [[{subpage_name}]]{why}",
-            )
-
-    def park(self):
-        """
-        Check that the candidate has exactly one valid verified result,
-        that the image file(s) exist and that there are no other obstacles.
-        If yes, park the candidate -- i.e., if the nomination was successful,
-        promote the new FP(s) or delist the former FP respectively;
-        else, if it has failed, just archive the nomination.
-        """
-        subpage_name = self.page.title()
-        cut_title = self.cutTitle()
-
-        # Check that the nomination subpage actually exists
-        if not self.page.exists():
-            error(f"{cut_title}: (Error: no such page?!)")
-            ask_for_help(
-                list_includes_missing_subpage.format(
-                    list=self._listPageName, subpage=subpage_name
-                )
-            )
-            return
-
-        # First look for verified results
-        # (leaving out stricken or commented results which have been corrected)
-        text = self.page.get(get_redirect=True)
-        redacted_text = filter_content(text)
-        results = self._VerifiedR.findall(redacted_text)
-        # Stop if there is not exactly one valid verified result
-        if not results:
-            out(f"{cut_title}: (ignoring, no verified results)")
-            return
-        if len(results) > 1:
-            error(f"{cut_title}: (Error: several verified results?)")
-            ask_for_help(
-                f"The nomination [[{subpage_name}]] seems to contain "
-                "more than one verified result. "
-                "Please remove (or cross out) all but one of the results."
-            )
-            return
-        if self.isWithdrawn():
-            out(f"{cut_title}: (ignoring, was withdrawn)")
-            return
-        if self.isFPX():
-            out(f"{cut_title}: (ignoring, was FPXed)")
-            return
-
-        # Check that the image page(s) exist, if not ignore this candidate
-        if self.isSet():
-            set_files = self.setFiles()
-            if not set_files:
-                error(f"{cut_title}: (Error: found no images in set)")
-                ask_for_help(
-                    f"The set nomination [[{subpage_name}]] seems to contain "
-                    "no images. Perhaps the formatting is damaged. "
-                    f"{please_fix_hint}"
-                )
-                return
-            for filename in set_files:
-                if not pywikibot.Page(G_Site, filename).exists():
-                    error(
-                        f"{cut_title}: (Error: can't find "
-                        f"set image '{filename}')"
-                    )
-                    ask_for_help(
-                        f"The set nomination [[{subpage_name}]] lists the "
-                        f"file [[:{filename}]], but that file does not exist. "
-                        f"Perhaps the file has been renamed. {please_fix_hint}"
-                    )
-                    return
-        elif not pywikibot.Page(G_Site, self.fileName()).exists():
-            error(f"{cut_title}: (Error: can't find image page)")
-            ask_for_help(
-                f"The nomination [[{subpage_name}]] is about the image "
-                f"[[:{self.fileName()}]], but that file does not exist. "
-                f"Perhaps the file has been renamed. {please_fix_hint}"
-            )
-            return
-
-        # We should now have a candidate with verified result that we can park
-        verified_result = results[0]
-        success = verified_result[3]
-        if success in {"yes", "no"}:
-            # If the keyword has not yet been added to the heading, add it now
-            new_text = self.fixHeading(text, success)
-            if new_text != text:
-                commit(text, new_text, self.page, "Fixed header")
-            # Park the candidate
-            if success == "yes":
-                self.handlePassedCandidate(verified_result)
-            else:
-                self.moveToLog(self._conString)
-        else:
-            error(
-                f"{cut_title}: (Error: invalid verified "
-                f"success status '{success}')"
-            )
-            ask_for_help(
-                f"The verified success status <code>{success}</code> "
-                f"in the results template of [[{subpage_name}]] "
-                f"is invalid. {please_fix_hint}"
-            )
-
-    @abc.abstractmethod
-    def handlePassedCandidate(self, results):
-        """
-        Handle the parking procedure for a passed candidate.
-        Must be implemented by the subclasses.
-        """
-        pass
-
-
-class FPCandidate(Candidate):
-    """A candidate up for promotion."""
-
-    def __init__(self, page, listName):
-        """
-        The initializer calls the superclass initializer in order to set
-        instance variables to the appropriate values for this class.
-
-        @param page A pywikibot.Page object for the nomination subpage.
-        """
-        super().__init__(
-            page,
-            listName,
-            SupportR,
-            OpposeR,
-            NeutralR,
-            "featured",
-            "not featured",
-            ReviewedTemplateR,
-            CountedTemplateR,
-            VerifiedResultR,
-        )
-
-    def getResultString(self):
-        """
-        Returns the results template to be added when closing a nomination.
-        Implementation for FP candidates.
-        """
-        gallery = self.findGalleryOfFile()
-        if self.imageCount() > 1:
-            return (
-                "{{FPC-results-unreviewed"
-                "|support=X|oppose=X|neutral=X"
-                f"|featured=X|gallery={gallery}|alternative="
-                "|sig=<small>'''Note: this candidate has several alternatives. "
-                "Thus, if featured, the code <code>alternative=</code> "
-                "in this template needs to be followed by the filename "
-                "of the chosen alternative.'''</small> "
-                "/~~~~}}"
-            )
-        else:
-            return (
-                "{{FPC-results-unreviewed"
-                f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
-                f"|featured={'yes' if self.isPassed() else 'no'}"
-                f"|gallery={gallery}"
-                "|sig=~~~~}}"
-            )
-
-    def getCloseCommitComment(self):
-        if self.imageCount() > 1:
-            return "Closing for review - contains alternatives, needs manual count"
-        else:
-            return (
-                "Closing for review (%d support, %d oppose, %d neutral, featured=%s)"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
-            )
-
-    def handlePassedCandidate(self, results):
-        """
-        Promotes a new featured picture (or set of featured pictures):
-        adds it to the appropriate gallery page, to the monthly overview
-        and to the landing-page list of recent FPs,
-        inserts the {{Assessments}} template into the description page(s),
-        notifies nominator and uploader, etc.
-        """
-        subpage_name = self.page.title()
-        cut_title = self.cutTitle()
-
-        # Some methods need the full gallery link with section anchor,
-        # others only the gallery page name or even just the basic gallery.
-        full_gallery_link = results[4].strip()
-        gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
-        if not gallery_page:
-            error(f"{cut_title}: (ignoring, gallery not defined)")
-            ask_for_help(
-                f"The gallery link in the nomination [[{subpage_name}]] "
-                f"is empty or broken. {please_fix_hint}"
-            )
-            return
-        basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
-
-        # If there is more than one image, search for the selected alternative
-        if self.imageCount() > 1:
-            if len(results) > 5 and results[5]:
-                alternative = results[5]
-                if not pywikibot.Page(G_Site, alternative).exists():
-                    error(
-                        f"{cut_title}: (ignoring, specified alternative "
-                        f"'{alternative}' not found)"
-                    )
-                    ask_for_help(
-                        f"Cannot find the alternative [[:{alternative}]] "
-                        f"specified by the nomination [[{subpage_name}]]. "
-                        f"{please_fix_hint}"
-                    )
-                    return
-                self._alternative = alternative
-            else:
-                error(f"{cut_title}: (ignoring, alternative not set)")
-                ask_for_help(
-                    f"The nomination [[{subpage_name}]] contains several "
-                    "images, but does not specify the selected alternative. "
-                    f"{please_fix_hint}"
-                )
-                return
-
-        # Promote the new featured picture(s)
-        files = self.setFiles() if self.isSet() else [self.fileName()]
-        if not files:
-            error(f"{cut_title}: (ignoring, no file(s) found)")
-            ask_for_help(
-                "Cannot find the featured file(s) in the nomination "
-                f"[[{subpage_name}]]. {please_fix_hint}"
-            )
-            return
-        self.addToFeaturedList(basic_gallery, files)
-        self.addToGalleryPage(full_gallery_link, files)
-        self.addAssessments(files)
-        self.addToCurrentMonth(files)
-        self.notifyNominator(files)
-        self.notifyUploaderAndCreator(files)
-        self.moveToLog(self._proString)
 
 
 class DelistCandidate(Candidate):
