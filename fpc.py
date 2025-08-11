@@ -1191,9 +1191,9 @@ class FPCandidate(Candidate):
             section_pattern = (
                 r"(\n=+ *"
                 + re.escape(section)  # Escape chars with regex meaning.
-                + r" *=+ *\n+(?:[^<= \n][^\n]+\s+)?<gallery\b.+?)</gallery>"
+                + r" *=+ *\n+(?:[^<= \n][^\n]+\s+)?<gallery\b[^>]*>)\s*"
             )
-            match = re.search(section_pattern, old_text, flags=re.DOTALL)
+            match = re.search(section_pattern, old_text)
             # Now match is a valid match object if we have found
             # the section, else it is None.
         else:
@@ -1202,11 +1202,11 @@ class FPCandidate(Candidate):
 
         # Add the new file(s) to the gallery page
         if match is not None:
-            # Append the new file(s) to the target section:
+            # Insert new file(s) at the top of the target section
             new_text = (
-                old_text[:match.end(1)]
+                f"{old_text[:match.end(1)]}\n"
                 + new_entries
-                + old_text[match.end(1):]
+                + old_text[match.end(0):]
             )
             message = (
                 f"Added {files_for_msg} to section '{section}'"
