@@ -2266,21 +2266,57 @@ def ask_for_help(message):
     commit(old_text, new_text, talk_page, "Added request for help")
 
 
+def _confirm_changes(page_name, comment=None):
+    """
+    Subroutine with shared code for asking whether the proposed changes
+    should be saved or discarded.
+
+    @param page_name: Name (title) of the Wikimedia Commons page.
+    @param comment:   Optional string with the edit summary/commit message;
+        omit if there is no custom edit summary, i.e. for Media Info
+        (structured data) changes.
+
+    Returns:
+    True if changes should be saved, False if changes should be discarded.
+    (If the user decides to quit, we quit immediately, no return value.)
+    """
+    if G_Dry:
+        return False
+    if G_Auto:
+        return True
+    choice = pywikibot.bot.input_choice(
+        f"Do you want to accept these changes to '{page_name}'"
+        + (f" with comment '{comment}'?" if comment else "?"),
+        [("yes", "y"), ("no", "n"), ("quit", "q")],
+        automatic_quit=False,
+    )
+    match choice:
+        case "y":
+            return True
+        case "n":
+            return False
+        case "q":
+            out("Aborting.")
+            sys.exit()
+        case _:
+            error("Congrats, you found a bug in pywikibot.bot.input_choice().")
+            sys.exit()
+
+
 def commit(old_text, new_text, page, comment):
     """
-    This will commit new_text to the page
-    and unless running in automatic mode it
-    will show you the diff and ask you to accept it.
+    This will commit the new text of the page.
+    Unless running in automatic mode it first shows the diff and asks
+    whether the user accepts the changes or not.
 
-    @param old_text Used to show the diff
-    @param new_text Text to be submitted as the new page
-    @param page Page to submit the new text to
-    @param comment The edit comment
+    @param old_text Old text of the page, used to show the diff.
+    @param new_text New text of the page to be submitted.
+    @param page     Pywikibot Page object for the concerned Commons page.
+    @param comment  The edit comment/summary for the page history.
     """
-
-    out("\n About to commit changes to: '%s'" % page.title())
-
     # Show the diff
+    page_name = page.title()
+    out(f"\nAbout to commit changes to '{page_name}':")
     lines_of_context = 0 if (G_Auto and not G_Dry) else 3
     pywikibot.showDiff(
         old_text,
@@ -2288,25 +2324,11 @@ def commit(old_text, new_text, page, comment):
         context=lines_of_context,
     )
 
-    if G_Dry:
-        choice = "n"
-    elif G_Auto:
-        choice = "y"
-    else:
-        choice = pywikibot.bot.input_choice(
-            "Do you want to accept these changes to '%s' with comment '%s' ?"
-            % (page.title(), comment),
-            [("yes", "y"), ("no", "n"), ("quit", "q")],
-            automatic_quit=False,
-        )
-
-    if choice == "y":
+    # Decide whether to save the changes
+    if _confirm_changes(page_name, comment):
         page.put(new_text, summary=comment, watch=None, minor=False)
-    elif choice == "q":
-        out("Aborting.")
-        sys.exit(0)
     else:
-        out("Changes to '%s' ignored" % page.title())
+        out(f"Changes to '{page_name}' ignored.")
 
 
 # Data and regexps used by the bot
