@@ -104,7 +104,7 @@ class Candidate(abc.ABC):
         # Later perhaps this can be cleaned up by letting the subclasses
         # keep the variables or (better?!) by using class constants
         # which are adapted by the subclasses.
-        self.page = page
+        self._page = page
         self._listPageName = listName
         self._pro = 0
         self._con = 0
@@ -128,6 +128,11 @@ class Candidate(abc.ABC):
         self._creator = None    # Username of the original creator
         self._uploader = {}     # Mapping: filename -> username of uploader
         self._nominator = None  # Username of the nominator
+
+    @property
+    def page(self):
+        """Simple property getter for the nomination subpage."""
+        return self._page
 
     def printAllInfo(self):
         """
@@ -166,7 +171,7 @@ class Candidate(abc.ABC):
         (if 'link' is True, a link to the user page), else just ''.
         """
         if self._creator is None:
-            wikitext = self.page.get(get_redirect=True)
+            wikitext = self._page.get(get_redirect=True)
             if match := CreatorNameR.search(wikitext):
                 self._creator = match.group(1).strip()
             else:
@@ -197,7 +202,7 @@ class Candidate(abc.ABC):
         if link is True, returns a link to the nominator's user page.
         """
         if self._nominator is None:
-            self._nominator = oldest_revision_user(self.page)
+            self._nominator = oldest_revision_user(self._page)
         if self._nominator:
             return user_page_link(self._nominator) if link else self._nominator
         return "Unknown"
@@ -207,7 +212,7 @@ class Candidate(abc.ABC):
         Check whether this candidate is a set nomination or not;
         the name of the nomination subpage for a set must contain "/[Ss]et/".
         """
-        return re.search(r"/ *[Ss]et */", self.page.title()) is not None
+        return re.search(r"/ *[Ss]et */", self._page.title()) is not None
 
     def setFiles(self):
         """
@@ -221,7 +226,7 @@ class Candidate(abc.ABC):
             return self._setFiles
         # Get wikitext of the nomination subpage and extract
         # the contents of the <gallery>...</gallery> element
-        wikitext = self.page.get(get_redirect=True)
+        wikitext = self._page.get(get_redirect=True)
         match = re.search(
             r"<gallery[^>]*>(.+?)</gallery>",
             wikitext,
@@ -230,7 +235,7 @@ class Candidate(abc.ABC):
         if not match:
             error(
                 "Error - no <gallery> found in set nomination "
-                f"'{self.page.title()}'"
+                f"'{self._page.title()}'"
             )
             return []
         text_inside_gallery = match.group(1)
@@ -263,7 +268,7 @@ class Candidate(abc.ABC):
         else:
             error(
                 "Error - no images found in set nomination "
-                f"'{self.page.title()}'"
+                f"'{self._page.title()}'"
             )
         self._setFiles = files_list
         return files_list
@@ -273,7 +278,7 @@ class Candidate(abc.ABC):
         Try to find the gallery link in the nomination subpage
         in order to make the life of the closing users easier.
         """
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         match = re.search(
             r"Gallery[^\n]+?\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
             text,
@@ -291,27 +296,27 @@ class Candidate(abc.ABC):
         if self._votesCounted:
             return
 
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         if text:
             text = filter_content(text)
             self._pro = len(re.findall(self._proR, text))
             self._con = len(re.findall(self._conR, text))
             self._neu = len(re.findall(self._neuR, text))
         else:
-            error(f"Error - '{self.page.title()}' has no content")
+            error(f"Error - '{self._page.title()}' has no content")
 
         self._votesCounted = True
 
     def isWithdrawn(self):
         """Withdrawn nominations should not be counted."""
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         text = filter_content(text)
         withdrawn = len(re.findall(WithdrawnR, text))
         return withdrawn > 0
 
     def isFPX(self):
         """Page marked with FPX template."""
-        return len(re.findall(FpxR, self.page.get(get_redirect=True)))
+        return len(re.findall(FpxR, self._page.get(get_redirect=True)))
 
     def rulesOfFifthDay(self):
         """Check if any of the rules of the fifth day can be applied."""
@@ -338,11 +343,11 @@ class Candidate(abc.ABC):
         """
 
         # First make sure that the page actually exists
-        if not self.page.exists():
+        if not self._page.exists():
             error('"%s" Error: no such page?!' % self.cutTitle())
             ask_for_help(
                 list_includes_missing_subpage.format(
-                    list=self._listPageName, subpage=self.page.title()
+                    list=self._listPageName, subpage=self._page.title()
                 )
             )
             return False
@@ -376,11 +381,11 @@ class Candidate(abc.ABC):
             out('"%s" is still active, ignoring' % self.cutTitle())
             return False
 
-        old_text = self.page.get(get_redirect=True)
+        old_text = self._page.get(get_redirect=True)
         if not old_text:
             error('"%s" Error: has no content' % self.cutTitle())
             ask_for_help(
-                f"The nomination subpage [[{self.page.title()}]] "
+                f"The nomination subpage [[{self._page.title()}]] "
                 f"seems to be empty. {please_fix_hint}"
             )
             return False
@@ -409,7 +414,7 @@ class Candidate(abc.ABC):
         commit(
             old_text,
             new_text,
-            self.page,
+            self._page,
             self.getCloseCommitComment()
             + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")),
         )
@@ -442,11 +447,11 @@ class Candidate(abc.ABC):
         match = re.match(r"===(.+?)===", text)
         if not match:
             warn(
-                f"Nomination '{self.page.title()}' does not start "
+                f"Nomination '{self._page.title()}' does not start "
                 f"with a heading; can't add '{keyword}' to the title."
             )
             ask_for_help(
-                f"The nomination [[{self.page.title()}]] does not start with "
+                f"The nomination [[{self._page.title()}]] does not start with "
                 "the usual <code><nowiki>===...===</nowiki></code> heading. "
                 "Please check if there is any rubbish at the beginning "
                 "and remove it, fix the heading if necessary, "
@@ -488,10 +493,10 @@ class Candidate(abc.ABC):
             return self._creationTime
 
         try:
-            timestamp = self.page.oldest_revision.timestamp
+            timestamp = self._page.oldest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
             error(
-                f"Could not ascertain creation time of '{self.page.title()}', "
+                f"Could not ascertain creation time of '{self._page.title()}', "
                 "returning now()"
             )
             return datetime.datetime.now(datetime.UTC)
@@ -538,7 +543,7 @@ class Candidate(abc.ABC):
             return self._daysSinceLastEdit
 
         try:
-            timestamp = self.page.latest_revision.timestamp
+            timestamp = self._page.latest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
             return -1
         # MediaWiki timestamps are always stored in UTC,
@@ -580,7 +585,7 @@ class Candidate(abc.ABC):
         or has been closed and counted, but is still waiting for the review;
         if neither the one nor the other applies, returns False.
         """
-        wikitext = self.page.get(get_redirect=True)
+        wikitext = self._page.get(get_redirect=True)
         if self._ReviewedR.search(wikitext):
             return "Reviewed"
         if self._CountedR.search(wikitext):
@@ -593,7 +598,7 @@ class Candidate(abc.ABC):
 
     def sectionCount(self):
         """Counts the number of sections in this nomination."""
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         text = filter_content(text)  # Ignore commented, stricken etc. stuff.
         return len(SectionR.findall(text))
 
@@ -605,7 +610,7 @@ class Candidate(abc.ABC):
         """
         if self._imgCount is not None:
             return self._imgCount
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         text = filter_content(text)  # Ignore commented, stricken etc. stuff.
         images = ImagesR.findall(text)
         count = len(images)
@@ -637,7 +642,7 @@ class Candidate(abc.ABC):
         [2] count of neutral votes,
         [3] ('yes'|'no'|'featured'|'not featured').
         """
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         # Search first for result(s) using the new template-base format,
         # and if this fails for result(s) in the old text-based format:
         results = re.findall(VerifiedResultR, text)
@@ -726,13 +731,13 @@ class Candidate(abc.ABC):
 
         # Try to derive the filename from the name of the nomination subpage,
         # using the standard 'File:' namespace
-        filename = PrefixR.sub("File:", self.page.title())
+        filename = PrefixR.sub("File:", self._page.title())
         filename = re.sub(r" */ *\d+ *$", "", filename)  # Remove '/2' etc.
 
         # If there is no file with that name, use the name of the first image
         # on the nomination subpage instead
         if not pywikibot.Page(G_Site, filename).exists():
-            if match := ImagesR.search(self.page.get(get_redirect=True)):
+            if match := ImagesR.search(self._page.get(get_redirect=True)):
                 filename = match.group(2)
 
         # Check if the image was renamed and try to resolve the redirect
@@ -749,7 +754,7 @@ class Candidate(abc.ABC):
         """
         Returns the name of the nomination subpage for this candidate
         without the leading 'Commons:Featured picture candidates/'
-        (if you want to include it, just call 'self.page.title()' instead).
+        (if you want to include it, just call 'self._page.title()' instead).
 
         Use 'keep_number=True' and adjust the 'keep_prefix' parameter
         to get tailor-made values for the 'com-nom' and 'subpage' parameters
@@ -762,7 +767,7 @@ class Candidate(abc.ABC):
         Use 'keep_prefix=False, keep_number=False' to get a clean title
         for the nomination, e.g. as title for a set nomination.
         """
-        name = self.page.title()
+        name = self._page.title()
         name = name.replace('_', ' ')
         name = re.sub(wikipattern(candPrefix), "", name, count=1).strip()
         if not keep_prefix:
@@ -785,7 +790,7 @@ class Candidate(abc.ABC):
         This is the last step of the parking procedure for FP candidates
         as well as for delisting candidates.
         """
-        subpage_name = self.page.title()
+        subpage_name = self._page.title()
         why = f" ({reason})" if reason else ""
 
         # Find and read the log page for this month
@@ -843,11 +848,11 @@ class Candidate(abc.ABC):
         promote the new FP(s) or delist the former FP respectively;
         else, if it has failed, just archive the nomination.
         """
-        subpage_name = self.page.title()
+        subpage_name = self._page.title()
         cut_title = self.cutTitle()
 
         # Check that the nomination subpage actually exists
-        if not self.page.exists():
+        if not self._page.exists():
             error(f"{cut_title}: (Error: no such page?!)")
             ask_for_help(
                 list_includes_missing_subpage.format(
@@ -858,7 +863,7 @@ class Candidate(abc.ABC):
 
         # First look for verified results
         # (leaving out stricken or commented results which have been corrected)
-        text = self.page.get(get_redirect=True)
+        text = self._page.get(get_redirect=True)
         redacted_text = filter_content(text)
         results = self._VerifiedR.findall(redacted_text)
         # Stop if there is not exactly one valid verified result
@@ -919,7 +924,7 @@ class Candidate(abc.ABC):
             # If the keyword has not yet been added to the heading, add it now
             new_text = self.fixHeading(text, success)
             if new_text != text:
-                commit(text, new_text, self.page, "Fixed header")
+                commit(text, new_text, self._page, "Fixed header")
             # Park the candidate
             if success == "yes":
                 self.handlePassedCandidate(verified_result)
@@ -1012,7 +1017,7 @@ class FPCandidate(Candidate):
         inserts the {{Assessments}} template into the description page(s),
         notifies nominator and uploader, etc.
         """
-        subpage_name = self.page.title()
+        subpage_name = self._page.title()
         cut_title = self.cutTitle()
 
         # Some methods need the full gallery link with section anchor,
@@ -1124,7 +1129,7 @@ class FPCandidate(Candidate):
         on that page.
         @param files List with filename(s) of the featured picture or set.
         """
-        subpage_name = self.page.title()
+        subpage_name = self._page.title()
 
         # Replace all underscores and non-breaking spaces by plain spaces
         # (underscores are present if users just copy the gallery link,
@@ -1329,16 +1334,16 @@ class FPCandidate(Candidate):
         filename = files[0]
 
         # Extract voting results
-        nom_page_text = self.page.get(get_redirect=True)
+        nom_page_text = self._page.get(get_redirect=True)
         match = VerifiedResultR.search(nom_page_text)
         try:
             ws = match.group(1)
             wo = match.group(2)
             wn = match.group(3)
         except AttributeError:
-            error(f"Error - no verified result found in '{self.page.title()}'")
+            error(f"Error - no verified result found in '{self._page.title()}'")
             ask_for_help(
-                f"The nomination [[{self.page.title()}]] is closed, "
+                f"The nomination [[{self._page.title()}]] is closed, "
                 "but does not contain a valid verified result. "
                 f"{please_fix_hint}"
             )
@@ -1397,7 +1402,7 @@ class FPCandidate(Candidate):
         if self.isSet():
             set_name = self.subpageName(keep_prefix=False, keep_number=False)
             title = f"Set: {set_name} ({len(files)} files)"
-            message = f"Added set [[{self.page.title()}|{set_name}]]"
+            message = f"Added set [[{self._page.title()}|{set_name}]]"
         else:
             title = bare_filename(filename)
             message = f"Added [[{filename}]]"
@@ -1414,7 +1419,7 @@ class FPCandidate(Candidate):
             creator_hint = ""
         new_text = old_text.replace(
             "</gallery>",
-            f"{filename}|[[{self.page.title()}|{count}]] '''{title}'''<br> "
+            f"{filename}|[[{self._page.title()}|{count}]] '''{title}'''<br> "
             f"{creator_hint}"
             f"uploaded by {uploader_link}, "
             f"nominated by {nominator_link},<br> "
@@ -1465,7 +1470,7 @@ class FPCandidate(Candidate):
             # Notifications for set nominations add a gallery to the talk page
             # and use a special template with an appropriate message.
             # Since August 2025 we use an improved version of the template.
-            nomination_link = self.page.title()
+            nomination_link = self._page.title()
             set_title = self.subpageName(keep_prefix=False, keep_number=False)
             template = (
                 f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
@@ -1725,7 +1730,7 @@ class DelistCandidate(Candidate):
                 "The bot is not yet able to handle delist-and-replace "
                 "nominations or set delisting nominations. "
                 "Therefore, please take care of the images "
-                f"from the nomination [[{self.page.title()}]] "
+                f"from the nomination [[{self._page.title()}]] "
                 "and remove or replace them manually."
             )
             return
@@ -1741,7 +1746,7 @@ class DelistCandidate(Candidate):
         # We skip checking the FP landing page with the newest FPs;
         # the chance that the image is still there is very small,
         # and even then that page will soon be updated anyway.
-        nomination_link = self.page.title()
+        nomination_link = self._page.title()
         filename = self.fileName()
         fn_pattern = wikipattern(filename.replace("File:", ""))
         file_page = pywikibot.FilePage(G_Site, title=filename)
@@ -1887,7 +1892,7 @@ class DelistCandidate(Candidate):
 
         # Commit the text of the page if it has changed
         if new_text != old_text:
-            summary = f"Delisted per [[{self.page.title()}]]"
+            summary = f"Delisted per [[{self._page.title()}]]"
             try:
                 commit(old_text, new_text, image_page, summary)
             except pywikibot.exceptions.LockedPageError:
