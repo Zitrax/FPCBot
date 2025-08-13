@@ -1736,6 +1736,7 @@ class DelistCandidate(Candidate):
             return
         self.removeFromGalleryPages(results)
         self.removeAssessments()
+        self.removeAssessmentFromMediaInfo()
         self.moveToLog(self._proString)
 
     def removeFromGalleryPages(self, results):
@@ -1901,6 +1902,56 @@ class DelistCandidate(Candidate):
             error(
                 f"Error - removing FP status from '{filename}' "
                 f"did not work."
+            )
+
+    def removeAssessmentFromMediaInfo(self):
+        """
+        Remove the 'Commons quality assessment' (P6731) claim
+        'Wikimedia Commons featured picture' (Q63348049)
+        from the Media Info (structured data) for the image.
+        """
+        # Get the Media Info for the image
+        filename = self.fileName()
+        file_page = pywikibot.FilePage(G_Site, title=filename)
+        if not file_page.exists():
+            error(f"Error - image '{filename}' not found.")
+            return
+        media_info = file_page.data_item()
+        structured_data = media_info.get()
+        try:
+            quality_assessments = structured_data["statements"]["P6731"]
+        except KeyError:
+            out(
+                "Found no 'Commons quality assessment' (P6731) claims "
+                f"for '{filename}'."
+            )
+            return
+
+        # Search for the claim(s) to be removed
+        # (normally there should be at most one FP claim, but I have seen
+        # weird things, so handle multiple FP claims to be on the save side)
+        claims_to_remove = []
+        for claim in quality_assessments:
+            # For now a simple string comparison seems sufficient.
+            # If this fails because of format variations etc.,
+            # use a regex comparison or explore the nested data values.
+            plain = repr(claim)
+            if (
+                "'property': 'P6731'" in plain
+                and "'numeric-id': 63348049" in plain
+            ):
+                claims_to_remove.append(claim)
+        if claims_to_remove:
+            try:
+                commit_media_info_changes(
+                    filename, media_info, claims_to_remove, []
+                )
+            except pywikibot.exceptions.LockedPageError:
+                error(f"Error - '{filename}' is locked.")
+        else:
+            out(
+                "Found no 'Wikimedia Commons featured picture' assessment "
+                f"claim (Q63348049) for '{filename}'."
             )
 
 
@@ -2329,6 +2380,49 @@ def commit(old_text, new_text, page, comment):
         page.put(new_text, summary=comment, watch=None, minor=False)
     else:
         out(f"Changes to '{page_name}' ignored.")
+
+
+def commit_media_info_changes(
+    filename, media_info, claims_to_remove, claims_to_add
+):
+    """
+    When changing the Media Info (structured data) for an image,
+    we cannot use the normal commit mechanism.
+    So we print kind of a self-made diff; in interactive mode we ask
+    whether to save the changes or not; if yes, we apply the changes.
+
+    @param filename:         Name of the affected image file.
+    @param media_info:       A Pywikibot MediaInfo instance representing
+        the Media Info (structured data) for the image.
+    @param claims_to_remove: list of Pywikibot Claim instances
+        representing the statement(s) to be removed; can be empty.
+    @param claims_to_add:    list of Pywikibot Claim instances
+        representing the statement(s) to be added; can be empty.
+    """
+    assert claims_to_remove or claims_to_add
+
+    # Show the diff
+    out(f"\nAbout to change the Media Info (structured data) of '{filename}':")
+    if claims_to_remove:
+        removing = "- " + "\n- ".join(
+            repr(claim) for claim in claims_to_remove
+        )
+        pywikibot.stdout(f"<<lightred>>{removing}<<default>>")
+    if claims_to_add:
+        adding = "+ " + "\n+ ".join(
+            repr(claim) for claim in claims_to_add
+        )
+        pywikibot.stdout(f"<<lightgreen>>{adding}<<default>>")
+
+    # Decide whether to save the changes
+    if _confirm_changes(filename):
+        if claims_to_remove:
+            media_info.removeClaims(claims_to_remove)
+        if claims_to_add:
+            for claim in claims_to_add:
+                media_info.addClaim(claim, bot=True)
+    else:
+        out(f"Changes to '{filename}' ignored.")
 
 
 # Data and regexps used by the bot
