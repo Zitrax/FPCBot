@@ -1070,6 +1070,7 @@ class FPCandidate(Candidate):
         self.addToFeaturedList(basic_gallery, files)
         self.addToGalleryPage(full_gallery_link, files)
         self.addAssessments(files)
+        self.addAssessmentToMediaInfo(files)
         self.addToCurrentMonth(files)
         self.notifyNominator(files)
         self.notifyUploaderAndCreator(files)
@@ -1321,12 +1322,91 @@ class FPCandidate(Candidate):
                 )
             commit(old_text, new_text, current_page, "FP promotion")
 
+    def addAssessmentToMediaInfo(self, files):
+        """
+        Adds the 'Commons quality assessment' (P6731) claim
+        'Wikimedia Commons featured picture' (Q63348049)
+        to the Media Info (structured data) of the new featured picture,
+        resp. of all files in a successful set nomination.
+
+        This is ==STEP 4== of the parking procedure.
+
+        @param files List with filename(s) of the featured picture or set.
+        """
+        # Setup a FP assessment claim (to be used with every file)
+        fp_claim_data = {
+            "mainsnak": {
+                "snaktype": "value",
+                "property": "P6731",
+                "datatype": "wikibase-item",
+                "datavalue": {
+                    "value": {
+                        "entity-type": "item",
+                        "numeric-id": 63348049,
+                    },
+                    "type": "wikibase-entityid",
+                },
+            },
+            "type": "statement",
+            "rank": "normal",
+        }
+        fp_claim = pywikibot.page.Claim.fromJSON(
+            site=pywikibot.Site("wikidata", "wikidata"),
+            data=fp_claim_data,
+        )
+
+        for filename in files:
+            # Get the Media Info for the image
+            file_page = pywikibot.FilePage(G_Site, title=filename)
+            if not file_page.exists():
+                error(f"Error - image '{filename}' not found.")
+                continue
+            media_info = file_page.data_item()
+            structured_data = media_info.get(force=True)
+            try:
+                statements = structured_data["statements"]
+            except KeyError:
+                error(
+                    "Error - no 'statements' entry in structured data "
+                    f"for '{filename}'."
+                )
+                continue
+
+            # Is there already a FP assessment claim?
+            try:
+                quality_assessments = statements["P6731"]
+            except KeyError:
+                # No 'Commons quality assessment' (P6731) claims at all
+                claim_already_present = False
+            else:
+                for claim in quality_assessments:
+                    if is_fp_assessment_claim(claim):
+                        claim_already_present = True
+                        break
+                else:
+                    # We did not leave the loop via 'break': claim not found
+                    claim_already_present = False
+
+            # Add the claim if necessary
+            if claim_already_present:
+                out(
+                    f"Skipping addAssessmentToMediaInfo() for '{filename}', "
+                    "FP assessment claim already present."
+                )
+            else:
+                try:
+                    commit_media_info_changes(
+                        filename, media_info, [], [fp_claim]
+                    )
+                except pywikibot.exceptions.LockedPageError:
+                    error(f"Error - '{filename}' is locked.")
+
     def addToCurrentMonth(self, files):
         """
         Adds the candidate to the monthly overview of new featured pictures.
         Should only be called on closed and verified candidates.
 
-        This is ==STEP 4== of the parking procedure.
+        This is ==STEP 5== of the parking procedure.
 
         @param files List with filename(s) of the featured picture or set.
         """
@@ -1434,7 +1514,7 @@ class FPCandidate(Candidate):
         Add a FP promotion template to the nominator's talk page.
         Should only be called on closed and verified candidates.
 
-        This is ==STEP 5== of the parking procedure.
+        This is ==STEP 6== of the parking procedure.
 
         @param files List with filename(s) of the featured picture or set.
         """
@@ -1532,7 +1612,7 @@ class FPCandidate(Candidate):
         In this case we notify also the original creator, if possible.)
         Should only be called on closed and verified candidates.
 
-        This is ==STEP 6== of the parking procedure.
+        This is ==STEP 7== of the parking procedure.
 
         To understand this method and how it differs from notifyNominator(),
         please keep in mind that all files in a set nomination have the same
@@ -1917,7 +1997,7 @@ class DelistCandidate(Candidate):
             error(f"Error - image '{filename}' not found.")
             return
         media_info = file_page.data_item()
-        structured_data = media_info.get()
+        structured_data = media_info.get(force=True)
         try:
             quality_assessments = structured_data["statements"]["P6731"]
         except KeyError:
@@ -1932,14 +2012,7 @@ class DelistCandidate(Candidate):
         # weird things, so handle multiple FP claims to be on the save side)
         claims_to_remove = []
         for claim in quality_assessments:
-            # For now a simple string comparison seems sufficient.
-            # If this fails because of format variations etc.,
-            # use a regex comparison or explore the nested data values.
-            plain = repr(claim)
-            if (
-                "'property': 'P6731'" in plain
-                and "'numeric-id': 63348049" in plain
-            ):
+            if is_fp_assessment_claim(claim):
                 claims_to_remove.append(claim)
         if claims_to_remove:
             try:
@@ -2235,6 +2308,22 @@ def user_page_link(username):
     return f"[[User:{username}|{username}]]"
 
 
+def is_fp_assessment_claim(claim):
+    """
+    Does the Pywikibot page.Claim object 'claim' represent a
+    'Commons quality assessment' (P6731) claim with the value
+    'Wikimedia Commons featured picture' (Q63348049)?
+    """
+    # For now a simple string comparison seems sufficient.
+    # If this fails because of format variations etc.,
+    # use a regex comparison or explore the nested data values.
+    plain = repr(claim)
+    return (
+        "'property': 'P6731'" in plain
+        and "'numeric-id': 63348049" in plain
+    )
+
+
 def oldest_revision_user(page):
     """
     Returns the name of the user who has created the oldest (first) revision
@@ -2416,11 +2505,18 @@ def commit_media_info_changes(
 
     # Decide whether to save the changes
     if _confirm_changes(filename):
+        # TODO: Whenever this is called a 2nd time or after another change,
+        # I get a Pywikibot warning:
+        #   'WARNING: API error badtoken: Invalid CSRF token.'
+        # This appears to be harmless (the change is still saved),
+        # but keep an eye on it.  Maybe related to Pywikibot bugs, cf. e.g.:
+        #   https://phabricator.wikimedia.org/T261050
         if claims_to_remove:
             media_info.removeClaims(claims_to_remove)
         if claims_to_add:
             for claim in claims_to_add:
                 media_info.addClaim(claim, bot=True)
+        out(f"Media Info (structured data) of '{filename}' changed.")
     else:
         out(f"Changes to '{filename}' ignored.")
 
