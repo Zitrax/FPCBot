@@ -1383,7 +1383,7 @@ class FPCandidate(Candidate):
                     },
                 ],
             },
-            'qualifiers-order': ['P580'],
+            "qualifiers-order": ["P580"],
         }
         fp_claim = pywikibot.page.Claim.fromJSON(
             site=pywikibot.Site("wikidata", "wikidata"),
@@ -2199,7 +2199,7 @@ def findCandidates(list_page_name, delist):
                 continue
             new_name = subpage.title()
             out(f"Nomination '{subpage_name}' has been renamed to '{new_name}'")
-            redirects.append((full_entry, f'{{{{{new_name}}}}}'))
+            redirects.append((full_entry, f"{{{{{new_name}}}}}"))
         # OK, seems the nomination is fine -- append candidate object
         candidates.append(candidate_class(subpage, list_page_name))
 
