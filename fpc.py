@@ -1333,6 +1333,19 @@ class FPCandidate(Candidate):
 
         @param files List with filename(s) of the featured picture or set.
         """
+        # As effective date for the FP status we use the last modification
+        # of the nomination subpage, normally made by the closing user.
+        # To limit the precision to the day/date, we use "'precision': 11"
+        # (right now more precise values are not supported on Wikidata:
+        # https://phabricator.wikimedia.org/T57755).  Therefore we must
+        # literally nullify the time part of the timestamp,
+        # else MediaWiki rejects the timestamp as 'Malformed input'.
+        try:
+            timestamp = self._page.latest_revision.timestamp
+        except pywikibot.exceptions.PageRelatedError:
+            timestamp = G_Site.server_time()
+        iso_timestamp = timestamp.isoformat(sep="T")
+        iso_timestamp = re.sub(r"T.+Z$", "T00:00:00Z", iso_timestamp, count=1)
         # Setup a FP assessment claim (to be used with every file)
         fp_claim_data = {
             "mainsnak": {
@@ -1349,6 +1362,28 @@ class FPCandidate(Candidate):
             },
             "type": "statement",
             "rank": "normal",
+            "qualifiers": {
+                "P580": [
+                    {
+                        "snaktype": "value",
+                        "property": "P580",
+                        "datatype": "time",
+                        "datavalue": {
+                            "value": {
+                                "time": iso_timestamp,
+                                "precision": 11,
+                                "after": 0,
+                                "before": 0,
+                                "timezone": 0,
+                                "calendarmodel":
+                                "http://www.wikidata.org/entity/Q1985727",
+                            },
+                            "type": "time",
+                        },
+                    },
+                ],
+            },
+            'qualifiers-order': ['P580'],
         }
         fp_claim = pywikibot.page.Claim.fromJSON(
             site=pywikibot.Site("wikidata", "wikidata"),
