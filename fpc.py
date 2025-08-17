@@ -1346,7 +1346,9 @@ class FPCandidate(Candidate):
             timestamp = G_Site.server_time()
         iso_timestamp = timestamp.isoformat(sep="T")
         iso_timestamp = re.sub(r"T.+Z$", "T00:00:00Z", iso_timestamp, count=1)
-        # Setup a FP assessment claim (to be used with every file)
+
+        # Prepare data for the FP assessment claim
+        fp_claim_site = pywikibot.Site("wikidata", "wikidata")
         fp_claim_data = {
             "mainsnak": {
                 "snaktype": "value",
@@ -1385,10 +1387,6 @@ class FPCandidate(Candidate):
             },
             "qualifiers-order": ["P580"],
         }
-        fp_claim = pywikibot.page.Claim.fromJSON(
-            site=pywikibot.Site("wikidata", "wikidata"),
-            data=fp_claim_data,
-        )
 
         for filename in files:
             # Get the Media Info for the image
@@ -1429,6 +1427,11 @@ class FPCandidate(Candidate):
                     "FP assessment claim already present."
                 )
             else:
+                # We must use a new Claim instance with every file,
+                # else Pywikibot raises a ValueError.
+                fp_claim = pywikibot.page.Claim.fromJSON(
+                    site=fp_claim_site, data=fp_claim_data
+                )
                 try:
                     commit_media_info_changes(
                         filename, media_info, [], [fp_claim]
