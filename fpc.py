@@ -746,7 +746,7 @@ class Candidate(abc.ABC):
             filename = page.getRedirectTarget().title()
         # TODO: Add more tests, catch exceptions, report missing files, etc.!
 
-        filename = filename.replace('_', ' ')
+        filename = filename.replace("_", " ")
         self._fileName = filename
         return filename
 
@@ -768,7 +768,7 @@ class Candidate(abc.ABC):
         for the nomination, e.g. as title for a set nomination.
         """
         name = self._page.title()
-        name = name.replace('_', ' ')
+        name = name.replace("_", " ")
         name = re.sub(wikipattern(candPrefix), "", name, count=1).strip()
         if not keep_prefix:
             name = re.sub(
