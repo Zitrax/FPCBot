@@ -275,8 +275,8 @@ class Candidate(abc.ABC):
 
     def findGalleryOfFile(self):
         """
-        Try to find the gallery link in the nomination subpage
-        in order to make the life of the closing users easier.
+        Try to find the gallery link in the nomination subpage;
+        this is used to copy the link to the results template.
         """
         text = self._page.get(get_redirect=True)
         match = re.search(
@@ -284,7 +284,7 @@ class Candidate(abc.ABC):
             text,
         )
         if match is not None:
-            return match.group(1)
+            return clean_gallery_link(match.group(1))
         else:
             return ""
 
@@ -1022,7 +1022,7 @@ class FPCandidate(Candidate):
 
         # Some methods need the full gallery link with section anchor,
         # others only the gallery page name or even just the basic gallery.
-        full_gallery_link = results[4].strip()
+        full_gallery_link = clean_gallery_link(results[4])
         gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
         if not gallery_page:
             error(f"{cut_title}: (ignoring, gallery not defined)")
@@ -1132,11 +1132,6 @@ class FPCandidate(Candidate):
         """
         subpage_name = self._page.title()
 
-        # Replace all underscores and non-breaking spaces by plain spaces
-        # (underscores are present if users just copy the gallery link,
-        # NBSP can be entered by accident with some keyboard settings,
-        # e.g. on macOS or Linux)
-        gallery_link = gallery_link.replace("_", " ").replace("\u00A0", " ")
         # Split the gallery link into gallery page name and section anchor
         # (the latter can be empty)
         link_parts = gallery_link.split("#", maxsplit=1)
@@ -2326,6 +2321,16 @@ def filter_content(text):
 def strip_tag(text, tag):
     """Will simply take a tag and remove a specified tag."""
     return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
+
+
+def clean_gallery_link(gallery_link):
+    """
+    Clean the gallery link: remove leading/trailing whitespace,
+    replace underscores and non-breaking spaces by plain spaces
+    (underscores are present if users just copy the link,
+    a NBSP can be entered by accident with some keyboard settings).
+    """
+    return gallery_link.replace("_", " ").replace("\u00A0", " ").strip()
 
 
 def bare_filename(filename):
