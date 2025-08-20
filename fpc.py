@@ -1603,7 +1603,7 @@ class FPCandidate(Candidate):
                 f"{old_text.rstrip()}\n"
                 "\n"
                 "== Set Promoted to FP ==\n"
-                '<gallery mode="packed-hover" heights="80px">\n'
+                '<gallery mode="packed-hover" heights="120px">\n'
                 f"{entries}\n"
                 "</gallery>\n"
                 f"{template} /~~~~"
