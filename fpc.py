@@ -1076,46 +1076,77 @@ class FPCandidate(Candidate):
         self.notifyUploaderAndCreator(files)
         self.moveToLog(self._proString)
 
-    def addToFeaturedList(self, gallery, files):
+    def addToFeaturedList(self, section_name, files):
         """
         Adds the new featured picture to the list with recently
         featured images that is used on the FP landing page.
-        This method uses just the basic gallery name, like 'Animals'.
         Should only be called on closed and verified candidates.
 
         This is ==STEP 1== of the parking procedure.
 
-        @param gallery The basic gallery name, like 'Animals'.
+        @param section_name The section name, like 'Animals' or 'Places'.
+        (The list uses the basic part of the gallery links as section names.)
         @param files List with filename(s) of the featured picture or set.
         """
-        file = files[0]  # For set nominations just use the first file.
-        listpage = "Commons:Featured pictures, list"
-        page = pywikibot.Page(G_Site, listpage)
-        old_text = page.get(get_redirect=True)
+        filename = files[0]  # For set nominations just use the first file.
 
-        # First check if the image is already on the page.
-        # This can happen if the process has previously been interrupted.
-        if re.search(wikipattern(file), old_text):
-            out(
-                "Skipping addToFeaturedList() for '%s', "
-                "image is already listed." % file
+        # Read the list
+        list_page_name = "Commons:Featured pictures, list"
+        page = pywikibot.Page(G_Site, list_page_name)
+        try:
+            old_text = page.get(get_redirect=False)
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"Error - can't read list of recent FPs: {exc}")
+            ask_for_help(
+                "The bot could not read the list of recent FPs at "
+                f"[[{list_page_name}]]: {exc} Please check and fix this."
             )
             return
 
-        # This function first needs to find the gallery
-        # then inside the gallery tags remove the last line and
-        # add this candidate to the top
-        # Thanks KODOS for a nice regexp gui
-        # This adds ourself first in the list of length 4 and removes the last
-        # all in the chosen gallery
-        out("Looking for gallery: '%s'" % wikipattern(gallery))
-        ListPageR = re.compile(
-            r"(^==\s*{{{\s*\d+\s*\|%s\s*}}}\s*==\s*<gallery.*>\s*)(.*\s*)(.*\s*.*\s*)(.*\s*)(</gallery>)"
-            % wikipattern(gallery),
-            re.MULTILINE,
+        # Check if the image is already on the page.
+        # This can happen if the process has previously been interrupted.
+        if re.search(wikipattern(filename), old_text):
+            out(
+                f"Skipping addToFeaturedList() for '{filename}', "
+                "image is already listed."
+            )
+            return
+
+        # Find the correct section and its <gallery> element;
+        # remove the last entry/entries from the <gallery> element,
+        # keeping the 3 newest ones, and insert the new FP before them.
+        esc_name = wikipattern(section_name)
+        match = re.search(
+            r"\n==\s*\{\{\{\s*\d+\s*\|\s*" + esc_name + r"\s*\}\}\}\s*==\s*"
+            r"<gallery[^\n>]*>(.+?)</gallery>",
+            old_text,
+            flags=re.DOTALL,
         )
-        new_text = re.sub(ListPageR, r"\1%s\n\2\3\5" % file, old_text)
-        commit(old_text, new_text, page, "Added [[%s]]" % file)
+        if not match:
+            error(f"Error - can't find gallery section '{section_name}'.")
+            ask_for_help(
+                f"The bot could not add the new FP [[{filename}]] "
+                f"to the list of recent FPs at [[{list_page_name}]] "
+                f"because it did not find the section ''{section_name}''. "
+                "Either there is no subheading with that name, "
+                "or it is not followed immediately by a valid "
+                "<code><nowiki><gallery></nowiki></code> element. "
+                "Please check whether the list page is OK or needs a fix, "
+                "and add the new FP by hand to the correct section."
+            )
+            return
+        entries = match.group(1).strip().splitlines()
+        formatted = "\n".join(entry.strip() for entry in entries[:3])
+        new_text = (
+            old_text[:match.start(1)]
+            + f"\n{filename}|{bare_filename(filename)}\n"
+            + f"{formatted}\n"
+            + old_text[match.end(1):]
+        )
+
+        # Commit the new text
+        summary = f"Added [[{filename}]] to section '{section_name}'"
+        commit(old_text, new_text, page, summary)
 
     def addToGalleryPage(self, gallery_link, files):
         """
