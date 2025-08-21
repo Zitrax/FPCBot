@@ -323,6 +323,10 @@ class Candidate(abc.ABC):
         if self.daysOld() < 5:
             return False
 
+        # Rules of the fifth day don't apply to nominations with alternatives
+        if self.imageCount() > 1:
+            return False
+
         self.countVotes()
 
         # First rule of the fifth day
@@ -333,7 +337,7 @@ class Candidate(abc.ABC):
         if self._pro >= 10 and self._con == 0:
             return True
 
-        # If we arrive here, no rule applies.
+        # If we arrive here, no rule applies
         return False
 
     def closePage(self):
@@ -367,9 +371,9 @@ class Candidate(abc.ABC):
             self.moveToLog(why)
             return True
 
-        # Rules of the fifth day do not apply to nominations with alternatives
-        fifth_day = False if self.imageCount() > 1 else self.rulesOfFifthDay()
-        if not fifth_day and not self.isDone():
+        # Is the nomination still active?
+        fifth_day = self.rulesOfFifthDay()
+        if not self.isDone() and not fifth_day:
             out(f"{cut_title}: (still active, ignoring)")
             return False
 
@@ -408,10 +412,7 @@ class Candidate(abc.ABC):
             new_text = self.fixHeading(new_text)
 
         # Save the new text of the nomination subpage
-        summary = (
-            self.getCloseCommitComment()
-            + (f" (FifthDay={'yes' if fifth_day else 'no'})")
-        )
+        summary = self.getCloseCommitComment(fifth_day)
         commit(old_text, new_text, self._page, summary)
         return True
 
@@ -468,10 +469,13 @@ class Candidate(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def getCloseCommitComment(self):
+    def getCloseCommitComment(self, fifth_day):
         """
         Returns the commit comment to be used when closing a nomination.
         Must be implemented by the subclasses.
+
+        @param fifth_day Is the nomination closed early because the Rules
+        of the 5th day apply to it?
         """
         pass
 
@@ -993,14 +997,19 @@ class FPCandidate(Candidate):
                 "|sig=~~~~}}"
             )
 
-    def getCloseCommitComment(self):
-        """Implementation for delisting candidates."""
+    def getCloseCommitComment(self, fifth_day):
+        """Implementation for FP candidates."""
         if self.imageCount() > 1:
-            return "Closing for review - contains alternatives, needs manual count"
+            return (
+                "Closing for review - contains alternatives, "
+                "needs manual counting"
+            )
         else:
             return (
-                "Closing for review (%d support, %d oppose, %d neutral, featured=%s)"
-                % (self._pro, self._con, self._neu, "yes" if self.isPassed() else "no")
+                f"Closing for review ({self._pro} support, "
+                f"{self._con} oppose, {self._neu} neutral, "
+                f"featured: {'yes' if self.isPassed() else 'no'}, "
+                f"5th day: {'yes' if fifth_day else 'no'})"
             )
 
     def handlePassedCandidate(self, results):
@@ -1839,19 +1848,20 @@ class DelistCandidate(Candidate):
             "|sig=~~~~}}"
         )
 
-    def getCloseCommitComment(self):
+    def getCloseCommitComment(self, fifth_day):
         """Implementation for delisting candidates."""
         if self.imageCount() != 1 or self.isSet():
             # A delist-and-replace or a set delisting nomination
             return (
                 "Closing for review - looks like a delist-and-replace "
-                "or set delisting nomination, needs manual count"
+                "or set delisting nomination, needs manual counting"
             )
         # A simple delisting nomination
         return (
             "Closing for review "
             f"({self._pro} delist, {self._con} keep, {self._neu} neutral, "
-            f"delisted={'yes' if self.isPassed() else 'no'})"
+            f"delisted: {'yes' if self.isPassed() else 'no'}, "
+            f"5th day: {'yes' if fifth_day else 'no'})"
         )
 
     def handlePassedCandidate(self, results):
