@@ -338,87 +338,81 @@ class Candidate(abc.ABC):
 
     def closePage(self):
         """
-        Will add the voting results to the page if it is finished.
-        If it was, True is returned else False
+        Checks whether the nomination is finished and can be closed or not.
+        If yes, adds the provisional results to the nomination subpage
+        and returns True, else returns False.
         """
+        subpage_name = self._page.title()
+        cut_title = self.cutTitle()
 
         # First make sure that the page actually exists
         if not self._page.exists():
-            error('"%s" Error: no such page?!' % self.cutTitle())
+            error(f"{cut_title}: (Error: no such page?!)")
             ask_for_help(
                 list_includes_missing_subpage.format(
-                    list=self._listPageName, subpage=self._page.title()
+                    list=self._listPageName, subpage=subpage_name
                 )
             )
             return False
 
+        # Close a withdrawn or FPXed nomination if at least one full day
+        # has passed since the last edit
         if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
-            # Will close withdrawn nominations if there are more than one
-            # full day since the last edit
-
+            old_enough = self.daysSinceLastEdit() > 0
+            action = "closing" if old_enough else "but waiting a day"
             why = "withdrawn" if self.isWithdrawn() else "FPXed"
-
-            oldEnough = self.daysSinceLastEdit() > 0
-            out(
-                '"%s" %s %s'
-                % (
-                    self.cutTitle(),
-                    why,
-                    "closing" if oldEnough else "but waiting a day",
-                )
-            )
-
-            if not oldEnough:
+            out(f"{cut_title}: {why} {action}")
+            if not old_enough:
                 return False
-
             self.moveToLog(why)
             return True
 
-        # We skip rule of the fifth day if we have several alternatives
-        fifthDay = False if self.imageCount() > 1 else self.rulesOfFifthDay()
-
-        if not fifthDay and not self.isDone():
-            out('"%s" is still active, ignoring' % self.cutTitle())
+        # Rules of the fifth day do not apply to nominations with alternatives
+        fifth_day = False if self.imageCount() > 1 else self.rulesOfFifthDay()
+        if not fifth_day and not self.isDone():
+            out(f"{cut_title}: (still active, ignoring)")
             return False
 
-        old_text = self._page.get(get_redirect=True)
-        if not old_text:
-            error('"%s" Error: has no content' % self.cutTitle())
+        # Is there any other reason not to close the nomination?
+        try:
+            old_text = self._page.get(get_redirect=False)
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"{cut_title}: (Error: is not readable)")
             ask_for_help(
-                f"The nomination subpage [[{self._page.title()}]] "
+                "The bot could not read the nomination subpage "
+                f"[[{subpage_name}]]: {exc} Please check and fix this."
+            )
+            return False
+        if not old_text:
+            error(f"{cut_title}: (Error: has no content)")
+            ask_for_help(
+                f"The nomination subpage [[{subpage_name}]] "
                 f"seems to be empty. {please_fix_hint}"
             )
             return False
-
-        if re.search(r"{{\s*FPC-closed-ignored.*}}", old_text):
-            out('"%s" is marked as ignored, so ignoring' % self.cutTitle())
+        if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", old_text):
+            out(f"{cut_title}: (marked as ignored, so ignoring)")
+            return False
+        if self._CountedR.search(old_text):
+            out(f"{cut_title}: (needs review, ignoring)")
+            return False
+        if self._ReviewedR.search(old_text):
+            out(f"{cut_title}: (already closed and reviewed, ignoring)")
             return False
 
-        if re.search(self._CountedR, old_text):
-            out('"%s" needs review, ignoring' % self.cutTitle())
-            return False
-
-        if re.search(self._ReviewedR, old_text):
-            out('"%s" already closed and reviewed, ignoring' % self.cutTitle())
-            return False
-
+        # OK, we should close the nomination
         if self.imageCount() <= 1:
             self.countVotes()
-
         new_text = old_text.rstrip() + "\n\n" + self.getResultString()
-
-        # Append a keyword for the result to the heading
         if self.imageCount() <= 1:
             new_text = self.fixHeading(new_text)
 
-        commit(
-            old_text,
-            new_text,
-            self._page,
+        # Save the new text of the nomination subpage
+        summary = (
             self.getCloseCommitComment()
-            + (" (FifthDay=%s)" % ("yes" if fifthDay else "no")),
+            + (f" (FifthDay={'yes' if fifth_day else 'no'})")
         )
-
+        commit(old_text, new_text, self._page, summary)
         return True
 
     def fixHeading(self, text, value=None):
