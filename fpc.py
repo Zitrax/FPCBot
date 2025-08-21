@@ -591,8 +591,8 @@ class Candidate(abc.ABC):
         return False
 
     def isIgnored(self):
-        """Some nominations currently require manual check."""
-        return self.imageCount() != 1
+        """Nominations with alternative images require manual counting."""
+        return self.imageCount() > 1
 
     def sectionCount(self):
         """Counts the number of sections in this nomination."""
