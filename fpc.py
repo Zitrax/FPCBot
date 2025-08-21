@@ -992,7 +992,7 @@ class FPCandidate(Candidate):
             return (
                 "{{FPC-results-unreviewed"
                 f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
-                f"|featured={'yes' if self.isPassed() else 'no'}"
+                f"|featured={yes_no(self.isPassed())}"
                 f"|gallery={gallery}"
                 "|sig=~~~~}}"
             )
@@ -1008,8 +1008,8 @@ class FPCandidate(Candidate):
             return (
                 f"Closing for review ({self._pro} support, "
                 f"{self._con} oppose, {self._neu} neutral, "
-                f"featured: {'yes' if self.isPassed() else 'no'}, "
-                f"5th day: {'yes' if fifth_day else 'no'})"
+                f"featured: {yes_no(self.isPassed())}, "
+                f"5th day: {yes_no(fifth_day)})"
             )
 
     def handlePassedCandidate(self, results):
@@ -1844,7 +1844,7 @@ class DelistCandidate(Candidate):
         return (
             "{{FPC-delist-results-unreviewed"
             f"|delist={self._pro}|keep={self._con}|neutral={self._neu}"
-            f"|delisted={'yes' if self.isPassed() else 'no'}"
+            f"|delisted={yes_no(self.isPassed())}"
             "|sig=~~~~}}"
         )
 
@@ -1860,8 +1860,8 @@ class DelistCandidate(Candidate):
         return (
             "Closing for review "
             f"({self._pro} delist, {self._con} keep, {self._neu} neutral, "
-            f"delisted: {'yes' if self.isPassed() else 'no'}, "
-            f"5th day: {'yes' if fifth_day else 'no'})"
+            f"delisted: {yes_no(self.isPassed())}, "
+            f"5th day: {yes_no(fifth_day)})"
         )
 
     def handlePassedCandidate(self, results):
@@ -2379,6 +2379,11 @@ def bare_filename(filename):
         filename,
         count=1,
     ).strip()
+
+
+def yes_no(value):
+    """Translates a boolean value to 'yes' and 'no' resp."""
+    return "yes" if value else "no"
 
 
 def user_page_link(username):
