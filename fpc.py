@@ -361,7 +361,7 @@ class Candidate(abc.ABC):
 
         # Close a withdrawn or FPXed nomination if at least one full day
         # has passed since the last edit
-        if (self.isWithdrawn() or self.isFPX()) and self.imageCount() <= 1:
+        if self.isWithdrawn() or self.isFPX():
             old_enough = self.daysSinceLastEdit() > 0
             action = "closing" if old_enough else "but waiting a day"
             why = "withdrawn" if self.isWithdrawn() else "FPXed"
