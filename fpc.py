@@ -1102,9 +1102,10 @@ class FPCandidate(Candidate):
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read list of recent FPs: {exc}")
             ask_for_help(
-                "The bot could not read the list of recent FPs at "
-                f"[[{list_page_name}]]: {format_exception(exc)}. "
-                "Please check and fix this."
+                "The bot could not read the list of recent Featured pictures "
+                f"at [[{list_page_name}]]: {format_exception(exc)}. "
+                "Please check and fix that page, and add the new FP "
+                f"[[:{filename}]] to the section ''{section_name}''."
             )
             return
 
@@ -1130,8 +1131,8 @@ class FPCandidate(Candidate):
         if not match:
             error(f"Error - can't find gallery section '{section_name}'.")
             ask_for_help(
-                f"The bot could not add the new FP [[{filename}]] "
-                f"to the list of recent FPs at [[{list_page_name}]] "
+                "The bot could not add the new Featured picture "
+                f"[[:{filename}]] to the list at [[{list_page_name}]] "
                 f"because it did not find the section ''{section_name}''. "
                 "Either there is no subheading with that name, "
                 "or it is not followed immediately by a valid "
