@@ -384,7 +384,8 @@ class Candidate(abc.ABC):
             error(f"{cut_title}: (Error: is not readable)")
             ask_for_help(
                 "The bot could not read the nomination subpage "
-                f"[[{subpage_name}]]: {exc} Please check and fix this."
+                f"[[{subpage_name}]]: {format_exception(exc)}. "
+                f"{please_fix_hint}"
             )
             return False
         if not old_text:
@@ -1102,7 +1103,8 @@ class FPCandidate(Candidate):
             error(f"Error - can't read list of recent FPs: {exc}")
             ask_for_help(
                 "The bot could not read the list of recent FPs at "
-                f"[[{list_page_name}]]: {exc} Please check and fix this."
+                f"[[{list_page_name}]]: {format_exception(exc)}. "
+                "Please check and fix this."
             )
             return
 
@@ -1189,8 +1191,8 @@ class FPCandidate(Candidate):
             error(f"Error - can't read gallery page '{full_page_name}': {exc}")
             ask_for_help(
                 "The bot could not read the gallery page "
-                f"[[{full_page_name}]] which was specified "
-                f"by the nomination [[{subpage_name}]]: {exc} "
+                f"[[{full_page_name}]] which was specified by "
+                f"the nomination [[{subpage_name}]]: {format_exception(exc)}. "
                 f"{please_check_gallery_and_sort_fps}"
             )
             return
@@ -1390,8 +1392,8 @@ class FPCandidate(Candidate):
                 "The bot could not add a Featured picture assessment claim "
                 "to the Structured data of one or more new FP(s) because "
                 "creating and connecting a Pywikibot <code>Site</code> object "
-                f"for Wikidata has failed: {exc}. Please add the claim "
-                "[[:wikidata:Special:EntityPage/P6731|"
+                f"for Wikidata has failed: {format_exception(exc)}. "
+                "Please add the claim [[:wikidata:Special:EntityPage/P6731|"
                 "Commons quality assessment (P6731)]]: "
                 "[[:wikidata:Special:EntityPage/Q63348049|"
                 "Wikimedia Commons featured picture (Q63348049)]] "
@@ -2194,8 +2196,8 @@ def findCandidates(list_page_name, delist):
     except pywikibot.exceptions.PageRelatedError as exc:
         error(f"Error - can't read candidate list '{list_page_name}': {exc}.")
         ask_for_help(
-            f"The bot cannot read the candidate list [[{list_page_name}]]: "
-            f"{exc} This is a serious problem, please check the page."
+            f"The bot could not read the candidate list [[{list_page_name}]]: "
+            f"{format_exception(exc)}. {serious_problem_check_page}"
         )
         return []
     without_comments = re.sub(r"<!--.+?-->", "", old_text, flags=re.DOTALL)
@@ -2313,10 +2315,17 @@ def checkCandidates(check, list_page_name, delist, descending=True):
                 check(candidate)
         except pywikibot.exceptions.NoPageError as exc:
             error(f"Error - no such page: '{exc}'")
-            ask_for_help(f"{exc} Please check this.")
+            ask_for_help(
+                "The bot could not find a page (perhaps it has been renamed "
+                f"without leaving a redirect): {format_exception(exc)}. "
+                f"{serious_problem_check_page}"
+            )
         except pywikibot.exceptions.LockedPageError as exc:
             error(f"Error - page is locked: '{exc}'")
-            ask_for_help(f"{exc} Please check this.")
+            ask_for_help(
+                "The bot could not edit a page because it is locked: "
+                f"{format_exception(exc)}. {serious_problem_check_page}"
+            )
         except Exception as exc:
             # Report exception with stack trace on the FPC talk page
             stack_trace = traceback.format_exc().rstrip()
@@ -2409,6 +2418,14 @@ def yes_no(value):
 def user_page_link(username):
     """Returns a link to the user page of the user."""
     return f"[[User:{username}|{username}]]"
+
+
+def format_exception(exc):
+    """Format an exception nicely in order to use it in requests for help."""
+    # Pywikibot exception messages often (but not always) end with '.'
+    message = str(exc).strip().rstrip('.')
+    name = type(exc).__name__
+    return f"''{message}'' (<code>{name}</code>)"
 
 
 def is_fp_assessment_claim(claim):
@@ -2735,6 +2752,9 @@ keep_templates = (
 
 please_fix_hint = (
     "Please check and fix this so that the bot can process the nomination."
+)
+serious_problem_check_page = (
+    "This is a serious problem, please check that page."
 )
 please_check_gallery_and_sort_fps = (
     "Please check that gallery page and add the new featured picture(s) "
