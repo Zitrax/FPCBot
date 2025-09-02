@@ -1377,7 +1377,27 @@ class FPCandidate(Candidate):
         iso_timestamp = re.sub(r"T.+Z$", "T00:00:00Z", iso_timestamp, count=1)
 
         # Prepare data for the FP assessment claim
-        fp_claim_site = pywikibot.Site("wikidata", "wikidata")
+        try:
+            fp_claim_site = pywikibot.Site("wikidata", "wikidata")
+        except pywikibot.exceptions.Error as exc:
+            # Creating a claim requires a Wikidata Site object, but sometimes
+            # creating it fails due to connection errors.  In this case we
+            # report the error and skip this step of the parking procedure,
+            # handing it over to manual handling by adding a request for help.
+            error(f"Error - could not create Site object for Wikidata: {exc}")
+            file_links = ", ".join(f"[[:{filename}]]" for filename in files)
+            ask_for_help(
+                "The bot could not add a Featured picture assessment claim "
+                "to the Structured data of one or more new FP(s) because "
+                "creating and connecting a Pywikibot <code>Site</code> object "
+                f"for Wikidata has failed: {exc}. Please add the claim "
+                "[[:wikidata:Special:EntityPage/P6731|"
+                "Commons quality assessment (P6731)]]: "
+                "[[:wikidata:Special:EntityPage/Q63348049|"
+                "Wikimedia Commons featured picture (Q63348049)]] "
+                f"to the Structured data of {file_links}."
+            )
+            return
         fp_claim_data = {
             "mainsnak": {
                 "snaktype": "value",
