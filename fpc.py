@@ -262,7 +262,7 @@ class Candidate(abc.ABC):
         if files_list:
             # Appyly uniform formatting to all filenames:
             files_list = [
-                f"File:{filename.strip().replace('_', ' ')}"
+                f"{FILE_NAMESPACE}{filename.strip().replace('_', ' ')}"
                 for filename in files_list
             ]
         else:
@@ -730,7 +730,7 @@ class Candidate(abc.ABC):
 
         # Try to derive the filename from the name of the nomination subpage,
         # using the standard 'File:' namespace
-        filename = PrefixR.sub("File:", self._page.title())
+        filename = PrefixR.sub(FILE_NAMESPACE, self._page.title())
         filename = re.sub(r" */ *\d+ *$", "", filename)  # Remove '/2' etc.
 
         # If there is no file with that name, use the name of the first image
@@ -768,7 +768,7 @@ class Candidate(abc.ABC):
         """
         name = self._page.title()
         name = name.replace("_", " ")
-        name = re.sub(wikipattern(candPrefix), "", name, count=1).strip()
+        name = re.sub(wikipattern(CAND_PREFIX), "", name, count=1).strip()
         if not keep_prefix:
             name = re.sub(
                 r"^(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:) *",
@@ -797,7 +797,7 @@ class Candidate(abc.ABC):
         now = datetime.datetime.now(datetime.UTC)
         year = now.year
         month = now.strftime("%B")  # Full local month name, here: English
-        log_link = f"Commons:Featured picture candidates/Log/{month} {year}"
+        log_link = f"{CAND_LOG_PREFIX}{month} {year}"
         log_page = pywikibot.Page(G_Site, log_link)
         try:
             old_log_text = log_page.get(get_redirect=True)
@@ -1087,15 +1087,14 @@ class FPCandidate(Candidate):
         filename = files[0]  # For set nominations just use the first file.
 
         # Read the list
-        list_page_name = "Commons:Featured pictures, list"
-        page = pywikibot.Page(G_Site, list_page_name)
+        page = pywikibot.Page(G_Site, GALLERY_LIST_PAGE_NAME)
         try:
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read list of recent FPs: {exc}")
             ask_for_help(
                 "The bot could not read the list of recent Featured pictures "
-                f"at [[{list_page_name}]]: {format_exception(exc)}. "
+                f"at [[{GALLERY_LIST_PAGE_NAME}]]: {format_exception(exc)}. "
                 "Please check and fix that page, and add the new FP "
                 f"[[:{filename}]] to the section ''{section_name}''."
             )
@@ -1124,7 +1123,7 @@ class FPCandidate(Candidate):
             error(f"Error - can't find gallery section '{section_name}'.")
             ask_for_help(
                 "The bot could not add the new Featured picture "
-                f"[[:{filename}]] to the list at [[{list_page_name}]] "
+                f"[[:{filename}]] to the list at [[{GALLERY_LIST_PAGE_NAME}]] "
                 f"because it did not find the section ''{section_name}''. "
                 "Either there is no subheading with that name, "
                 "or it is not followed immediately by a valid "
@@ -1168,7 +1167,7 @@ class FPCandidate(Candidate):
         section = link_parts[1].strip() if len(link_parts) > 1 else ""
 
         # Read the gallery page
-        full_page_name = f"Commons:Featured pictures/{gallery_page_name}"
+        full_page_name = f"{FP_PREFIX}{gallery_page_name}"
         page = pywikibot.Page(G_Site, full_page_name)
         try:
             old_text = page.get(get_redirect=False)
@@ -1515,7 +1514,7 @@ class FPCandidate(Candidate):
         now = datetime.datetime.now(datetime.UTC)
         year = now.year
         month = now.strftime("%B")  # Full local month name, here: English
-        monthpage = f"Commons:Featured pictures/chronological/{month} {year}"
+        monthpage = f"{CHRONO_ARCHIVE_PREFIX}{month} {year}"
         page = pywikibot.Page(G_Site, monthpage)
         try:
             old_text = page.get(get_redirect=True)
@@ -1601,7 +1600,7 @@ class FPCandidate(Candidate):
         @param files List with filename(s) of the featured picture or set.
         """
         # Get and read nominator talk page
-        talk_link = "User talk:" + self.nominator(link=False)
+        talk_link = f"{USER_TALK_NAMESPACE}{self.nominator(link=False)}"
         talk_page = pywikibot.Page(G_Site, talk_link)
         ignoring = "but ignoring since it's just the nominator notification."
         try:
@@ -1756,7 +1755,7 @@ class FPCandidate(Candidate):
         ignoring = f"but ignoring since it's just the {role} notification."
 
         # Find and read the user talk page
-        talk_link = "User talk:" + username
+        talk_link = f"{USER_TALK_NAMESPACE}{username}"
         if talk_link in ignored_pages:
             # Don't load or report undefined or locked talk pages twice
             return
@@ -1912,7 +1911,7 @@ class DelistCandidate(Candidate):
         # and even then that page will soon be updated anyway.
         nomination_link = self._page.title()
         filename = self.fileName()
-        fn_pattern = wikipattern(filename.replace("File:", ""))
+        fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
         file_page = pywikibot.FilePage(G_Site, title=filename)
         if not file_page.exists():
             error(f"Error - image '{filename}' not found.")
@@ -1922,7 +1921,7 @@ class DelistCandidate(Candidate):
         )
         for page in using_pages:
             page_name = page.title()
-            if not page_name.startswith("Commons:Featured pictures/"):
+            if not page_name.startswith(FP_PREFIX):
                 # Any other page -- don't remove the image here, of course.
                 continue
             try:
@@ -1930,7 +1929,7 @@ class DelistCandidate(Candidate):
             except pywikibot.exceptions.PageRelatedError as exc:
                 error(f"Error - could not read {page_name}: {exc}")
                 continue
-            if page_name.startswith("Commons:Featured pictures/chronological"):
+            if page_name.startswith(CHRONO_ARCHIVE_PREFIX):
                 # Chronological archive page: mark the image as delisted
                 out(f"Adding delist note to '{page_name}'...")
                 if match := re.search(
@@ -2410,7 +2409,7 @@ def yes_no(value):
 
 def user_page_link(username):
     """Returns a link to the user page of the user."""
-    return f"[[User:{username}|{username}]]"
+    return f"[[{USER_NAMESPACE}{username}|{username}]]"
 
 
 def format_exception(exc):
@@ -2503,17 +2502,16 @@ def ask_for_help(message):
     short, but complete sentences; normally they should end with a request
     to change this or that in order to help the bot.
     """
-    talk_page_name = "Commons talk:Featured picture candidates"
-    talk_page = pywikibot.Page(G_Site, talk_page_name)
+    talk_page = pywikibot.Page(G_Site, FP_TALK_PAGE_NAME)
     try:
         old_text = talk_page.get()
     except pywikibot.exceptions.PageRelatedError:
-        error(f"Error - could not read FPC talk page '{talk_page_name}'.")
+        error(f"Error - could not read FPC talk page '{FP_TALK_PAGE_NAME}'.")
     if message in old_text:
         return  # Don't post the same message twice.
     new_text = old_text.rstrip() + (
-        "\n\n== FPCBot asking for help ==\n"
-        "[[File:Robot icon.svg|64px|left|link=User:FPCBot]]\n"
+        f"\n\n== {BOT_NAME} asking for help ==\n"
+        f"[[File:Robot icon.svg|64px|left|link={USER_NAMESPACE}{BOT_NAME}]]\n"
         f"{message} Thank you! / ~~~~"
     )
     commit(old_text, new_text, talk_page, "Added request for help")
@@ -2634,7 +2632,22 @@ def commit_media_info_changes(
         out(f"Changes to '{filename}' ignored.")
 
 
-# Data and regexps used by the bot
+# Constants
+
+# Namespaces, prefixes, page names, etc.
+BOT_NAME = "FPCBot"
+FILE_NAMESPACE = "File:"
+USER_NAMESPACE = "User:"
+USER_TALK_NAMESPACE = "User talk:"
+FP_PREFIX = "Commons:Featured pictures/"
+CAND_PREFIX = "Commons:Featured picture candidates/"
+CAND_LOG_PREFIX = f"{CAND_PREFIX}Log/"
+CHRONO_ARCHIVE_PREFIX = f"{FP_PREFIX}chronological/"
+CAND_LIST_PAGE_NAME = f"{CAND_PREFIX}candidate list"
+TEST_LOG_PAGE_NAME = f"{CAND_LOG_PREFIX}January 2025"
+GALLERY_LIST_PAGE_NAME = "Commons:Featured pictures, list"
+FP_TALK_PAGE_NAME = "Commons talk:Featured picture candidates"
+
 
 # List of valid templates
 # They are taken from the page Commons:Polling_templates and some common redirects
@@ -2767,8 +2780,7 @@ list_includes_missing_subpage = (
 # Removes also any possible crap between the prefix and the namespace
 # and faulty spaces between namespace and filename (sometimes users
 # accidentally add such spaces when creating nominations).
-candPrefix = "Commons:Featured picture candidates/"
-PrefixR = re.compile(candPrefix + r".*?([Ff]ile|[Ii]mage): *")
+PrefixR = re.compile(wikipattern(CAND_PREFIX) + r".*?([Ff]ile|[Ii]mage): *")
 
 # Looks for results using the old, text-based results format
 # which was in use until August 2009.  An example of such a line is:
@@ -2889,9 +2901,7 @@ def main(*args):
     global G_MatchPattern
     global G_Site
 
-    # Define local constants and default values
-    candidates_page = "Commons:Featured picture candidates/candidate list"
-    test_log = "Commons:Featured picture candidates/Log/January 2025"
+    # Define default values
     delist = False
     fpc = False
 
@@ -2976,34 +2986,34 @@ def main(*args):
                     out("Recounting votes for FP candidates...", heading=True)
                     checkCandidates(
                         Candidate.compareResultToCount,
-                        test_log,
+                        TEST_LOG_PAGE_NAME,
                         delist=False,
                         descending=False,
                     )
             case "-close":
                 if delist:
                     out("Closing delist candidates...", heading=True)
-                    checkCandidates(Candidate.closePage, candidates_page, delist=True)
+                    checkCandidates(Candidate.closePage, CAND_LIST_PAGE_NAME, delist=True)
                 if fpc:
                     out("Closing FP candidates...", heading=True)
-                    checkCandidates(Candidate.closePage, candidates_page, delist=False)
+                    checkCandidates(Candidate.closePage, CAND_LIST_PAGE_NAME, delist=False)
             case "-info":
                 if delist:
                     out("Gathering info about delist candidates...", heading=True)
-                    checkCandidates(Candidate.printAllInfo, candidates_page, delist=True)
+                    checkCandidates(Candidate.printAllInfo, CAND_LIST_PAGE_NAME, delist=True)
                 if fpc:
                     out("Gathering info about FP candidates...", heading=True)
-                    checkCandidates(Candidate.printAllInfo, candidates_page, delist=False)
+                    checkCandidates(Candidate.printAllInfo, CAND_LIST_PAGE_NAME, delist=False)
             case "-park":
                 if G_Threads and G_Auto:
                     warn("Auto-parking using threads is disabled for now...")
                     sys.exit()
                 if delist:
                     out("Parking delist candidates...", heading=True)
-                    checkCandidates(Candidate.park, candidates_page, delist=True)
+                    checkCandidates(Candidate.park, CAND_LIST_PAGE_NAME, delist=True)
                 if fpc:
                     out("Parking FP candidates...", heading=True)
-                    checkCandidates(Candidate.park, candidates_page, delist=False)
+                    checkCandidates(Candidate.park, CAND_LIST_PAGE_NAME, delist=False)
             case _:
                 # This means we have forgotten to update the invalid_args test.
                 error(
