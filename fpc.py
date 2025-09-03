@@ -249,7 +249,7 @@ class Candidate(abc.ABC):
         files_list = re.findall(
             r"^ *(?:[Ff]ile|[Ii]mage):([^\n|]+)",
             text_inside_gallery,
-            flags=re.MULTILINE
+            flags=re.MULTILINE,
         )
         if not files_list:
             # If we did not find a single file, let's try a casual search
@@ -2415,7 +2415,7 @@ def user_page_link(username):
 def format_exception(exc):
     """Format an exception nicely in order to use it in requests for help."""
     # Pywikibot exception messages often (but not always) end with '.'
-    message = str(exc).strip().rstrip('.')
+    message = str(exc).strip().rstrip(".")
     name = type(exc).__name__
     return f"''{message}'' (<code>{name}</code>)"
 
