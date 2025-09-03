@@ -413,7 +413,7 @@ class Candidate(abc.ABC):
             new_text = self.fixHeading(new_text)
 
         # Save the new text of the nomination subpage
-        summary = self.getCloseCommitComment(fifth_day)
+        summary = self.getCloseEditSummary(fifth_day)
         commit(old_text, new_text, self._page, summary)
         return True
 
@@ -470,9 +470,9 @@ class Candidate(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def getCloseCommitComment(self, fifth_day):
+    def getCloseEditSummary(self, fifth_day):
         """
-        Returns the commit comment to be used when closing a nomination.
+        Returns the edit summary to be used when closing a nomination.
         Must be implemented by the subclasses.
 
         @param fifth_day Is the nomination closed early because the Rules
@@ -813,12 +813,8 @@ class Candidate(abc.ABC):
             )
         else:
             new_log_text = old_log_text + "\n{{" + subpage_name + "}}"
-            commit(
-                old_log_text,
-                new_log_text,
-                log_page,
-                f"Added [[{subpage_name}]]{why}",
-            )
+            summary = f"Added [[{subpage_name}]]{why}"
+            commit(old_log_text, new_log_text, log_page, summary)
 
         # Remove nomination from the list of current nominations
         candidates_list_page = pywikibot.Page(G_Site, self._listPageName)
@@ -832,12 +828,8 @@ class Candidate(abc.ABC):
                 "candidate not found in list."
             )
         else:
-            commit(
-                old_cand_text,
-                new_cand_text,
-                candidates_list_page,
-                f"Removed [[{subpage_name}]]{why}",
-            )
+            summary = f"Removed [[{subpage_name}]]{why}"
+            commit(old_cand_text, new_cand_text, candidates_list_page, summary)
 
     def park(self):
         """
@@ -998,7 +990,7 @@ class FPCandidate(Candidate):
                 "|sig=~~~~}}"
             )
 
-    def getCloseCommitComment(self, fifth_day):
+    def getCloseEditSummary(self, fifth_day):
         """Implementation for FP candidates."""
         if self.imageCount() > 1:
             return (
@@ -1212,14 +1204,14 @@ class FPCandidate(Candidate):
                 "image(s) already listed."
             )
             return
-        # Format the new entries and a summary for the message
+        # Format the new entries and a hint for the edit summary
         new_entries = "".join(
             f"{filename}|{bare_filename(filename)}\n"
             for filename in new_files
         )
-        files_for_msg = f"[[{new_files[0]}]]"
+        files_for_summary = f"[[{new_files[0]}]]"
         if len(new_files) > 1:
-            files_for_msg += f" and {len(new_files) - 1} more set file(s)"
+            files_for_summary += f" and {len(new_files) - 1} more set file(s)"
 
         # Have we got a section anchor?
         if section:
@@ -1246,8 +1238,8 @@ class FPCandidate(Candidate):
                 + new_entries
                 + old_text[match.end(0):]
             )
-            message = (
-                f"Added {files_for_msg} to section '{section}'"
+            summary = (
+                f"Added {files_for_summary} to section '{section}'"
             )
         else:
             # Either the section anchor was missing or empty,
@@ -1273,7 +1265,7 @@ class FPCandidate(Candidate):
                 + new_entries
                 + old_text[gallery_end_pos:]
             )
-            message = f"Added {files_for_msg} to the 'Unsorted' section"
+            summary = f"Added {files_for_summary} to the 'Unsorted' section"
             warn(
                 f"{'Invalid' if section else 'No'} gallery section, "
                 "adding image(s) to the 'Unsorted' section."
@@ -1295,7 +1287,7 @@ class FPCandidate(Candidate):
                 f"to the ''Unsorted'' section of [[{full_page_name}]]. "
                 "Please sort these images into the correct section."
             )
-        commit(old_text, new_text, page, message)
+        commit(old_text, new_text, page, summary)
 
     def addAssessments(self, files):
         """
@@ -1572,10 +1564,10 @@ class FPCandidate(Candidate):
         if self.isSet():
             set_name = self.subpageName(keep_prefix=False, keep_number=False)
             title = f"Set: {set_name} ({len(files)} files)"
-            message = f"Added set [[{self._page.title()}|{set_name}]]"
+            summary = f"Added set [[{self._page.title()}|{set_name}]]"
         else:
             title = bare_filename(filename)
-            message = f"Added [[{filename}]]"
+            summary = f"Added [[{filename}]]"
         creator_link = self.creator(link=True)
         uploader_link = self.uploader(filename, link=True)
         nominator_link = self.nominator(link=True)
@@ -1597,7 +1589,7 @@ class FPCandidate(Candidate):
             "</gallery>",
             1,
         )
-        commit(old_text, new_text, page, message)
+        commit(old_text, new_text, page, summary)
 
     def notifyNominator(self, files):
         """
@@ -1665,7 +1657,7 @@ class FPCandidate(Candidate):
                 "</gallery>\n"
                 f"{template} /~~~~"
             )
-            message = f"FP promotion of set [[{nomination_link}|{set_title}]]"
+            summary = f"FP promotion of set [[{nomination_link}|{set_title}]]"
 
         else:
             # Single FP nomination
@@ -1685,11 +1677,11 @@ class FPCandidate(Candidate):
                 "== FP Promotion ==\n"
                 f"{template} /~~~~"
             )
-            message = f"FP promotion of [[{filename}]]"
+            summary = f"FP promotion of [[{filename}]]"
 
         # Commit the new text
         try:
-            commit(old_text, new_text, talk_page, message)
+            commit(old_text, new_text, talk_page, summary)
         except pywikibot.exceptions.LockedPageError:
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
 
@@ -1817,9 +1809,9 @@ class FPCandidate(Candidate):
             "== FP Promotion ==\n"
             f"{template} /~~~~"
         )
-        message = f"FP promotion of [[{filename}]]"
+        summary = f"FP promotion of [[{filename}]]"
         try:
-            commit(old_text, new_text, talk_page, message)
+            commit(old_text, new_text, talk_page, summary)
         except pywikibot.exceptions.LockedPageError:
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
             ignored_pages.add(talk_link)
@@ -1871,7 +1863,7 @@ class DelistCandidate(Candidate):
             "|sig=~~~~}}"
         )
 
-    def getCloseCommitComment(self, fifth_day):
+    def getCloseEditSummary(self, fifth_day):
         """Implementation for delisting candidates."""
         if self.imageCount() != 1 or self.isSet():
             # A delist-and-replace or a set delisting nomination
@@ -2264,10 +2256,10 @@ def findCandidates(list_page_name, delist):
         new_text = old_text
         for full_entry, new_entry in redirects:
             new_text = new_text.replace(full_entry, new_entry, 1)
-        message = (
+        summary = (
             f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
         )
-        commit(old_text, new_text, page, message)
+        commit(old_text, new_text, page, summary)
     return candidates
 
 
@@ -2527,13 +2519,13 @@ def ask_for_help(message):
     commit(old_text, new_text, talk_page, "Added request for help")
 
 
-def _confirm_changes(page_name, comment=None):
+def _confirm_changes(page_name, summary=None):
     """
     Subroutine with shared code for asking whether the proposed changes
     should be saved or discarded.
 
     @param page_name: Name (title) of the Wikimedia Commons page.
-    @param comment:   Optional string with the edit summary/commit message;
+    @param summary:   Optional string with the edit summary;
         omit if there is no custom edit summary, i.e. for Media Info
         (structured data) changes.
 
@@ -2547,7 +2539,7 @@ def _confirm_changes(page_name, comment=None):
         return True
     choice = pywikibot.bot.input_choice(
         f"Do you want to accept these changes to '{page_name}'"
-        + (f" with comment '{comment}'?" if comment else "?"),
+        + (f" with summary '{summary}'?" if summary else "?"),
         [("yes", "y"), ("no", "n"), ("quit", "q")],
         automatic_quit=False,
     )
@@ -2564,7 +2556,7 @@ def _confirm_changes(page_name, comment=None):
             sys.exit()
 
 
-def commit(old_text, new_text, page, comment):
+def commit(old_text, new_text, page, summary):
     """
     This will commit the new text of the page.
     Unless running in automatic mode it first shows the diff and asks
@@ -2573,7 +2565,7 @@ def commit(old_text, new_text, page, comment):
     @param old_text Old text of the page, used to show the diff.
     @param new_text New text of the page to be submitted.
     @param page     Pywikibot Page object for the concerned Commons page.
-    @param comment  The edit comment/summary for the page history.
+    @param summary  The edit summary for the page history.
     """
     # Show the diff
     page_name = page.title()
@@ -2586,8 +2578,8 @@ def commit(old_text, new_text, page, comment):
     )
 
     # Decide whether to save the changes
-    if _confirm_changes(page_name, comment):
-        page.put(new_text, summary=comment, watch=None, minor=False)
+    if _confirm_changes(page_name, summary):
+        page.put(new_text, summary=summary, watch=None, minor=False)
     else:
         out(f"Changes to '{page_name}' ignored.")
 
