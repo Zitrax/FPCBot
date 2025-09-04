@@ -1896,12 +1896,13 @@ class DelistCandidate(Candidate):
                 "and remove or replace them manually."
             )
             return
-        self.removeFromGalleryPages(results)
-        self.removeAssessments()
-        self.removeAssessmentFromMediaInfo()
+        filename = self.fileName()
+        self.removeFromGalleryPages(filename, results)
+        self.removeAssessments(filename)
+        self.removeAssessmentFromMediaInfo(filename)
         self.moveToLog(self._proString)
 
-    def removeFromGalleryPages(self, results):
+    def removeFromGalleryPages(self, filename, results):
         """
         Remove a delisted FP from the FP gallery pages and mark its entry
         in the chronological archive as delisted.
@@ -1910,7 +1911,6 @@ class DelistCandidate(Candidate):
         # the chance that the image is still there is very small,
         # and even then that page will soon be updated anyway.
         nomination_link = self._page.title()
-        filename = self.fileName()
         fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
         file_page = pywikibot.FilePage(G_Site, title=filename)
         if not file_page.exists():
@@ -1986,10 +1986,9 @@ class DelistCandidate(Candidate):
                     f"did not work on '{page_name}'."
                 )
 
-    def removeAssessments(self):
+    def removeAssessments(self, filename):
         """Remove FP status from the image description page."""
         # Get and read image description page
-        filename = self.fileName()
         image_page = pywikibot.Page(G_Site, filename)
         try:
             old_text = image_page.get(get_redirect=False)
@@ -2066,14 +2065,13 @@ class DelistCandidate(Candidate):
                 f"did not work."
             )
 
-    def removeAssessmentFromMediaInfo(self):
+    def removeAssessmentFromMediaInfo(self, filename):
         """
         Remove the 'Commons quality assessment' (P6731) claim
         'Wikimedia Commons featured picture' (Q63348049)
         from the Media Info (structured data) for the image.
         """
         # Get the Media Info for the image
-        filename = self.fileName()
         file_page = pywikibot.FilePage(G_Site, title=filename)
         if not file_page.exists():
             error(f"Error - image '{filename}' not found.")
