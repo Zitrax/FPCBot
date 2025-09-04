@@ -1092,11 +1092,11 @@ class FPCandidate(Candidate):
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read list of recent FPs: {exc}")
+            fexc = format_exception(exc)
             ask_for_help(
-                "The bot could not read the list of recent Featured pictures "
-                f"at [[{GALLERY_LIST_PAGE_NAME}]]: {format_exception(exc)}. "
-                "Please check and fix that page, and add the new FP "
-                f"[[:{filename}]] to the section ''{section_name}''."
+                could_not_read_recent_fps_list.format(exception=fexc)
+                + f" Then please add the new FP [[:{filename}]] "
+                f"to the section ''{section_name}''."
             )
             return
 
@@ -1897,19 +1897,60 @@ class DelistCandidate(Candidate):
             )
             return
         filename = self.fileName()
+        self.removeFromFeaturedList(filename)
         self.removeFromGalleryPages(filename, results)
         self.removeAssessments(filename)
         self.removeAssessmentFromMediaInfo(filename)
         self.moveToLog(self._proString)
+
+    def removeFromFeaturedList(self, filename):
+        """
+        Remove a delisted FP from the list with recently featured images
+        that is used on the FP landing page.
+
+        Usually this is not necessary.  Until August 2025, a comment said:
+        'We skip checking the FP landing page with the newest FPs;
+        the chance that the image is still there is very small,
+        and even then that page will soon be updated anyway.'
+        That's correct.  But some sections of the list are updated
+        only very rarely (e.g. the 'Other lifeforms' section),
+        so a delisted FP could stay there for years.  That would be bad,
+        and removing a FP from the list is easy, so let's just do it.
+        """
+        # Read the list
+        page = pywikibot.Page(G_Site, GALLERY_LIST_PAGE_NAME)
+        try:
+            old_text = page.get(get_redirect=False)
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"Error - can't read list of recent FPs: {exc}")
+            fexc = format_exception(exc)
+            ask_for_help(
+                could_not_read_recent_fps_list.format(exception=fexc)
+                + f" If the delisted FP [[:{filename}]] "
+                "appears on that page, please remove it."
+            )
+            return
+
+        # Remove the image, if present, from the list
+        new_text, n = re.subn(
+            r"\n[^\n]*" + wikipattern(filename) + r"[^\n]*",
+            "",
+            old_text,
+        )
+        if n == 0:
+            out(
+                f"Skipping removeFromFeaturedList() for '{filename}', "
+                "image not found in list."
+            )
+            return
+        summary = f"Removed [[{filename}]] per [[{self._page.title()}]]"
+        commit(old_text, new_text, page, summary)
 
     def removeFromGalleryPages(self, filename, results):
         """
         Remove a delisted FP from the FP gallery pages and mark its entry
         in the chronological archive as delisted.
         """
-        # We skip checking the FP landing page with the newest FPs;
-        # the chance that the image is still there is very small,
-        # and even then that page will soon be updated anyway.
         nomination_link = self._page.title()
         fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
         file_page = pywikibot.FilePage(G_Site, title=filename)
@@ -2767,7 +2808,12 @@ please_check_gallery_and_sort_fps = (
 list_includes_missing_subpage = (
     "The candidate list [[{list}]] includes the nomination [[{subpage}]], "
     "but that page does not exist. Perhaps the page has been renamed "
-    "and the list needs to be updated. " + please_fix_hint
+    f"and the list needs to be updated. {please_fix_hint}"
+)
+could_not_read_recent_fps_list = (
+    f"The bot could not read [[{GALLERY_LIST_PAGE_NAME}|the list]] "
+    "of recent Featured pictures: {exception}. "
+    "Please check the list page and fix it."
 )
 
 
