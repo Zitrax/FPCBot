@@ -1366,9 +1366,8 @@ class FPCandidate(Candidate):
         try:
             timestamp = self._page.latest_revision.timestamp
         except pywikibot.exceptions.PageRelatedError:
-            timestamp = G_Site.server_time()
-        iso_timestamp = timestamp.isoformat(sep="T")
-        iso_timestamp = re.sub(r"T.+Z$", "T00:00:00Z", iso_timestamp, count=1)
+            timestamp = datetime.datetime.now(datetime.UTC)
+        iso_timestamp = timestamp.strftime("%Y-%m-%dT00:00:00Z")
 
         # Prepare data for the FP assessment claim
         try:
