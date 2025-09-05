@@ -1024,7 +1024,8 @@ class FPCandidate(Candidate):
             error(f"{cut_title}: (ignoring, gallery not defined)")
             ask_for_help(
                 f"The gallery link in the nomination [[{subpage_name}]] "
-                f"is empty or broken. {please_fix_hint}"
+                f"is empty or broken. {please_fix_hint}",
+                nominator=self.nominator(link=False),
             )
             return
         basic_gallery = re.search(r"^(.*?)(?:/|$)", gallery_page).group(1)
@@ -1176,7 +1177,8 @@ class FPCandidate(Candidate):
             ask_for_help(
                 f"The gallery page [[{full_page_name}]] which was specified "
                 f"by the nomination [[{subpage_name}]] does not exist. "
-                f"{please_check_gallery_and_sort_fps}"
+                f"{please_check_gallery_and_sort_fps}",
+                nominator=self.nominator(link=False),
             )
             return
         except pywikibot.exceptions.PageRelatedError as exc:
@@ -1284,7 +1286,8 @@ class FPCandidate(Candidate):
                 f"[[{subpage_name}]] {problem} "
                 "Therefore one or more new featured pictures are added "
                 f"to the ''Unsorted'' section of [[{full_page_name}]]. "
-                "Please sort these images into the correct section."
+                "Please sort these images into the correct section.",
+                nominator=self.nominator(link=False),
             )
         commit(old_text, new_text, page, summary)
 
@@ -2529,7 +2532,7 @@ def findEndOfTemplate(text, template):
     return 0
 
 
-def ask_for_help(message):
+def ask_for_help(message, nominator=None):
     """
     Adds a short notice to the FPC talk page, asking for help with a problem.
     This is useful if the problem is very probably caused by a broken link,
@@ -2539,6 +2542,9 @@ def ask_for_help(message):
     @param message A concise description of the problem in one or two
     short, but complete sentences; normally they should end with a request
     to change this or that in order to help the bot.
+    @param nominator The user name of the nominator if you want to ping them.
+    Don't use this for technical problems, but only when the nominator
+    is clearly responsible (and should be able) to fix the issue.
     """
     talk_page = pywikibot.Page(G_Site, FP_TALK_PAGE_NAME)
     try:
@@ -2552,6 +2558,11 @@ def ask_for_help(message):
         f"[[File:Robot icon.svg|64px|left|link={USER_NAMESPACE}{BOT_NAME}]]\n"
         f"{message} Thank you! / ~~~~"
     )
+    if nominator:
+        new_text += (
+            f"\n\n:Hi {{{{ping|{nominator}}}}} This is your nomination, "
+            "could you please sort this out? Thank you! / ~~~~"
+        )
     commit(old_text, new_text, talk_page, "Added request for help")
 
 
