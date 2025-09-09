@@ -141,6 +141,7 @@ class Candidate(abc.ABC):
         """
         try:
             self.countVotes()
+            withdrawn = self.isWithdrawn() or self.isFPX()
             out(
                 "%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%02d Im:%02d W:%s (%s)"
                 % (
@@ -152,7 +153,7 @@ class Candidate(abc.ABC):
                     self.daysSinceLastEdit(),
                     self.sectionCount(),
                     self.imageCount(),
-                    "True " if self.isWithdrawn() else "False",
+                    "True " if withdrawn else "False",
                     self.statusString(),
                 )
             )
@@ -308,15 +309,16 @@ class Candidate(abc.ABC):
         self._votesCounted = True
 
     def isWithdrawn(self):
-        """Withdrawn nominations should not be counted."""
+        """Has the nomination been marked as withdrawn?"""
         text = self._page.get(get_redirect=True)
         text = filter_content(text)
-        withdrawn = len(re.findall(WithdrawnR, text))
-        return withdrawn > 0
+        return WithdrawnR.search(text) is not None
 
     def isFPX(self):
-        """Page marked with FPX template."""
-        return len(re.findall(FpxR, self._page.get(get_redirect=True)))
+        """Is the nomination marked with a {{FPX}} or {{FPD}} template?"""
+        text = self._page.get(get_redirect=True)
+        text = filter_content(text)
+        return FpxR.search(text) is not None
 
     def rulesOfFifthDay(self):
         """Check if any of the rules of the fifth day can be applied."""
@@ -359,13 +361,13 @@ class Candidate(abc.ABC):
             )
             return False
 
-        # Close a withdrawn or FPXed nomination if at least one full day
+        # Close a withdrawn or FPXed/FPDed nomination if at least one full day
         # has passed since the last edit
-        if self.isWithdrawn() or self.isFPX():
+        if (withdrawn := self.isWithdrawn()) or self.isFPX():
             old_enough = self.daysSinceLastEdit() > 0
             action = "closing" if old_enough else "but waiting a day"
-            why = "withdrawn" if self.isWithdrawn() else "FPXed"
-            out(f"{cut_title}: {why} {action}")
+            why = "withdrawn" if withdrawn else "FPXed/FPDed"
+            out(f"{cut_title}: {why}, {action}")
             if not old_enough:
                 return False
             self.moveToLog(why)
@@ -516,6 +518,8 @@ class Candidate(abc.ABC):
             return reviewed
         if self.isWithdrawn():
             return "Withdrawn"
+        if self.isFPX():
+            return "FPXed/FPDed"
         if self.isIgnored():
             return "Ignored"
         if self.isDone() or self.rulesOfFifthDay():
@@ -662,7 +666,7 @@ class Candidate(abc.ABC):
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
         elif self.isFPX():
-            out("%s: (ignoring, was FPXed)" % self.cutTitle())
+            out("%s: (ignoring, was FPXed/FPDed)" % self.cutTitle())
             return
         elif self.imageCount() > 1:
             out("%s: (ignoring, contains alternatives)" % self.cutTitle())
@@ -852,7 +856,15 @@ class Candidate(abc.ABC):
             )
             return
 
-        # First look for verified results
+        # Withdrawn/FPXed/FPDed nominations are handled by closePage()
+        if self.isWithdrawn():
+            out(f"{cut_title}: (ignoring, was withdrawn)")
+            return
+        if self.isFPX():
+            out(f"{cut_title}: (ignoring, was FPXed/FPDed)")
+            return
+
+        # Look for verified results
         # (leaving out stricken or commented results which have been corrected)
         text = self._page.get(get_redirect=True)
         redacted_text = filter_content(text)
@@ -868,12 +880,6 @@ class Candidate(abc.ABC):
                 "more than one verified result. "
                 "Please remove (or cross out) all but one of the results."
             )
-            return
-        if self.isWithdrawn():
-            out(f"{cut_title}: (ignoring, was withdrawn)")
-            return
-        if self.isFPX():
-            out(f"{cut_title}: (ignoring, was FPXed)")
             return
 
         # Check that the image page(s) exist, if not ignore this candidate
@@ -2890,12 +2896,10 @@ DelistR = re.compile(
     r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(delist_templates), re.MULTILINE
 )
 KeepR = re.compile(r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(keep_templates), re.MULTILINE)
-# Finds if a withdraw template is used
-# This template has an optional string which we
-# must be able to detect after the pipe symbol
-WithdrawnR = re.compile(r"{{\s*(?:[wW]ithdrawn?|[fF]PD)\s*(\|.*)?}}", re.MULTILINE)
-# Nomination that contain the fpx template
-FpxR = re.compile(r"{{\s*FPX(\|.*)?}}", re.MULTILINE)
+# Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
+WithdrawnR = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
+# Does the nomination contain a {{FPX}} or {{FPD}} template?
+FpxR = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
 # Counts the number of displayed images
 ImagesR = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
 # Look for a size specification of the image link
