@@ -53,13 +53,23 @@ from pywikibot import config
 
 
 class ThreadCheckCandidate(threading.Thread):
+    """
+    A simple thread subclass representing and handling the execution
+    of one of the bot's task on a certain candidate (nomination).
+    """
+
     def __init__(self, candidate, check):
-        threading.Thread.__init__(self)
-        self.candidate = candidate
-        self.check = check
+        """
+        The initializer initializes the thread and saves references
+        to the Candidate instance and to the method which should be called.
+        """
+        super().__init__(self)
+        self._candidate = candidate
+        self._check = check
 
     def run(self):
-        self.check(self.candidate)
+        """Execute the desired task for the candidate."""
+        self._check(self._candidate)
 
 
 class Candidate(abc.ABC):
