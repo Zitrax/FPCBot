@@ -3090,14 +3090,17 @@ def main(*args):
                 sys.exit()
 
 
-def signal_handler(signal, frame):
+def signal_handler(signal_number, frame):
+    """Handle a SIGINT (keyboard, Ctrl-C) interrupt."""
     global G_Abort
     print("\n\nReceived SIGINT, will abort...\n")
     G_Abort = True
 
 
+# Install a custom handler for SIGINT (keyboard, Ctrl-C) interrupts
 signal.signal(signal.SIGINT, signal_handler)
 
+# Define the entry point for the bot program with the common idiom
 if __name__ == "__main__":
     try:
         main()
