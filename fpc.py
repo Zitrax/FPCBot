@@ -2852,84 +2852,94 @@ could_not_read_recent_fps_list = (
 # accidentally add such spaces when creating nominations).
 PrefixR = re.compile(wikipattern(CAND_PREFIX) + r".*?([Ff]ile|[Ii]mage): *")
 
-# Looks for results using the old, text-based results format
+# Look for results using the old, text-based results format
 # which was in use until August 2009.  An example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
 PreviousResultR = re.compile(
-    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral\s*=>\s*((?:not )?featured)",
-    re.MULTILINE,
+    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral"
+    r"\s*=>\s*((?:not )?featured)"
 )
 
-# Looks for verified results using the new, template-based format
+# Look for verified results using the new, template-based format
 VerifiedResultR = re.compile(
     r"""
-                              {{\s*FPC-results-reviewed\s*\|        # Template start
-                              \s*support\s*=\s*(\d+)\s*\|           # Support votes (1)
-                              \s*oppose\s*=\s*(\d+)\s*\|            # Oppose Votes  (2)
-                              \s*neutral\s*=\s*(\d+)\s*\|           # Neutral votes (3)
-                              \s*featured\s*=\s*(\w+)\s*\|          # Featured, should be yes or no, but is not verified at this point (4)
-                              \s*gallery\s*=\s*([^|]*)              # A gallery page if the image was featured (5)
-                              (?:\|\s*alternative\s*=\s*([^|]*))?   # For candidate with alternatives this specifies the winning image (6)
-                              .*}}                                  # END
-                              """,
-    re.MULTILINE | re.VERBOSE,
+    \{\{\s*FPC-results-reviewed\s*\|
+    \s*support\s*=\s*(\d+)\s*\|            # (1) Support votes
+    \s*oppose\s*=\s*(\d+)\s*\|             # (2) Oppose votes
+    \s*neutral\s*=\s*(\d+)\s*\|            # (3) Neutral votes
+    \s*featured\s*=\s*(\w+)\s*\|           # (4) Featured, should be 'yes'/'no'
+    \s*gallery\s*=\s*([^|\n]*)             # (5) Gallery link (if featured)
+    (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives: name of the winning image
+    .*?\}\}
+    """,
+    re.VERBOSE,
 )
-
 VerifiedDelistResultR = re.compile(
-    r"{{\s*FPC-delist-results-reviewed\s*\|\s*delist\s*=\s*(\d+)\s*\|\s*keep\s*=\s*(\d+)\s*\|\s*neutral\s*=\s*(\d+)\s*\|\s*delisted\s*=\s*(\w+).*?}}",
-    re.MULTILINE,
+    r"""
+    \{\{\s*FPC-delist-results-reviewed\s*\|
+    \s*delist\s*=\s*(\d+)\s*\|   # (1) Delist votes
+    \s*keep\s*=\s*(\d+)\s*\|     # (2) Keep votes
+    \s*neutral\s*=\s*(\d+)\s*\|  # (3) Neutral votes
+    \s*delisted\s*=\s*(\w+)      # (4) Delisted, should be 'yes'/'no'
+    .*?\}\}
+    """,
+    re.VERBOSE,
 )
 
-# Matches the entire line including newline so they can be stripped away
-CountedTemplateR = re.compile(r"^.*{{\s*FPC-results-unreviewed.*}}.*$\n?", re.MULTILINE)
+# Simple regexes which check just whether a certain template is present or not
+CountedTemplateR = re.compile(
+    r"\{\{\s*FPC-results-unreviewed.*?\}\}"
+)
 DelistCountedTemplateR = re.compile(
-    r"^.*{{\s*FPC-delist-results-unreviewed.*}}.*$\n?", re.MULTILINE
+    r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
 )
-ReviewedTemplateR = re.compile(r"^.*{{\s*FPC-results-reviewed.*}}.*$\n?", re.MULTILINE)
+ReviewedTemplateR = re.compile(
+    r"\{\{\s*FPC-results-reviewed.*?\}\}"
+)
 DelistReviewedTemplateR = re.compile(
-    r"^.*{{\s*FPC-delist-results-reviewed.*}}.*$\n?", re.MULTILINE
+    r"\{\{\s*FPC-delist-results-reviewed.*?\}\}"
 )
 
-# Is whitespace allowed at the end ?
-SectionR = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
-# Voting templates
+# Find voting templates
 SupportR = re.compile(
-    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(support_templates), re.MULTILINE
+    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(support_templates)
 )
 OpposeR = re.compile(
-    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(oppose_templates), re.MULTILINE
+    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(oppose_templates)
 )
 NeutralR = re.compile(
-    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(neutral_templates), re.MULTILINE
+    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(neutral_templates)
 )
 DelistR = re.compile(
-    r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(delist_templates), re.MULTILINE
+    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(delist_templates)
 )
-KeepR = re.compile(r"{{\s*(?:%s)(\|.*)?\s*}}" % "|".join(keep_templates), re.MULTILINE)
+KeepR = re.compile(
+    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(keep_templates)
+)
+
 # Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
 WithdrawnR = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
 # Does the nomination contain a {{FPX}} or {{FPD}} template?
 FpxR = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
-# Counts the number of displayed images
+# Does the nomination contain subheadings = subsections?
+SectionR = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
+# Count the number of displayed images
 ImagesR = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
-# Look for a size specification of the image link
+# Look for a size specification in the image link
 ImagesSizeR = re.compile(r"\|.*?(\d+)\s*px")
-# Find if there is a thumb parameter specified
+# Check if there is a 'thumb' parameter in the image link
 ImagesThumbR = re.compile(r"\|\s*thumb\b")
-# Finds the last image link on a page
-LastImageR = re.compile(
-    r"(?s)(\[\[(?:[Ff]ile|[Ii]mage):[^\n]*\]\])(?!.*\[\[(?:[Ff]ile|[Ii]mage):)"
-)
-# Finds the {{Assessments}} template on an image description page
-# (sometimes people break it into several lines, so use '\s' and re.DOTALL)
-AssessmentsR = re.compile(
-    r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
-)
 # Search nomination for the username of the original creator
 CreatorNameR = re.compile(
     r"\{\{[Ii]nfo\}\}.+?"
     r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
     r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
+)
+
+# Find the {{Assessments}} template on an image description page
+# (sometimes people break it into several lines, so use '\s' and re.DOTALL)
+AssessmentsR = re.compile(
+    r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
 )
 
 # Auto reply yes to all questions
