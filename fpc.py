@@ -2937,20 +2937,21 @@ DelistReviewedTemplateR = re.compile(
 )
 
 # Find voting templates
+VOTING_TEMPLATE_MODEL = r"\{\{\s*(?:%s)\s*(\|.*?)?\s*\}\}"
 SupportR = re.compile(
-    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(support_templates)
+    VOTING_TEMPLATE_MODEL % "|".join(support_templates)
 )
 OpposeR = re.compile(
-    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(oppose_templates)
+    VOTING_TEMPLATE_MODEL % "|".join(oppose_templates)
 )
 NeutralR = re.compile(
-    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(neutral_templates)
+    VOTING_TEMPLATE_MODEL % "|".join(neutral_templates)
 )
 DelistR = re.compile(
-    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(delist_templates)
+    VOTING_TEMPLATE_MODEL % "|".join(delist_templates)
 )
 KeepR = re.compile(
-    r"\{\{\s*(?:%s)(\|.*)?\s*\}\}" % "|".join(keep_templates)
+    VOTING_TEMPLATE_MODEL % "|".join(keep_templates)
 )
 
 # Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
