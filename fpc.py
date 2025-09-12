@@ -52,6 +52,309 @@ import pywikibot
 from pywikibot import config
 
 
+# Constants
+
+# Namespaces, prefixes, page names, etc.
+BOT_NAME = "FPCBot"
+FILE_NAMESPACE = "File:"
+USER_NAMESPACE = "User:"
+USER_TALK_NAMESPACE = "User talk:"
+FP_PREFIX = "Commons:Featured pictures/"
+CAND_PREFIX = "Commons:Featured picture candidates/"
+CAND_LOG_PREFIX = f"{CAND_PREFIX}Log/"
+CHRONO_ARCHIVE_PREFIX = f"{FP_PREFIX}chronological/"
+CAND_LIST_PAGE_NAME = f"{CAND_PREFIX}candidate list"
+TEST_LOG_PAGE_NAME = f"{CAND_LOG_PREFIX}January 2025"
+GALLERY_LIST_PAGE_NAME = "Commons:Featured pictures, list"
+FP_TALK_PAGE_NAME = "Commons talk:Featured picture candidates"
+
+
+# Valid voting templates
+# Taken from Commons:Polling_templates, including some common redirects
+SUPPORT_TEMPLATES = (
+    "[Ss]upport",
+    "[Ss]upp?",
+    "[Ss]",
+    "[Vv]ote[ _]support",
+    "[Ss]trong[ _]support",
+    "[Ss]Support",
+    "[Ww]eak[ _]support",
+    "[Ww]eak[ _][Ss]",
+    "[Ww]Support",
+    # Variants and translations
+    "[Aa][ _]favore?",
+    "[Aa][ _]favuri",
+    "[Aa]poio",
+    "[AaÁá][ _]fabor",
+    "[Dd]estek",
+    "[Kk]yllä",
+    "[Oo]ui",
+    "[Pp]our",
+    "[Pp]ro",
+    "[Pp]RO",
+    "[Ss][Ff]or",
+    "[Ss]amþykkt",
+    "[Ss]im",
+    "[Ss]tödjer",
+    "[Ss]ubteno",
+    "[Ss]up",
+    "[Ss]í",
+    "[Tt]acaíocht",
+    "[Tt]ak",
+    "[Tt]aurä",
+    "[Vv]oor",
+    "[Yy]es",
+    "[Υυ]πέρ",
+    "[Зз]а",
+    "[Пп]адтрымліваю",
+    "דעב",
+    "เห็นด้วย",
+    "ჰო",
+    "支持",
+    "賛成",
+    "찬성",
+)
+OPPOSE_TEMPLATES = (
+    "[Oo]ppose",
+    "[Oo]pp",
+    "[Oo]",
+    "[Ss]trong[ _]oppose",
+    "[Ss]Oppose",
+    "[Ww]eak[ _]oppose",
+    "[Ww]eak[ _][Oo]",
+    "[Ww]eako",
+    # {{FPX contested}} is counted like a normal {{oppose}} vote
+    "FPX[ _]contested",
+    # Variants and translations
+    "[Cc]ontr[aeo]",
+    "[Cc]ontrario",
+    "[Cc]untrariu",
+    "[Dd]iscordo",
+    "[Dd]íliostaigh",
+    "[Ee]i",
+    "[Ee]n[ _]contra",
+    "[Ii][ _]gcoinne",
+    "[Kk]ar[sş]i",
+    "[Kk]ontra",
+    "[Kk]ontraŭi",
+    "[Ll]ivari",
+    "[Mm]autohe",
+    "[Mm]ot",
+    "[Nn]ein",
+    "[Nn]ie",
+    "[Nn]o",
+    "[Nn]ão",
+    "[Oo]pponera",
+    "[Ss]tödjer[ _]ej",
+    "[Tt]egen",
+    "[Áá][ _]móti",
+    "[Пп]ротив",
+    "[Сс]упраць",
+    "נגד",
+    "ไม่เห็นด้วย",
+    "反対",
+    "除外",
+    "반대",
+)
+NEUTRAL_TEMPLATES = (
+    "[Nn]eutral",
+    "[Nn]eu",
+    "[Nn]",
+    "[Vv]n",
+    # Variants and translations
+    "[Hh]lutlaus",
+    "[Nn]eodrach",
+    "[Nn]eutr[aeo]",
+    "[Nn]eutrale",
+    "[Nn]eŭtrala",
+    "[Nn]iutrali",
+    "[Nn]øytral",
+    "[Oo]partisk",
+    "[Tt]arafs[iı]z",
+    "[Вв]оздерживаюсь",
+    "[Вв]оздржан",
+    "[Нн]эўтральна",
+    "נמנע",
+    "เป็นกลาง",
+    "中立",
+    "중립",
+)
+DELIST_TEMPLATES = (
+    "[Dd]elist",
+    # There seem to be no internationalized delist versions.
+    # Don't add {{Remove}} or {{Del}}, they are for deletion discussions.
+)
+KEEP_TEMPLATES = (
+    "[Kk]eep",
+    "[Kk]",
+    "[Vv]ote[ _]keep",
+    "[Vv]keep",
+    "[Vv]k",
+    "[Ss]trong[ _]keep",
+    "[Ww]eak[ _]keep",
+    "[Ww]k",
+    "[Vv]wk",
+    # Variants and translations
+    "[Bb]ehalten",
+    "[Bb]ehold",
+    "[Bb]ehåll",
+    "[Cc]onserver",
+    "[Gg]arder",
+    "[Mm]antenere?",
+    "[Mm]anter",
+    "[Ss]avi",
+    "[Зз]адржи",
+    "เก็บ",
+    "保留",
+    "維持",
+)
+
+
+# Shared messages
+
+PLEASE_FIX_HINT = (
+    "Please check and fix this so that the bot can process the nomination."
+)
+SERIOUS_PROBLEM_CHECK_PAGE = (
+    "This is a serious problem, please check that page."
+)
+PLEASE_CHECK_GALLERY_AND_SORT_FPS = (
+    "Please check that gallery page and add the new featured picture(s) "
+    "from the nomination to the appropriate gallery page."
+)
+LIST_INCLUDES_MISSING_SUBPAGE = (
+    "The candidate list [[{list}]] includes the nomination [[{subpage}]], "
+    "but that page does not exist. Perhaps the page has been renamed "
+    f"and the list needs to be updated. {PLEASE_FIX_HINT}"
+)
+COULD_NOT_READ_RECENT_FPS_LIST = (
+    f"The bot could not read [[{GALLERY_LIST_PAGE_NAME}|the list]] "
+    "of recent Featured pictures: {exception}. "
+    "Please check the list page and fix it."
+)
+
+
+# Compiled regular expressions
+
+# Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
+# or to replace both by the standard 'File:' namespace.
+# Removes also any possible crap between the prefix and the namespace
+# and faulty spaces between namespace and filename (sometimes users
+# accidentally add such spaces when creating nominations).
+PREFIX_REGEX = re.compile(
+    CAND_PREFIX.replace(" ", r"[ _]") + r".*?([Ff]ile|[Ii]mage): *"
+)
+
+# Look for results using the old, text-based results format
+# which was in use until August 2009.  An example of such a line is:
+# '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
+OBSOLETE_RESULT_REGEX = re.compile(
+    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral"
+    r"\s*=>\s*((?:not )?featured)"
+)
+
+# Look for verified results using the new, template-based format
+VERIFIED_RESULT_REGEX = re.compile(
+    r"""
+    \{\{\s*FPC-results-reviewed\s*\|
+    \s*support\s*=\s*(\d+)\s*\|            # (1) Support votes
+    \s*oppose\s*=\s*(\d+)\s*\|             # (2) Oppose votes
+    \s*neutral\s*=\s*(\d+)\s*\|            # (3) Neutral votes
+    \s*featured\s*=\s*(\w+)\s*\|           # (4) Featured, should be 'yes'/'no'
+    \s*gallery\s*=\s*([^|\n]*)             # (5) Gallery link (if featured)
+    (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives: name of the winning image
+    .*?\}\}
+    """,
+    re.VERBOSE,
+)
+VERIFIED_DELIST_RESULT_REGEX = re.compile(
+    r"""
+    \{\{\s*FPC-delist-results-reviewed\s*\|
+    \s*delist\s*=\s*(\d+)\s*\|   # (1) Delist votes
+    \s*keep\s*=\s*(\d+)\s*\|     # (2) Keep votes
+    \s*neutral\s*=\s*(\d+)\s*\|  # (3) Neutral votes
+    \s*delisted\s*=\s*(\w+)      # (4) Delisted, should be 'yes'/'no'
+    .*?\}\}
+    """,
+    re.VERBOSE,
+)
+
+# Simple regexes which check just whether a certain template is present or not
+COUNTED_TEMPLATE_REGEX = re.compile(
+    r"\{\{\s*FPC-results-unreviewed.*?\}\}"
+)
+DELIST_COUNTED_TEMPLATE_REGEX = re.compile(
+    r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
+)
+REVIEWED_TEMPLATE_REGEX = re.compile(
+    r"\{\{\s*FPC-results-reviewed.*?\}\}"
+)
+DELIST_REVIEWED_TEMPLATE_REGEX = re.compile(
+    r"\{\{\s*FPC-delist-results-reviewed.*?\}\}"
+)
+
+# Find voting templates
+VOTING_TEMPLATE_MODEL = r"\{\{\s*(?:%s)\s*(\|.*?)?\s*\}\}"
+SUPPORT_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(SUPPORT_TEMPLATES)
+)
+OPPOSE_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(OPPOSE_TEMPLATES)
+)
+NEUTRAL_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(NEUTRAL_TEMPLATES)
+)
+DELIST_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(DELIST_TEMPLATES)
+)
+KEEP_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(KEEP_TEMPLATES)
+)
+
+# Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
+WITHDRAWN_REGEX = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
+# Does the nomination contain a {{FPX}} or {{FPD}} template?
+FPX_FPD_REGEX = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
+# Does the nomination contain subheadings = subsections?
+SECTION_REGEX = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
+# Count the number of displayed images
+IMAGES_REGEX = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
+# Look for a size specification in the image link
+IMAGE_SIZE_REGEX = re.compile(r"\|.*?(\d+)\s*px")
+# Check if there is a 'thumb' parameter in the image link
+IMAGE_THUMB_REGEX = re.compile(r"\|\s*thumb\b")
+# Search nomination for the username of the original creator
+CREATOR_NAME_REGEX = re.compile(
+    r"\{\{[Ii]nfo\}\}.+?"
+    r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
+    r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
+)
+
+# Find the {{Assessments}} template on an image description page
+# (sometimes people break it into several lines, so use '\s' and re.DOTALL)
+ASSESSMENTS_TEMPLATE_REGEX = re.compile(
+    r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
+)
+
+
+# Globals
+
+# Auto reply yes to all questions
+G_Auto = False
+# Auto answer no
+G_Dry = False
+# Use threads
+G_Threads = False
+# Avoid timestamps in output
+G_LogNoTime = False
+# Pattern to match
+G_MatchPattern = ""
+# Flag that will be set to True if CTRL-C was pressed
+G_Abort = False
+# Pywikibot Site object
+G_Site = None
+
+
 class ThreadCheckCandidate(threading.Thread):
     """
     A simple thread subclass representing and handling the execution
@@ -2695,309 +2998,6 @@ def commit_media_info_changes(
         out(f"Media Info (structured data) of '{filename}' changed.")
     else:
         out(f"Changes to '{filename}' ignored.")
-
-
-# Constants
-
-# Namespaces, prefixes, page names, etc.
-BOT_NAME = "FPCBot"
-FILE_NAMESPACE = "File:"
-USER_NAMESPACE = "User:"
-USER_TALK_NAMESPACE = "User talk:"
-FP_PREFIX = "Commons:Featured pictures/"
-CAND_PREFIX = "Commons:Featured picture candidates/"
-CAND_LOG_PREFIX = f"{CAND_PREFIX}Log/"
-CHRONO_ARCHIVE_PREFIX = f"{FP_PREFIX}chronological/"
-CAND_LIST_PAGE_NAME = f"{CAND_PREFIX}candidate list"
-TEST_LOG_PAGE_NAME = f"{CAND_LOG_PREFIX}January 2025"
-GALLERY_LIST_PAGE_NAME = "Commons:Featured pictures, list"
-FP_TALK_PAGE_NAME = "Commons talk:Featured picture candidates"
-
-
-# Valid voting templates
-# Taken from Commons:Polling_templates, including some common redirects
-SUPPORT_TEMPLATES = (
-    "[Ss]upport",
-    "[Ss]upp?",
-    "[Ss]",
-    "[Vv]ote[ _]support",
-    "[Ss]trong[ _]support",
-    "[Ss]Support",
-    "[Ww]eak[ _]support",
-    "[Ww]eak[ _][Ss]",
-    "[Ww]Support",
-    # Variants and translations
-    "[Aa][ _]favore?",
-    "[Aa][ _]favuri",
-    "[Aa]poio",
-    "[AaÁá][ _]fabor",
-    "[Dd]estek",
-    "[Kk]yllä",
-    "[Oo]ui",
-    "[Pp]our",
-    "[Pp]ro",
-    "[Pp]RO",
-    "[Ss][Ff]or",
-    "[Ss]amþykkt",
-    "[Ss]im",
-    "[Ss]tödjer",
-    "[Ss]ubteno",
-    "[Ss]up",
-    "[Ss]í",
-    "[Tt]acaíocht",
-    "[Tt]ak",
-    "[Tt]aurä",
-    "[Vv]oor",
-    "[Yy]es",
-    "[Υυ]πέρ",
-    "[Зз]а",
-    "[Пп]адтрымліваю",
-    "דעב",
-    "เห็นด้วย",
-    "ჰო",
-    "支持",
-    "賛成",
-    "찬성",
-)
-OPPOSE_TEMPLATES = (
-    "[Oo]ppose",
-    "[Oo]pp",
-    "[Oo]",
-    "[Ss]trong[ _]oppose",
-    "[Ss]Oppose",
-    "[Ww]eak[ _]oppose",
-    "[Ww]eak[ _][Oo]",
-    "[Ww]eako",
-    # {{FPX contested}} is counted like a normal {{oppose}} vote
-    "FPX[ _]contested",
-    # Variants and translations
-    "[Cc]ontr[aeo]",
-    "[Cc]ontrario",
-    "[Cc]untrariu",
-    "[Dd]iscordo",
-    "[Dd]íliostaigh",
-    "[Ee]i",
-    "[Ee]n[ _]contra",
-    "[Ii][ _]gcoinne",
-    "[Kk]ar[sş]i",
-    "[Kk]ontra",
-    "[Kk]ontraŭi",
-    "[Ll]ivari",
-    "[Mm]autohe",
-    "[Mm]ot",
-    "[Nn]ein",
-    "[Nn]ie",
-    "[Nn]o",
-    "[Nn]ão",
-    "[Oo]pponera",
-    "[Ss]tödjer[ _]ej",
-    "[Tt]egen",
-    "[Áá][ _]móti",
-    "[Пп]ротив",
-    "[Сс]упраць",
-    "נגד",
-    "ไม่เห็นด้วย",
-    "反対",
-    "除外",
-    "반대",
-)
-NEUTRAL_TEMPLATES = (
-    "[Nn]eutral",
-    "[Nn]eu",
-    "[Nn]",
-    "[Vv]n",
-    # Variants and translations
-    "[Hh]lutlaus",
-    "[Nn]eodrach",
-    "[Nn]eutr[aeo]",
-    "[Nn]eutrale",
-    "[Nn]eŭtrala",
-    "[Nn]iutrali",
-    "[Nn]øytral",
-    "[Oo]partisk",
-    "[Tt]arafs[iı]z",
-    "[Вв]оздерживаюсь",
-    "[Вв]оздржан",
-    "[Нн]эўтральна",
-    "נמנע",
-    "เป็นกลาง",
-    "中立",
-    "중립",
-)
-DELIST_TEMPLATES = (
-    "[Dd]elist",
-    # There seem to be no internationalized delist versions.
-    # Don't add {{Remove}} or {{Del}}, they are for deletion discussions.
-)
-KEEP_TEMPLATES = (
-    "[Kk]eep",
-    "[Kk]",
-    "[Vv]ote[ _]keep",
-    "[Vv]keep",
-    "[Vv]k",
-    "[Ss]trong[ _]keep",
-    "[Ww]eak[ _]keep",
-    "[Ww]k",
-    "[Vv]wk",
-    # Variants and translations
-    "[Bb]ehalten",
-    "[Bb]ehold",
-    "[Bb]ehåll",
-    "[Cc]onserver",
-    "[Gg]arder",
-    "[Mm]antenere?",
-    "[Mm]anter",
-    "[Ss]avi",
-    "[Зз]адржи",
-    "เก็บ",
-    "保留",
-    "維持",
-)
-
-
-# Shared messages
-
-PLEASE_FIX_HINT = (
-    "Please check and fix this so that the bot can process the nomination."
-)
-SERIOUS_PROBLEM_CHECK_PAGE = (
-    "This is a serious problem, please check that page."
-)
-PLEASE_CHECK_GALLERY_AND_SORT_FPS = (
-    "Please check that gallery page and add the new featured picture(s) "
-    "from the nomination to the appropriate gallery page."
-)
-LIST_INCLUDES_MISSING_SUBPAGE = (
-    "The candidate list [[{list}]] includes the nomination [[{subpage}]], "
-    "but that page does not exist. Perhaps the page has been renamed "
-    f"and the list needs to be updated. {PLEASE_FIX_HINT}"
-)
-COULD_NOT_READ_RECENT_FPS_LIST = (
-    f"The bot could not read [[{GALLERY_LIST_PAGE_NAME}|the list]] "
-    "of recent Featured pictures: {exception}. "
-    "Please check the list page and fix it."
-)
-
-
-# Compiled regular expressions
-
-# Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
-# or to replace both by the standard 'File:' namespace.
-# Removes also any possible crap between the prefix and the namespace
-# and faulty spaces between namespace and filename (sometimes users
-# accidentally add such spaces when creating nominations).
-PREFIX_REGEX = re.compile(
-    wikipattern(CAND_PREFIX) + r".*?([Ff]ile|[Ii]mage): *"
-)
-
-# Look for results using the old, text-based results format
-# which was in use until August 2009.  An example of such a line is:
-# '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
-OBSOLETE_RESULT_REGEX = re.compile(
-    r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral"
-    r"\s*=>\s*((?:not )?featured)"
-)
-
-# Look for verified results using the new, template-based format
-VERIFIED_RESULT_REGEX = re.compile(
-    r"""
-    \{\{\s*FPC-results-reviewed\s*\|
-    \s*support\s*=\s*(\d+)\s*\|            # (1) Support votes
-    \s*oppose\s*=\s*(\d+)\s*\|             # (2) Oppose votes
-    \s*neutral\s*=\s*(\d+)\s*\|            # (3) Neutral votes
-    \s*featured\s*=\s*(\w+)\s*\|           # (4) Featured, should be 'yes'/'no'
-    \s*gallery\s*=\s*([^|\n]*)             # (5) Gallery link (if featured)
-    (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives: name of the winning image
-    .*?\}\}
-    """,
-    re.VERBOSE,
-)
-VERIFIED_DELIST_RESULT_REGEX = re.compile(
-    r"""
-    \{\{\s*FPC-delist-results-reviewed\s*\|
-    \s*delist\s*=\s*(\d+)\s*\|   # (1) Delist votes
-    \s*keep\s*=\s*(\d+)\s*\|     # (2) Keep votes
-    \s*neutral\s*=\s*(\d+)\s*\|  # (3) Neutral votes
-    \s*delisted\s*=\s*(\w+)      # (4) Delisted, should be 'yes'/'no'
-    .*?\}\}
-    """,
-    re.VERBOSE,
-)
-
-# Simple regexes which check just whether a certain template is present or not
-COUNTED_TEMPLATE_REGEX = re.compile(
-    r"\{\{\s*FPC-results-unreviewed.*?\}\}"
-)
-DELIST_COUNTED_TEMPLATE_REGEX = re.compile(
-    r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
-)
-REVIEWED_TEMPLATE_REGEX = re.compile(
-    r"\{\{\s*FPC-results-reviewed.*?\}\}"
-)
-DELIST_REVIEWED_TEMPLATE_REGEX = re.compile(
-    r"\{\{\s*FPC-delist-results-reviewed.*?\}\}"
-)
-
-# Find voting templates
-VOTING_TEMPLATE_MODEL = r"\{\{\s*(?:%s)\s*(\|.*?)?\s*\}\}"
-SUPPORT_VOTE_REGEX = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(SUPPORT_TEMPLATES)
-)
-OPPOSE_VOTE_REGEX = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(OPPOSE_TEMPLATES)
-)
-NEUTRAL_VOTE_REGEX = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(NEUTRAL_TEMPLATES)
-)
-DELIST_VOTE_REGEX = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(DELIST_TEMPLATES)
-)
-KEEP_VOTE_REGEX = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(KEEP_TEMPLATES)
-)
-
-# Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
-WITHDRAWN_REGEX = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
-# Does the nomination contain a {{FPX}} or {{FPD}} template?
-FPX_FPD_REGEX = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
-# Does the nomination contain subheadings = subsections?
-SECTION_REGEX = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
-# Count the number of displayed images
-IMAGES_REGEX = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
-# Look for a size specification in the image link
-IMAGE_SIZE_REGEX = re.compile(r"\|.*?(\d+)\s*px")
-# Check if there is a 'thumb' parameter in the image link
-IMAGE_THUMB_REGEX = re.compile(r"\|\s*thumb\b")
-# Search nomination for the username of the original creator
-CREATOR_NAME_REGEX = re.compile(
-    r"\{\{[Ii]nfo\}\}.+?"
-    r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
-    r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
-)
-
-# Find the {{Assessments}} template on an image description page
-# (sometimes people break it into several lines, so use '\s' and re.DOTALL)
-ASSESSMENTS_TEMPLATE_REGEX = re.compile(
-    r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
-)
-
-
-# Globals
-
-# Auto reply yes to all questions
-G_Auto = False
-# Auto answer no
-G_Dry = False
-# Use threads
-G_Threads = False
-# Avoid timestamps in output
-G_LogNoTime = False
-# Pattern to match
-G_MatchPattern = ""
-# Flag that will be set to True if CTRL-C was pressed
-G_Abort = False
-# Pywikibot Site object
-G_Site = None
 
 
 def main(*args):
