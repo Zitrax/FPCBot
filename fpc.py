@@ -183,7 +183,7 @@ class Candidate(abc.ABC):
         """
         if self._creator is None:
             wikitext = self._page.get(get_redirect=True)
-            if match := CreatorNameR.search(wikitext):
+            if match := CREATOR_NAME_REGEX.search(wikitext):
                 self._creator = match.group(1).strip()
             else:
                 self._creator = ""
@@ -322,13 +322,13 @@ class Candidate(abc.ABC):
         """Has the nomination been marked as withdrawn?"""
         text = self._page.get(get_redirect=True)
         text = filter_content(text)
-        return WithdrawnR.search(text) is not None
+        return WITHDRAWN_REGEX.search(text) is not None
 
     def isFPX(self):
         """Is the nomination marked with a {{FPX}} or {{FPD}} template?"""
         text = self._page.get(get_redirect=True)
         text = filter_content(text)
-        return FpxR.search(text) is not None
+        return FPX_FPD_REGEX.search(text) is not None
 
     def rulesOfFifthDay(self):
         """Check if any of the rules of the fifth day can be applied."""
@@ -365,7 +365,7 @@ class Candidate(abc.ABC):
         if not self._page.exists():
             error(f"{cut_title}: (Error: no such page?!)")
             ask_for_help(
-                list_includes_missing_subpage.format(
+                LIST_INCLUDES_MISSING_SUBPAGE.format(
                     list=self._listPageName, subpage=subpage_name
                 )
             )
@@ -397,14 +397,14 @@ class Candidate(abc.ABC):
             ask_for_help(
                 "The bot could not read the nomination subpage "
                 f"[[{subpage_name}]]: {format_exception(exc)}. "
-                f"{please_fix_hint}"
+                f"{PLEASE_FIX_HINT}"
             )
             return False
         if not old_text:
             error(f"{cut_title}: (Error: has no content)")
             ask_for_help(
                 f"The nomination subpage [[{subpage_name}]] "
-                f"seems to be empty. {please_fix_hint}"
+                f"seems to be empty. {PLEASE_FIX_HINT}"
             )
             return False
         if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", old_text):
@@ -613,7 +613,7 @@ class Candidate(abc.ABC):
         """Counts the number of sections in this nomination."""
         text = self._page.get(get_redirect=True)
         text = filter_content(text)  # Ignore commented, stricken etc. stuff.
-        return len(SectionR.findall(text))
+        return len(SECTION_REGEX.findall(text))
 
     def imageCount(self):
         """
@@ -625,16 +625,16 @@ class Candidate(abc.ABC):
             return self._imgCount
         text = self._page.get(get_redirect=True)
         text = filter_content(text)  # Ignore commented, stricken etc. stuff.
-        images = ImagesR.findall(text)
+        images = IMAGES_REGEX.findall(text)
         count = len(images)
         if count >= 2:
             # We have several images, check if some of them are marked
             # as thumbnails or are too small to be counted
             for image_link, _ in images:
-                if ImagesThumbR.search(image_link):
+                if IMAGE_THUMB_REGEX.search(image_link):
                     count -= 1
                 else:
-                    size = ImagesSizeR.search(image_link)
+                    size = IMAGE_SIZE_REGEX.search(image_link)
                     if size and (int(size.group(1)) <= 150):
                         count -= 1
         self._imgCount = count
@@ -658,9 +658,9 @@ class Candidate(abc.ABC):
         text = self._page.get(get_redirect=True)
         # Search first for result(s) using the new template-base format,
         # and if this fails for result(s) in the old text-based format:
-        results = re.findall(VerifiedResultR, text)
+        results = VERIFIED_RESULT_REGEX.findall(text)
         if not results:
-            results = re.findall(PreviousResultR, text)
+            results = OBSOLETE_RESULT_REGEX.findall(text)
         return results
 
     def compareResultToCount(self):
@@ -744,13 +744,13 @@ class Candidate(abc.ABC):
 
         # Try to derive the filename from the name of the nomination subpage,
         # using the standard 'File:' namespace
-        filename = PrefixR.sub(FILE_NAMESPACE, self._page.title())
+        filename = PREFIX_REGEX.sub(FILE_NAMESPACE, self._page.title())
         filename = re.sub(r" */ *\d+ *$", "", filename)  # Remove '/2' etc.
 
         # If there is no file with that name, use the name of the first image
         # on the nomination subpage instead
         if not pywikibot.Page(G_Site, filename).exists():
-            if match := ImagesR.search(self._page.get(get_redirect=True)):
+            if match := IMAGES_REGEX.search(self._page.get(get_redirect=True)):
                 filename = match.group(2)
 
         # Check if the image was renamed and try to resolve the redirect
@@ -860,7 +860,7 @@ class Candidate(abc.ABC):
         if not self._page.exists():
             error(f"{cut_title}: (Error: no such page?!)")
             ask_for_help(
-                list_includes_missing_subpage.format(
+                LIST_INCLUDES_MISSING_SUBPAGE.format(
                     list=self._listPageName, subpage=subpage_name
                 )
             )
@@ -900,7 +900,7 @@ class Candidate(abc.ABC):
                 ask_for_help(
                     f"The set nomination [[{subpage_name}]] seems to contain "
                     "no images. Perhaps the formatting is damaged. "
-                    f"{please_fix_hint}"
+                    f"{PLEASE_FIX_HINT}"
                 )
                 return
             for filename in set_files:
@@ -912,7 +912,7 @@ class Candidate(abc.ABC):
                     ask_for_help(
                         f"The set nomination [[{subpage_name}]] lists the "
                         f"file [[:{filename}]], but that file does not exist. "
-                        f"Perhaps the file has been renamed. {please_fix_hint}"
+                        f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
                     )
                     return
         elif not pywikibot.Page(G_Site, self.fileName()).exists():
@@ -920,7 +920,7 @@ class Candidate(abc.ABC):
             ask_for_help(
                 f"The nomination [[{subpage_name}]] is about the image "
                 f"[[:{self.fileName()}]], but that file does not exist. "
-                f"Perhaps the file has been renamed. {please_fix_hint}"
+                f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
             )
             return
 
@@ -945,7 +945,7 @@ class Candidate(abc.ABC):
             ask_for_help(
                 f"The verified success status <code>{success}</code> "
                 f"in the results template of [[{subpage_name}]] "
-                f"is invalid. {please_fix_hint}"
+                f"is invalid. {PLEASE_FIX_HINT}"
             )
 
     @abc.abstractmethod
@@ -970,14 +970,14 @@ class FPCandidate(Candidate):
         super().__init__(
             page,
             listName,
-            SupportR,
-            OpposeR,
-            NeutralR,
+            SUPPORT_VOTE_REGEX,
+            OPPOSE_VOTE_REGEX,
+            NEUTRAL_VOTE_REGEX,
             "featured",
             "not featured",
-            ReviewedTemplateR,
-            CountedTemplateR,
-            VerifiedResultR,
+            REVIEWED_TEMPLATE_REGEX,
+            COUNTED_TEMPLATE_REGEX,
+            VERIFIED_RESULT_REGEX,
         )
 
     def getResultString(self):
@@ -1040,7 +1040,7 @@ class FPCandidate(Candidate):
             error(f"{cut_title}: (ignoring, gallery not defined)")
             ask_for_help(
                 f"The gallery link in the nomination [[{subpage_name}]] "
-                f"is empty or broken. {please_fix_hint}",
+                f"is empty or broken. {PLEASE_FIX_HINT}",
                 nominator=self.nominator(link=False),
             )
             return
@@ -1058,7 +1058,7 @@ class FPCandidate(Candidate):
                     ask_for_help(
                         f"Cannot find the alternative [[:{alternative}]] "
                         f"specified by the nomination [[{subpage_name}]]. "
-                        f"{please_fix_hint}"
+                        f"{PLEASE_FIX_HINT}"
                     )
                     return
                 self._alternative = alternative
@@ -1067,7 +1067,7 @@ class FPCandidate(Candidate):
                 ask_for_help(
                     f"The nomination [[{subpage_name}]] contains several "
                     "images, but does not specify the selected alternative. "
-                    f"{please_fix_hint}"
+                    f"{PLEASE_FIX_HINT}"
                 )
                 return
 
@@ -1077,7 +1077,7 @@ class FPCandidate(Candidate):
             error(f"{cut_title}: (ignoring, no file(s) found)")
             ask_for_help(
                 "Cannot find the featured file(s) in the nomination "
-                f"[[{subpage_name}]]. {please_fix_hint}"
+                f"[[{subpage_name}]]. {PLEASE_FIX_HINT}"
             )
             return
         self.addToFeaturedList(basic_gallery, files)
@@ -1111,7 +1111,7 @@ class FPCandidate(Candidate):
             error(f"Error - can't read list of recent FPs: {exc}")
             fexc = format_exception(exc)
             ask_for_help(
-                could_not_read_recent_fps_list.format(exception=fexc)
+                COULD_NOT_READ_RECENT_FPS_LIST.format(exception=fexc)
                 + f" Then please add the new FP [[:{filename}]] "
                 f"to the section ''{section_name}''."
             )
@@ -1193,7 +1193,7 @@ class FPCandidate(Candidate):
             ask_for_help(
                 f"The gallery page [[{full_page_name}]] which was specified "
                 f"by the nomination [[{subpage_name}]] does not exist. "
-                f"{please_check_gallery_and_sort_fps}",
+                f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}",
                 nominator=self.nominator(link=False),
             )
             return
@@ -1203,7 +1203,7 @@ class FPCandidate(Candidate):
                 "The bot could not read the gallery page "
                 f"[[{full_page_name}]] which was specified by "
                 f"the nomination [[{subpage_name}]]: {format_exception(exc)}. "
-                f"{please_check_gallery_and_sort_fps}"
+                f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
             )
             return
 
@@ -1274,7 +1274,7 @@ class FPCandidate(Candidate):
                     f"The gallery page [[{full_page_name}]] which was "
                     f"specified by the nomination [[{subpage_name}]] "
                     "seems to be invalid or broken. "
-                    f"{please_check_gallery_and_sort_fps}"
+                    f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
                 )
                 return
             new_text = (
@@ -1514,7 +1514,7 @@ class FPCandidate(Candidate):
 
         # Extract voting results
         nom_page_text = self._page.get(get_redirect=True)
-        match = VerifiedResultR.search(nom_page_text)
+        match = VERIFIED_RESULT_REGEX.search(nom_page_text)
         try:
             ws = match.group(1)
             wo = match.group(2)
@@ -1524,7 +1524,7 @@ class FPCandidate(Candidate):
             ask_for_help(
                 f"The nomination [[{self._page.title()}]] is closed, "
                 "but does not contain a valid verified result. "
-                f"{please_fix_hint}"
+                f"{PLEASE_FIX_HINT}"
             )
             return
 
@@ -1847,14 +1847,14 @@ class DelistCandidate(Candidate):
         super().__init__(
             page,
             listName,
-            DelistR,
-            KeepR,
-            NeutralR,
+            DELIST_VOTE_REGEX,
+            KEEP_VOTE_REGEX,
+            NEUTRAL_VOTE_REGEX,
             "delisted",
             "not delisted",
-            DelistReviewedTemplateR,
-            DelistCountedTemplateR,
-            VerifiedDelistResultR,
+            DELIST_REVIEWED_TEMPLATE_REGEX,
+            DELIST_COUNTED_TEMPLATE_REGEX,
+            VERIFIED_DELIST_RESULT_REGEX,
         )
 
     def getResultString(self):
@@ -1943,7 +1943,7 @@ class DelistCandidate(Candidate):
             error(f"Error - can't read list of recent FPs: {exc}")
             fexc = format_exception(exc)
             ask_for_help(
-                could_not_read_recent_fps_list.format(exception=fexc)
+                COULD_NOT_READ_RECENT_FPS_LIST.format(exception=fexc)
                 + f" If the delisted FP [[:{filename}]] "
                 "appears on that page, please remove it."
             )
@@ -2064,7 +2064,7 @@ class DelistCandidate(Candidate):
         # The replacement strings use the '\g<1>' notation because r'\12'
         # would be misinterpreted as backreference to (non-existent) group 12,
         # and the name of the nomination subpage could start with a figure.
-        if match := AssessmentsR.search(old_text):
+        if match := ASSESSMENTS_TEMPLATE_REGEX.search(old_text):
             params = match.group(1)
             params, n = re.subn(
                 r"(\|\s*(?:com|featured)\s*=\s*)\d",
@@ -2246,7 +2246,7 @@ def findCandidates(list_page_name, delist):
         error(f"Error - can't read candidate list '{list_page_name}': {exc}.")
         ask_for_help(
             f"The bot could not read the candidate list [[{list_page_name}]]: "
-            f"{format_exception(exc)}. {serious_problem_check_page}"
+            f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
         )
         return []
     without_comments = re.sub(r"<!--.+?-->", "", old_text, flags=re.DOTALL)
@@ -2273,7 +2273,7 @@ def findCandidates(list_page_name, delist):
             continue
         # Skip nominations which do not match the '-match' argument
         if match_pattern:
-            comparison_name = PrefixR.sub("", subpage_name).lower()
+            comparison_name = PREFIX_REGEX.sub("", subpage_name).lower()
             if match_pattern not in comparison_name:
                 continue
         subpage = pywikibot.Page(G_Site, subpage_name)
@@ -2281,7 +2281,7 @@ def findCandidates(list_page_name, delist):
         if not subpage.exists():
             error(f"Error - nomination '{subpage_name}' not found, ignoring.")
             ask_for_help(
-                list_includes_missing_subpage.format(
+                LIST_INCLUDES_MISSING_SUBPAGE.format(
                     list=list_page_name, subpage=subpage_name
                 )
             )
@@ -2298,7 +2298,7 @@ def findCandidates(list_page_name, delist):
                 )
                 ask_for_help(
                     f"The nomination subpage [[{subpage_name}]] "
-                    f"contains an invalid redirect. {please_fix_hint}"
+                    f"contains an invalid redirect. {PLEASE_FIX_HINT}"
                 )
                 continue
             new_name = subpage.title()
@@ -2367,13 +2367,13 @@ def checkCandidates(check, list_page_name, delist, descending=True):
             ask_for_help(
                 "The bot could not find a page (perhaps it has been renamed "
                 f"without leaving a redirect): {format_exception(exc)}. "
-                f"{serious_problem_check_page}"
+                f"{SERIOUS_PROBLEM_CHECK_PAGE}"
             )
         except pywikibot.exceptions.LockedPageError as exc:
             error(f"Error - page is locked: '{exc}'")
             ask_for_help(
                 "The bot could not edit a page because it is locked: "
-                f"{format_exception(exc)}. {serious_problem_check_page}"
+                f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
             )
         except Exception as exc:
             # Report exception with stack trace on the FPC talk page
@@ -2716,7 +2716,7 @@ FP_TALK_PAGE_NAME = "Commons talk:Featured picture candidates"
 
 # Valid voting templates
 # Taken from Commons:Polling_templates, including some common redirects
-support_templates = (
+SUPPORT_TEMPLATES = (
     "[Ss]upport",
     "[Ss]upp?",
     "[Ss]",
@@ -2759,7 +2759,7 @@ support_templates = (
     "賛成",
     "찬성",
 )
-oppose_templates = (
+OPPOSE_TEMPLATES = (
     "[Oo]ppose",
     "[Oo]pp",
     "[Oo]",
@@ -2801,7 +2801,7 @@ oppose_templates = (
     "除外",
     "반대",
 )
-neutral_templates = (
+NEUTRAL_TEMPLATES = (
     "[Nn]eutral",
     "[Nn]eu",
     "[Nn]",
@@ -2824,12 +2824,12 @@ neutral_templates = (
     "中立",
     "중립",
 )
-delist_templates = (
+DELIST_TEMPLATES = (
     "[Dd]elist",
     # There seem to be no internationalized delist versions.
     # Don't add {{Remove}} or {{Del}}, they are for deletion discussions.
 )
-keep_templates = (
+KEEP_TEMPLATES = (
     "[Kk]eep",
     "[Kk]",
     "[Vv]ote[ _]keep",
@@ -2857,22 +2857,22 @@ keep_templates = (
 
 # Shared messages
 
-please_fix_hint = (
+PLEASE_FIX_HINT = (
     "Please check and fix this so that the bot can process the nomination."
 )
-serious_problem_check_page = (
+SERIOUS_PROBLEM_CHECK_PAGE = (
     "This is a serious problem, please check that page."
 )
-please_check_gallery_and_sort_fps = (
+PLEASE_CHECK_GALLERY_AND_SORT_FPS = (
     "Please check that gallery page and add the new featured picture(s) "
     "from the nomination to the appropriate gallery page."
 )
-list_includes_missing_subpage = (
+LIST_INCLUDES_MISSING_SUBPAGE = (
     "The candidate list [[{list}]] includes the nomination [[{subpage}]], "
     "but that page does not exist. Perhaps the page has been renamed "
-    f"and the list needs to be updated. {please_fix_hint}"
+    f"and the list needs to be updated. {PLEASE_FIX_HINT}"
 )
-could_not_read_recent_fps_list = (
+COULD_NOT_READ_RECENT_FPS_LIST = (
     f"The bot could not read [[{GALLERY_LIST_PAGE_NAME}|the list]] "
     "of recent Featured pictures: {exception}. "
     "Please check the list page and fix it."
@@ -2886,18 +2886,20 @@ could_not_read_recent_fps_list = (
 # Removes also any possible crap between the prefix and the namespace
 # and faulty spaces between namespace and filename (sometimes users
 # accidentally add such spaces when creating nominations).
-PrefixR = re.compile(wikipattern(CAND_PREFIX) + r".*?([Ff]ile|[Ii]mage): *")
+PREFIX_REGEX = re.compile(
+    wikipattern(CAND_PREFIX) + r".*?([Ff]ile|[Ii]mage): *"
+)
 
 # Look for results using the old, text-based results format
 # which was in use until August 2009.  An example of such a line is:
 # '''result:''' 3 support, 2 oppose, 0 neutral => not featured.
-PreviousResultR = re.compile(
+OBSOLETE_RESULT_REGEX = re.compile(
     r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral"
     r"\s*=>\s*((?:not )?featured)"
 )
 
 # Look for verified results using the new, template-based format
-VerifiedResultR = re.compile(
+VERIFIED_RESULT_REGEX = re.compile(
     r"""
     \{\{\s*FPC-results-reviewed\s*\|
     \s*support\s*=\s*(\d+)\s*\|            # (1) Support votes
@@ -2910,7 +2912,7 @@ VerifiedResultR = re.compile(
     """,
     re.VERBOSE,
 )
-VerifiedDelistResultR = re.compile(
+VERIFIED_DELIST_RESULT_REGEX = re.compile(
     r"""
     \{\{\s*FPC-delist-results-reviewed\s*\|
     \s*delist\s*=\s*(\d+)\s*\|   # (1) Delist votes
@@ -2923,51 +2925,51 @@ VerifiedDelistResultR = re.compile(
 )
 
 # Simple regexes which check just whether a certain template is present or not
-CountedTemplateR = re.compile(
+COUNTED_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*FPC-results-unreviewed.*?\}\}"
 )
-DelistCountedTemplateR = re.compile(
+DELIST_COUNTED_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
 )
-ReviewedTemplateR = re.compile(
+REVIEWED_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*FPC-results-reviewed.*?\}\}"
 )
-DelistReviewedTemplateR = re.compile(
+DELIST_REVIEWED_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*FPC-delist-results-reviewed.*?\}\}"
 )
 
 # Find voting templates
 VOTING_TEMPLATE_MODEL = r"\{\{\s*(?:%s)\s*(\|.*?)?\s*\}\}"
-SupportR = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(support_templates)
+SUPPORT_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(SUPPORT_TEMPLATES)
 )
-OpposeR = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(oppose_templates)
+OPPOSE_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(OPPOSE_TEMPLATES)
 )
-NeutralR = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(neutral_templates)
+NEUTRAL_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(NEUTRAL_TEMPLATES)
 )
-DelistR = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(delist_templates)
+DELIST_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(DELIST_TEMPLATES)
 )
-KeepR = re.compile(
-    VOTING_TEMPLATE_MODEL % "|".join(keep_templates)
+KEEP_VOTE_REGEX = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(KEEP_TEMPLATES)
 )
 
 # Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
-WithdrawnR = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
+WITHDRAWN_REGEX = re.compile(r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}")
 # Does the nomination contain a {{FPX}} or {{FPD}} template?
-FpxR = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
+FPX_FPD_REGEX = re.compile(r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}")
 # Does the nomination contain subheadings = subsections?
-SectionR = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
+SECTION_REGEX = re.compile(r"^={1,4}.+={1,4}\s*$", re.MULTILINE)
 # Count the number of displayed images
-ImagesR = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
+IMAGES_REGEX = re.compile(r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])")
 # Look for a size specification in the image link
-ImagesSizeR = re.compile(r"\|.*?(\d+)\s*px")
+IMAGE_SIZE_REGEX = re.compile(r"\|.*?(\d+)\s*px")
 # Check if there is a 'thumb' parameter in the image link
-ImagesThumbR = re.compile(r"\|\s*thumb\b")
+IMAGE_THUMB_REGEX = re.compile(r"\|\s*thumb\b")
 # Search nomination for the username of the original creator
-CreatorNameR = re.compile(
+CREATOR_NAME_REGEX = re.compile(
     r"\{\{[Ii]nfo\}\}.+?"
     r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
     r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
@@ -2975,9 +2977,12 @@ CreatorNameR = re.compile(
 
 # Find the {{Assessments}} template on an image description page
 # (sometimes people break it into several lines, so use '\s' and re.DOTALL)
-AssessmentsR = re.compile(
+ASSESSMENTS_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
 )
+
+
+# Globals
 
 # Auto reply yes to all questions
 G_Auto = False
