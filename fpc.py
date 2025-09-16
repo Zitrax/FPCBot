@@ -60,7 +60,8 @@ FILE_NAMESPACE = "File:"
 USER_NAMESPACE = "User:"
 USER_TALK_NAMESPACE = "User talk:"
 FP_PREFIX = "Commons:Featured pictures/"
-CAND_PREFIX = "Commons:Featured picture candidates/"
+FPC_PAGE = "Commons:Featured picture candidates"
+CAND_PREFIX = f"{FPC_PAGE}/"
 CAND_LOG_PREFIX = f"{CAND_PREFIX}Log/"
 CHRONO_ARCHIVE_PREFIX = f"{FP_PREFIX}chronological/"
 CAND_LIST_PAGE_NAME = f"{CAND_PREFIX}candidate list"
@@ -2883,8 +2884,11 @@ def ask_for_help(message, nominator=None):
     )
     if nominator:
         new_text += (
-            f"\n\n:Hi {{{{ping|{nominator}}}}} This is your nomination, "
-            "could you please sort this out? Thank you! / ~~~~"
+            f"\n\n:Hi {user_page_link(nominator)}, this is your nomination, "
+            "could you please sort this out? (Of course, anyone else "
+            "is welcome to solve the problem too!) If you need help, "
+            f"just ask an experienced [[{FPC_PAGE}|FPC]] regular. "
+            "Thank you! / ~~~~"
         )
     commit(old_text, new_text, talk_page, "Added request for help")
 
