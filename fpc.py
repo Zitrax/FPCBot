@@ -52,7 +52,7 @@ import pywikibot
 from pywikibot import config
 
 
-# Constants
+# CONSTANTS
 
 # Namespaces, prefixes, page names, etc.
 BOT_NAME = "FPCBot"
@@ -337,7 +337,7 @@ ASSESSMENTS_TEMPLATE_REGEX = re.compile(
 )
 
 
-# Globals
+# GLOBALS
 
 # Auto reply yes to all questions
 G_Auto = False
@@ -354,6 +354,8 @@ G_Abort = False
 # Pywikibot Site object
 G_Site = None
 
+
+# CLASSES
 
 class ThreadCheckCandidate(threading.Thread):
     """
@@ -2470,6 +2472,8 @@ class DelistCandidate(Candidate):
             )
 
 
+# FUNCTIONS
+
 def wikipattern(s):
     """
     Prepares a filename, page name etc. so that it can be used in a regex
@@ -3148,6 +3152,8 @@ def signal_handler(signal_number, frame):
     print("\n\nReceived SIGINT, will abort...\n")
     G_Abort = True
 
+
+# PROGRAM SETUP
 
 # Install a custom handler for SIGINT (keyboard, Ctrl-C) interrupts
 signal.signal(signal.SIGINT, signal_handler)
