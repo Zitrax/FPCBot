@@ -253,6 +253,10 @@ OBSOLETE_RESULT_REGEX = re.compile(
     r"'''[Rr]esult:'''\s+(\d+)\s+support,\s+(\d+)\s+oppose,\s+(\d+)\s+neutral"
     r"\s*=>\s*((?:not )?featured)"
 )
+OBSOLETE_DELIST_RESULT_REGEX = re.compile(
+    r"'''[Rr]esult:'''\s+(\d+)\s+delist,\s+(\d+)\s+keep,\s+(\d+)\s+neutral"
+    r"\s*=>\s*((?:not )?delisted)"
+)
 
 # Look for verified results using the new, template-based format
 VERIFIED_RESULT_REGEX = re.compile(
@@ -878,23 +882,22 @@ class Candidate(abc.ABC):
 
     def isDone(self):
         """
-        Checks if a nomination can be closed
+        Check whether the voting period for the nomination is over.
+        NB: This method doesn't consider the rules of the fifth day,
+        please use rulesOfFifthDay() for that purpose.
         """
         return self.daysOld() >= 9
 
     def isPassed(self):
         """
-        Find if an image can be featured.
-        Does not check the age, it needs to be
-        checked using isDone()
+        Check whether a nomination can be successfully closed or not.
+        NB: This method doesn't consider the age of the nomination,
+        please check that with isDone() and rulesOfFifthDay().
         """
-
         if self.isWithdrawn():
             return False
-
         if not self._votesCounted:
             self.countVotes()
-
         return self._pro >= 7 and (self._pro >= 2 * self._con)
 
     def isReviewed(self):
@@ -962,11 +965,18 @@ class Candidate(abc.ABC):
         [3] ('yes'|'no'|'featured'|'not featured').
         """
         text = self._page.get(get_redirect=True)
+        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
         # Search first for result(s) using the new template-base format,
         # and if this fails for result(s) in the old text-based format:
-        results = VERIFIED_RESULT_REGEX.findall(text)
+        results = self._VerifiedR.findall(text)
         if not results:
-            results = OBSOLETE_RESULT_REGEX.findall(text)
+            regex = (
+                # TODO: Clumsy programming style, will improve this soon.
+                OBSOLETE_DELIST_RESULT_REGEX
+                if isinstance(self, DelistCandidate) else
+                OBSOLETE_RESULT_REGEX
+            )
+            results = regex.findall(text)
         return results
 
     def compareResultToCount(self):
@@ -976,57 +986,49 @@ class Candidate(abc.ABC):
         This is useful to test the vote counting code of the bot
         and to find possibly incorrect old results.
         """
-        res = self.existingResult()
-
+        # Check status and get old result(s)
         if self.isWithdrawn():
             out("%s: (ignoring, was withdrawn)" % self.cutTitle())
             return
-        elif self.isFPX():
+        if self.isFPX():
             out("%s: (ignoring, was FPXed/FPDed)" % self.cutTitle())
             return
-        elif self.imageCount() > 1:
+        if self.imageCount() > 1:
             out("%s: (ignoring, contains alternatives)" % self.cutTitle())
             return
-        elif not res:
+        results = self.existingResult()
+        if not results:
             out("%s: (ignoring, has no results)" % self.cutTitle())
             return
-        elif len(res) > 1:
+        if len(results) > 1:
             out("%s: (ignoring, has several results)" % self.cutTitle())
             return
 
-        # We have one result, so make a vote count and compare
-        old_res = res[0]
-        was_featured = old_res[3].lower() in {"yes", "featured"}
-        ws = int(old_res[0])
-        wo = int(old_res[1])
-        wn = int(old_res[2])
+        # We have exactly one old result, so recount the votes and compare
+        old_result = results[0]
+        old_success = old_result[3].lower() in {"yes", "featured", "delisted"}
+        old_pro = int(old_result[0])
+        old_con = int(old_result[1])
+        old_neu = int(old_result[2])
         self.countVotes()
-
         if (
-            self._pro == ws
-            and self._con == wo
-            and self._neu == wn
-            and was_featured == self.isPassed()
+            self._pro == old_pro
+            and self._con == old_con
+            and self._neu == old_neu
+            and old_success == self.isPassed()
         ):
             status = "OK"
         else:
             status = "FAIL"
 
-        # List info to console
+        # Print result as list entry to console
         out(
-            "%s: S%02d/%02d O:%02d/%02d N%02d/%02d F%d/%d (%s)"
-            % (
-                self.cutTitle(),
-                self._pro,
-                ws,
-                self._con,
-                wo,
-                self._neu,
-                wn,
-                self.isPassed(),
-                was_featured,
-                status,
-            )
+            f"{self.cutTitle()}: "
+            f"P:{self._pro:02d}/{old_pro:02d} "
+            f"C:{self._con:02d}/{old_con:02d} "
+            f"N:{self._neu:02d}/{old_neu:02d} "
+            f"S:{self.isPassed():d}/{old_success:d} "
+            f"({status})"
         )
 
     def cutTitle(self):
@@ -3109,7 +3111,13 @@ def main(*args):
         match arg:
             case "-test":
                 if delist:
-                    warn("Task '-test' not supported for delisting candidates")
+                    out("Recounting votes for delist candidates...", heading=True)
+                    checkCandidates(
+                        Candidate.compareResultToCount,
+                        TEST_LOG_PAGE_NAME,
+                        delist=True,
+                        descending=False,
+                    )
                 if fpc:
                     out("Recounting votes for FP candidates...", heading=True)
                     checkCandidates(
