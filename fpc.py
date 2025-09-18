@@ -40,6 +40,7 @@ Options:
 # Standard library imports
 import sys
 import abc
+from typing import Literal
 import signal
 import datetime
 import time
@@ -339,6 +340,18 @@ CREATOR_NAME_REGEX = re.compile(
 # (sometimes people break it into several lines, so use '\s' and re.DOTALL)
 ASSESSMENTS_TEMPLATE_REGEX = re.compile(
     r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
+)
+
+# Find 'Featured pictures of/from/by ...' categories which must be removed
+# if a FP is delisted.  If the category is followed by a NL, remove it, too.
+# NB: We must not touch project-specific categories like 'Featured pictures
+# on Wikipedia, <language>', hence the negative lookahead assertion '(?!on )'.
+TOPICAL_FP_CATEGORY_REGEX = re.compile(
+    r"\[\[[Cc]ategory: *Featured (?:"
+    r"pictures (?!on ).+?"
+    r"|(?:[a-z -]+)?photo(?:graphs|graphy|s).*?"
+    r"|(?:diagrams|maps).*?"
+    r")\]\] *\n?"
 )
 
 
@@ -1625,52 +1638,90 @@ class FPCandidate(Candidate):
 
         @param files List with filename(s) of the featured picture or set.
         """
-        AssR = re.compile(r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}")
         subpage_name = self.subpageName(keep_prefix=False, keep_number=True)
         for filename in files:
+            # Try to get and read the image description page
             page = pywikibot.Page(G_Site, filename)
-            current_page = page
-            old_text = page.get(get_redirect=True)
-
-            # Is there already an {{Assessments}} template for this file?
-            if match := re.search(AssR, old_text):
-                # There is already an {{Assessments}} template, so update it.
-                # We must remove any existing 'featured', 'com-nom', 'subpage'
-                # parameters because they are probably outdated.
-                # TODO: 'subpage' is an old name of 'com-nom', remove it later.
-                params = re.sub(r"\|\s*featured\s*=\s*\d+", "", match.group(1))
-                params = re.sub(r"\|\s*(?:subpage|com-nom)\s*=\s*[^{}|]+", "", params)
-                params = params.strip()  # Required by the following test.
-                if params and params[0] != "|":
-                    params = "|" + params
-                params += "|featured=1|com-nom=" + subpage_name
-                new_text = (
-                    old_text[:match.start(0)]
-                    + "{{Assessments%s}}" % params
-                    + old_text[match.end(0):]
+            try:
+                old_text = page.get(get_redirect=False)
+            except pywikibot.exceptions.NoPageError:
+                # If the image has been deleted etc., we must just ignore it
+                error(
+                    f"Error - image '{filename}' not found, "
+                    "can't add {{Assessments}}."
                 )
-                if new_text == old_text:
+                continue
+            except pywikibot.exceptions.IsRedirectPageError:
+                # The image has been renamed, try to resolve the redirect
+                try:
+                    page = page.getRedirectTarget()
+                    old_text = page.get(get_redirect=False)
+                except pywikibot.exceptions.PageRelatedError:
+                    # Circular, nested or invalid redirect etc.
+                    error(
+                        f"Error - image '{filename}' moved with "
+                        "invalid redirect, can't add {{Assessments}}."
+                    )
+                    continue
+                filename = page.title()  # Update the filename.
+
+            # Search and (if found) update the {{Assessments}} template
+            found, up_to_date, new_text = update_assessments_template(
+                old_text, 1, subpage_name
+            )
+            if found:
+                if up_to_date:
                     # Old and new template are identical, so skip this file,
                     # but continue to check other files (for set nominations)
                     out(
-                        "Skipping addAssessments() for '%s', "
-                        "image is already featured." % filename
+                        f"Skipping addAssessments() for '{filename}', "
+                        "image is already featured."
                     )
                     continue
+                # Else: The {{Assessments}} template was found and updated.
             else:
-                # There is no {{Assessments}} template, so just add a new one
-                if re.search(r"\{\{(?:|\s*)[Ll]ocation", old_text):
-                    end = findEndOfTemplate(old_text, "[Ll]ocation")
-                elif re.search(r"\{\{(?:|\s*)[Oo]bject[_\s][Ll]ocation", old_text):
-                    end = findEndOfTemplate(old_text, r"[Oo]bject[_\s][Ll]ocation")
+                # There is no {{Assessments}} template, so just add a new one.
+                tmpl = f"{{{{Assessments|featured=1|com-nom={subpage_name}}}}}"
+                # Search for the best location, in order of priority:
+                # 1) At the very end of the file description stuff by putting
+                # it right before the header of the license section;
+                # 2) after the location templates (usually they appear after
+                # the info templates and are displayed in unity with them);
+                # 3) after one of the common information templates.
+                if match := re.search(
+                    r"\n== *\{\{ *int:license-header *\}\} *==", old_text
+                ):
+                    end = match.start(0)
                 else:
-                    end = findEndOfTemplate(old_text, "[Ii]nformation")
-                new_text = (
-                    old_text[:end]
-                    + "\n{{Assessments|featured=1|com-nom=%s}}\n" % subpage_name
-                    + old_text[end:]
+                    end = findEndOfTemplate(
+                        old_text, r"(?:[Oo]bject[ _])?[Ll]ocation(?:[ _]dec)?"
+                    )
+                    if not end:
+                        end = findEndOfTemplate(
+                            old_text,
+                            r"[Ii]nformation|[Aa]rtwork"
+                            r"|[Pp]hotograph|[Aa]rt[ _][Pp]hoto",
+                        )
+                if end:
+                    # Use no empty line before, 1 empty line after the template
+                    new_text = (
+                        f"{old_text[:end].rstrip()}\n"
+                        f"{tmpl}\n"
+                        "\n"
+                        f"{old_text[end:].lstrip()}"
+                    )
+                else:
+                    # Searches have failed, just add the template at the top
+                    new_text = f"{tmpl}\n\n{old_text.lstrip()}"
+
+            # Commit the new text
+            try:
+                commit(old_text, new_text, page, "FP promotion")
+            except pywikibot.exceptions.LockedPageError:
+                error(
+                    f"Error - image '{filename}' is locked, "
+                    "can't add/update {{Assessments}}."
                 )
-            commit(old_text, new_text, current_page, "FP promotion")
 
     def addAssessmentToMediaInfo(self, files):
         """
@@ -2364,72 +2415,32 @@ class DelistCandidate(Candidate):
             return
         subpage_name = self.subpageName(keep_prefix=False, keep_number=True)
 
-        # Update the {{Assessments}} template
-        # We have to replace 'featured=1' by '=2' and to update the name
-        # of the nomination subpage in the 'com-nom'/'subpage' parameter
-        # to make sure that the link in the template correctly points
-        # to the delist nomination (and not to the original nomination).
-        # The replacement strings use the '\g<1>' notation because r'\12'
-        # would be misinterpreted as backreference to (non-existent) group 12,
-        # and the name of the nomination subpage could start with a figure.
-        if match := ASSESSMENTS_TEMPLATE_REGEX.search(old_text):
-            params = match.group(1)
-            params, n = re.subn(
-                r"(\|\s*(?:com|featured)\s*=\s*)\d",
-                r"\g<1>2",
-                params,
-                count=1,
-            )
-            if n == 0:
-                params += "|featured=2"
-            params, n = re.subn(
-                r"(\|\s*)(?:com-nom|subpage)(\s*=\s*)[^{}|\n]+",
-                r"\g<1>com-nom\g<2>" + subpage_name,
-                params,
-                count=1,
-            )
-            if n == 0:
-                params += f"|com-nom={subpage_name}"
-            new_text = (
-                old_text[:match.start(1)]
-                + params
-                + old_text[match.end(1):]
-            )
-        else:
+        # Search and (if found) update the {{Assessments}} template
+        found, up_to_date, new_text = update_assessments_template(
+            old_text, 2, subpage_name
+        )
+        if not found:
             error(f"Error - no {{{{Assessments}}}} found on '{filename}'.")
             return
+        if up_to_date:
+            # This can happen if the process has previously been interrupted.
+            out(
+                f"Skipping addAssessments() for '{filename}', "
+                "image is already delisted."
+            )
+            return
 
-        # Remove 'Featured pictures of/from/by ...' categories.
-        # We must not touch project-specific categories like
-        # 'Featured pictures on Wikipedia, <language>'.
-        new_text = re.sub(
-            r"\[\[[Cc]ategory: *Featured pictures (?!on ).+?\]\] *\n?",
-            "",
-            new_text,
-        )
-        new_text = re.sub(
-            r"\[\[[Cc]ategory: *Featured (?:[a-z -]+)?"
-            r"photo(?:graphs|graphy|s).*?\]\] *\n?",
-            "",
-            new_text,
-        )
-        new_text = re.sub(
-            r"\[\[[Cc]ategory: *Featured (?:diagrams|maps).*?\]\] *\n?",
-            "",
-            new_text,
-        )
+        # Remove 'Featured pictures of/from/by ...' categories
+        new_text = TOPICAL_FP_CATEGORY_REGEX.sub("", new_text)
 
-        # Commit the text of the page if it has changed
-        if new_text != old_text:
-            summary = f"Delisted per [[{self._page.title()}]]"
-            try:
-                commit(old_text, new_text, image_page, summary)
-            except pywikibot.exceptions.LockedPageError:
-                error(f"Error - '{filename}' is locked.")
-        else:
+        # Commit the new text
+        summary = f"Delisted per [[{self._page.title()}]]"
+        try:
+            commit(old_text, new_text, image_page, summary)
+        except pywikibot.exceptions.LockedPageError:
             error(
-                f"Error - removing FP status from '{filename}' "
-                f"did not work."
+                f"Error - '{filename}' is locked, "
+                "can't update {{Assessments}}."
             )
 
     def removeAssessmentFromMediaInfo(self, filename):
@@ -2856,6 +2867,73 @@ def findEndOfTemplate(text, template):
             cp = ns + 2
     # Apparently we never found it
     return 0
+
+
+def update_assessments_template(
+    old_text: str,
+    featured_value: Literal[1, 2],
+    com_nom_value: str,
+) -> tuple[bool, bool, str]:
+    """Update the {{Assessments}} template on an image description page,
+    if present, to use the specified 'featured' and 'com-nom' values.
+    This function is used both for FP and delisting candidates.
+    It also updates the old 'subpage' parameter name to 'com-nom',
+    but preserves the code formatting of the {{Assessments}} template
+    because sometimes users format it with spaces, newlines, etc.
+
+    Arguments:
+    @param old_text: the text of the image description page.
+    @param featured_value: new value for 'featured' parameter, 1 or 2.
+    @param com_nom_value: new value for the 'com-nom' parameter.
+
+    Returns a tuple, containing
+    [0] bool: did the text contain an {{Assessments}} template?
+    [1] bool: if there was a template, was it already up-to-date?
+    [2] str: the updated text of the image description page.
+    """
+    if match := ASSESSMENTS_TEMPLATE_REGEX.search(old_text):
+        params = match.group(1)
+        # Search and update/append 'featured' parameter
+        fstr = str(featured_value)
+        if m := re.search(r"\|\s*featured\s*=\s*(\w+)", params):
+            if m.group(1) != fstr:
+                params = f"{params[:m.start(1)]}{fstr}{params[m.end(1):]}"
+                after = m.start(1) + len(fstr)
+            else:
+                after = m.end(1)
+        else:
+            params += f"|featured={fstr}"
+            after = len(params)
+        # Search and update/append 'com-nom' parameter
+        if m := re.search(
+            # NB: The end of the regex is so complicated because we want
+            # to leave any whitespace after the 'com-nom' value unchanged,
+            # therefore it must be excluded from group 2.
+            r"\|\s*(com-nom|subpage)\s*=\s*(.+?)\s*(?:$|[{}|\n])", params
+        ):
+            if m.group(1) == "subpage":
+                # We can replace the old name directly because the length
+                # of 'subpage' and 'com-nom' is identical
+                params = f"{params[:m.start(1)]}com-nom{params[m.end(1):]}"
+            if m.group(2) != com_nom_value:
+                params = (
+                    f"{params[:m.start(2)]}{com_nom_value}{params[m.end(2):]}"
+                )
+        else:
+            # Insert new 'com-nom' right after the 'featured' parameter
+            params = (
+                f"{params[:after]}|com-nom={com_nom_value}{params[after:]}"
+            )
+        # Check and assemble result
+        if params == match.group(1):
+            return (True, True, old_text)
+        new_text = (
+            old_text[:match.start(1)]
+            + params
+            + old_text[match.end(1):]
+        )
+        return (True, False, new_text)
+    return (False, False, old_text)
 
 
 def ask_for_help(message, nominator=None):
