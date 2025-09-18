@@ -2827,19 +2827,23 @@ def oldest_revision_user(page):
         return ""
 
 
-def findEndOfTemplate(text, template):
+def findEndOfTemplate(text, template_names):
     """
-    As regexps can't properly deal with nested parantheses.
-    this function will manually scan for where a template ends
-    such that we can insert new text after it.
-    Will return the position or 0 if not found.
-    """
-    m = re.search(r"{{\s*%s" % template, text)
-    if not m:
-        return 0
+    Search for the end of a template.  Returns the position of the first
+    character after the template, or 0 if the template is not found.
+    We use a specific function because normal regexes as supported by
+    Python's 're' module can't properly deal with nested templates.
 
+    @param text           Wikitext of the page you want to search.
+    @param template_names String with the allowed template name(s);
+    handled as a regex fragment, so you can supply several names
+    by separating them with '|' or by using '(?:...)?', etc.
+    """
+    match = re.search(r"(\{\{\s*" + template_names + r"\s*)[|{}]", text)
+    if not match:
+        return 0
     lvl = 0
-    cp = m.start() + 2
+    cp = match.end(1)
 
     while cp < len(text):
         ns = text.find("{{", cp)
