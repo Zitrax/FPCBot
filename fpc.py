@@ -949,12 +949,8 @@ class Candidate(abc.ABC):
             # We have several images, check if some of them are marked
             # as thumbnails or are too small to be counted
             for image_link, _ in images:
-                if IMAGE_THUMB_REGEX.search(image_link):
+                if is_just_thumbnail(image_link):
                     count -= 1
-                else:
-                    size = IMAGE_SIZE_REGEX.search(image_link)
-                    if size and (int(size.group(1)) <= 150):
-                        count -= 1
         self._imgCount = count
         return count
 
@@ -1067,8 +1063,13 @@ class Candidate(abc.ABC):
         # If there is no file with that name, use the name of the first image
         # on the nomination subpage instead
         if not pywikibot.Page(G_Site, filename).exists():
-            if match := IMAGES_REGEX.search(self._page.get(get_redirect=True)):
-                filename = match.group(2)
+            text = self._page.get(get_redirect=True)
+            text = filter_content(text)  # Ignore comments etc.
+            images = IMAGES_REGEX.findall(text)
+            for image_link, image_name in images:
+                if not is_just_thumbnail(image_link):
+                    filename = image_name
+                    break
 
         # Check if the image was renamed and try to resolve the redirect
         page = pywikibot.Page(G_Site, filename)
@@ -2774,6 +2775,16 @@ def bare_filename(filename):
         filename,
         count=1,
     ).strip()
+
+
+def is_just_thumbnail(image_link):
+    """Is the image link from a nomination subpage just a thumbnail or icon?"""
+    if IMAGE_THUMB_REGEX.search(image_link):
+        return True
+    size = IMAGE_SIZE_REGEX.search(image_link)
+    if size and (int(size.group(1)) <= 150):
+        return True
+    return False
 
 
 def yes_no(value):
