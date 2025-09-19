@@ -474,24 +474,20 @@ class Candidate(abc.ABC):
         """
         try:
             self.countVotes()
-            withdrawn = self.isWithdrawn() or self.isFPX()
             out(
-                "%s: S:%02d O:%02d N:%02d D:%02d De:%02d Se:%02d Im:%02d W:%s (%s)"
-                % (
-                    self.cutTitle(),
-                    self._pro,
-                    self._con,
-                    self._neu,
-                    self.daysOld(),
-                    self.daysSinceLastEdit(),
-                    self.sectionCount(),
-                    self.imageCount(),
-                    "True " if withdrawn else "False",
-                    self.statusString(),
-                )
+                f"{self.cutTitle()}: "
+                f"P:{self._pro:02d} "
+                f"C:{self._con:02d} "
+                f"N:{self._neu:02d} "
+                f"Do:{self.daysOld():02d} "
+                f"De:{self.daysSinceLastEdit():02d} "
+                f"Se:{self.sectionCount():02d} "
+                f"Im:{self.imageCount():02d} "
+                f"W:{y_n(self.isWithdrawn() or self.isFPX())} "
+                f"({self.statusString()})"
             )
         except pywikibot.exceptions.NoPageError:
-            error("%s: -- No such page -- " % self.cutTitle())
+            error(f"{self.cutTitle()}: -- No such page --")
 
     def creator(self, link):
         """
@@ -1001,20 +997,20 @@ class Candidate(abc.ABC):
         """
         # Check status and get old result(s)
         if self.isWithdrawn():
-            out("%s: (ignoring, was withdrawn)" % self.cutTitle())
+            out(f"{self.cutTitle()}: (ignoring, was withdrawn)")
             return
         if self.isFPX():
-            out("%s: (ignoring, was FPXed/FPDed)" % self.cutTitle())
+            out(f"{self.cutTitle()}: (ignoring, was FPXed/FPDed)")
             return
         if self.imageCount() > 1:
-            out("%s: (ignoring, contains alternatives)" % self.cutTitle())
+            out(f"{self.cutTitle()}: (ignoring, contains alternatives)")
             return
         results = self.existingResult()
         if not results:
-            out("%s: (ignoring, has no results)" % self.cutTitle())
+            out(f"{self.cutTitle()}: (ignoring, has no results)")
             return
         if len(results) > 1:
-            out("%s: (ignoring, has several results)" % self.cutTitle())
+            out(f"{self.cutTitle()}: (ignoring, has several results)")
             return
 
         # We have exactly one old result, so recount the votes and compare
@@ -1040,7 +1036,7 @@ class Candidate(abc.ABC):
             f"P:{self._pro:02d}/{old_pro:02d} "
             f"C:{self._con:02d}/{old_con:02d} "
             f"N:{self._neu:02d}/{old_neu:02d} "
-            f"S:{self.isPassed():d}/{old_success:d} "
+            f"S:{y_n(self.isPassed())}/{y_n(old_success)} "
             f"({status})"
         )
 
@@ -2783,6 +2779,11 @@ def bare_filename(filename):
 def yes_no(value):
     """Translates a boolean value to 'yes' and 'no' resp."""
     return "yes" if value else "no"
+
+
+def y_n(value):
+    """Translates a boolean value to 'Y' and 'N' resp., for use in tables."""
+    return "Y" if value else "N"
 
 
 def user_page_link(username):
