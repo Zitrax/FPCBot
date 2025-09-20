@@ -45,6 +45,7 @@ import signal
 import datetime
 import time
 import re
+import urllib.parse
 import threading
 import traceback
 
@@ -2759,9 +2760,17 @@ def clean_gallery_link(gallery_link):
     Clean the gallery link: remove leading/trailing whitespace,
     replace underscores and non-breaking spaces by plain spaces
     (underscores are present if users just copy the link,
-    a NBSP can be entered by accident with some keyboard settings).
+    a NBSP can be entered by accident with some keyboard settings),
+    and replace %-encoded characters by their plain text counterparts.
     """
-    return gallery_link.replace("_", " ").replace("\u00A0", " ").strip()
+    link = gallery_link.replace("_", " ").replace("\u00A0", " ").strip()
+    if "%" in link:
+        try:
+            link = urllib.parse.unquote(link, errors="strict")
+        except UnicodeError:
+            # Keep the encoded value of the link, just log the error
+            error("Error - invalid %xx escape in gallery link.")
+    return link
 
 
 def bare_filename(filename):
