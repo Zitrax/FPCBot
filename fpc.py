@@ -485,6 +485,7 @@ class Candidate(abc.ABC):
                 f"Se:{self.sectionCount():02d} "
                 f"Im:{self.imageCount():02d} "
                 f"W:{y_n(self.isWithdrawn() or self.isFPX())} "
+                f"S:{y_n(self.isPassed())} "
                 f"({self.statusString()})"
             )
         except pywikibot.exceptions.NoPageError:
@@ -900,7 +901,7 @@ class Candidate(abc.ABC):
 
     def isPassed(self):
         """
-        Check whether a nomination can be successfully closed or not.
+        Check whether the nomination is successful acc. to the current votes.
         NB: This method doesn't consider the age of the nomination,
         please check that with isDone() and rulesOfFifthDay().
         """
