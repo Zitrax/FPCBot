@@ -1063,6 +1063,10 @@ class Candidate(abc.ABC):
         # If there is no file with that name, use the name of the first image
         # on the nomination subpage instead
         if not pywikibot.Page(G_Site, filename).exists():
+            warn(
+                f"Did not find image '{filename}', "
+                "trying the first image in the nomination..."
+            )
             images = IMAGES_REGEX.findall(self.filtered_content())
             for image_link, image_name in images:
                 if not is_just_thumbnail(image_link):
