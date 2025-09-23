@@ -387,7 +387,7 @@ class ThreadCheckCandidate(threading.Thread):
         The initializer initializes the thread and saves references
         to the Candidate instance and to the method which should be called.
         """
-        super().__init__(self)
+        super().__init__()
         self._candidate = candidate
         self._check = check
 
