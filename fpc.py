@@ -440,6 +440,7 @@ class Candidate(abc.ABC):
         # which are adapted by the subclasses.
         self._page = page
         self._listPageName = listName
+        self._filtered_content = None
         self._pro = 0
         self._con = 0
         self._neu = 0
@@ -491,6 +492,22 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.NoPageError:
             error(f"{self.cutTitle()}: -- No such page --")
 
+    def filtered_content(self):
+        """
+        Return a filtered version of the wikitext of the nomination subpage,
+        i.e. without comments, stricken text, code examples, etc.
+        The filtered version is cached because we need it very often.
+        """
+        if self._filtered_content is None:
+            self._filtered_content = filter_content(
+                self._page.get(get_redirect=False)
+            )
+        return self._filtered_content
+
+    def reset_filtered_content(self):
+        """Flag filtered content as outdated after changing page contents."""
+        self._filtered_content = None
+
     def creator(self, link):
         """
         Returns the name of the user who has originally created the image(s).
@@ -503,8 +520,7 @@ class Candidate(abc.ABC):
         (if 'link' is True, a link to the user page), else just ''.
         """
         if self._creator is None:
-            wikitext = self._page.get(get_redirect=True)
-            if match := CREATOR_NAME_REGEX.search(wikitext):
+            if match := CREATOR_NAME_REGEX.search(self.filtered_content()):
                 self._creator = match.group(1).strip()
             else:
                 self._creator = ""
@@ -556,12 +572,10 @@ class Candidate(abc.ABC):
         # Use cached result if possible
         if self._setFiles is not None:
             return self._setFiles
-        # Get wikitext of the nomination subpage and extract
-        # the contents of the <gallery>...</gallery> element
-        wikitext = self._page.get(get_redirect=True)
+        # Extract contents of the first <gallery>...</gallery> element
         match = re.search(
             r"<gallery[^>]*>(.+?)</gallery>",
-            wikitext,
+            self.filtered_content(),
             flags=re.DOTALL,
         )
         if not match:
@@ -571,10 +585,6 @@ class Candidate(abc.ABC):
             )
             return []
         text_inside_gallery = match.group(1)
-        # As a precaution let's comb out all comments:
-        text_inside_gallery = re.sub(
-            r"<!--.+?-->", "", text_inside_gallery, flags=re.DOTALL
-        )
         # First try to find files which are properly listed with 'File:'
         # or 'Image:' prefix; they must be the first element on their line,
         # but leading whitespace is tolerated:
@@ -610,10 +620,9 @@ class Candidate(abc.ABC):
         Try to find the gallery link in the nomination subpage;
         this is used to copy the link to the results template.
         """
-        text = self._page.get(get_redirect=True)
         match = re.search(
             r"Gallery[^\n]+?\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
-            text,
+            self.filtered_content(),
         )
         if match is not None:
             return clean_gallery_link(match.group(1))
@@ -627,29 +636,21 @@ class Candidate(abc.ABC):
         """
         if self._votesCounted:
             return
-
-        text = self._page.get(get_redirect=True)
-        if text:
-            text = filter_content(text)
+        if text := self.filtered_content():
             self._pro = len(re.findall(self._proR, text))
             self._con = len(re.findall(self._conR, text))
             self._neu = len(re.findall(self._neuR, text))
         else:
-            error(f"Error - '{self._page.title()}' has no content")
-
+            error(f"Error - '{self._page.title()}' has no real content")
         self._votesCounted = True
 
     def isWithdrawn(self):
         """Has the nomination been marked as withdrawn?"""
-        text = self._page.get(get_redirect=True)
-        text = filter_content(text)
-        return WITHDRAWN_REGEX.search(text) is not None
+        return WITHDRAWN_REGEX.search(self.filtered_content()) is not None
 
     def isFPX(self):
         """Is the nomination marked with a {{FPX}} or {{FPD}} template?"""
-        text = self._page.get(get_redirect=True)
-        text = filter_content(text)
-        return FPX_FPD_REGEX.search(text) is not None
+        return FPX_FPD_REGEX.search(self.filtered_content()) is not None
 
     def rulesOfFifthDay(self):
         """Check if any of the rules of the fifth day can be applied."""
@@ -712,7 +713,7 @@ class Candidate(abc.ABC):
 
         # Is there any other reason not to close the nomination?
         try:
-            old_text = self._page.get(get_redirect=False)
+            filtered_text = self.filtered_content()
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"{cut_title}: (Error: is not readable)")
             ask_for_help(
@@ -721,26 +722,27 @@ class Candidate(abc.ABC):
                 f"{PLEASE_FIX_HINT}"
             )
             return False
-        if not old_text:
-            error(f"{cut_title}: (Error: has no content)")
+        if not filtered_text:
+            error(f"{cut_title}: (Error: has no real content)")
             ask_for_help(
                 f"The nomination subpage [[{subpage_name}]] "
                 f"seems to be empty. {PLEASE_FIX_HINT}"
             )
             return False
-        if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", old_text):
+        if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", filtered_text):
             out(f"{cut_title}: (marked as ignored, so ignoring)")
             return False
-        if self._CountedR.search(old_text):
+        if self._CountedR.search(filtered_text):
             out(f"{cut_title}: (needs review, ignoring)")
             return False
-        if self._ReviewedR.search(old_text):
+        if self._ReviewedR.search(filtered_text):
             out(f"{cut_title}: (already closed and reviewed, ignoring)")
             return False
 
         # OK, we should close the nomination
         if self.imageCount() <= 1:
             self.countVotes()
+        old_text = self._page.get(get_redirect=False)
         new_text = old_text.rstrip() + "\n\n" + self.getResultString()
         if self.imageCount() <= 1:
             new_text = self.fixHeading(new_text)
@@ -748,6 +750,7 @@ class Candidate(abc.ABC):
         # Save the new text of the nomination subpage
         summary = self.getCloseEditSummary(fifth_day)
         commit(old_text, new_text, self._page, summary)
+        self.reset_filtered_content()
         return True
 
     def fixHeading(self, text, value=None):
@@ -918,10 +921,10 @@ class Candidate(abc.ABC):
         or has been closed and counted, but is still waiting for the review;
         if neither the one nor the other applies, returns False.
         """
-        wikitext = self._page.get(get_redirect=True)
-        if self._ReviewedR.search(wikitext):
+        text = self.filtered_content()
+        if self._ReviewedR.search(text):
             return "Reviewed"
-        if self._CountedR.search(wikitext):
+        if self._CountedR.search(text):
             return "Counted"
         return False
 
@@ -931,9 +934,7 @@ class Candidate(abc.ABC):
 
     def sectionCount(self):
         """Counts the number of sections in this nomination."""
-        text = self._page.get(get_redirect=True)
-        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
-        return len(SECTION_REGEX.findall(text))
+        return len(SECTION_REGEX.findall(self.filtered_content()))
 
     def imageCount(self):
         """
@@ -943,9 +944,7 @@ class Candidate(abc.ABC):
         """
         if self._imgCount is not None:
             return self._imgCount
-        text = self._page.get(get_redirect=True)
-        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
-        images = IMAGES_REGEX.findall(text)
+        images = IMAGES_REGEX.findall(self.filtered_content())
         count = len(images)
         if count >= 2:
             # We have several images, check if some of them are marked
@@ -971,8 +970,7 @@ class Candidate(abc.ABC):
         [2] count of neutral votes,
         [3] ('yes'|'no'|'featured'|'not featured').
         """
-        text = self._page.get(get_redirect=True)
-        text = filter_content(text)  # Ignore commented, stricken etc. stuff.
+        text = self.filtered_content()
         # Search first for result(s) using the new template-base format,
         # and if this fails for result(s) in the old text-based format:
         results = self._VerifiedR.findall(text)
@@ -1065,9 +1063,7 @@ class Candidate(abc.ABC):
         # If there is no file with that name, use the name of the first image
         # on the nomination subpage instead
         if not pywikibot.Page(G_Site, filename).exists():
-            text = self._page.get(get_redirect=True)
-            text = filter_content(text)  # Ignore comments etc.
-            images = IMAGES_REGEX.findall(text)
+            images = IMAGES_REGEX.findall(self.filtered_content())
             for image_link, image_name in images:
                 if not is_just_thumbnail(image_link):
                     filename = image_name
@@ -1196,9 +1192,7 @@ class Candidate(abc.ABC):
 
         # Look for verified results
         # (leaving out stricken or commented results which have been corrected)
-        text = self._page.get(get_redirect=True)
-        redacted_text = filter_content(text)
-        results = self._VerifiedR.findall(redacted_text)
+        results = self._VerifiedR.findall(self.filtered_content())
         # Stop if there is not exactly one valid verified result
         if not results:
             out(f"{cut_title}: (ignoring, no verified results)")
@@ -1249,9 +1243,11 @@ class Candidate(abc.ABC):
         success = verified_result[3]
         if success in {"yes", "no"}:
             # If the keyword has not yet been added to the heading, add it now
-            new_text = self.fixHeading(text, success)
-            if new_text != text:
-                commit(text, new_text, self._page, "Fixed header")
+            old_text = self._page.get(get_redirect=False)
+            new_text = self.fixHeading(old_text, success)
+            if new_text != old_text:
+                commit(old_text, new_text, self._page, "Fixed header")
+                self.reset_filtered_content()
             # Park the candidate
             if success == "yes":
                 self.handlePassedCandidate(verified_result)
@@ -1871,13 +1867,11 @@ class FPCandidate(Candidate):
         filename = files[0]
 
         # Extract voting results
-        nom_page_text = self._page.get(get_redirect=True)
-        match = VERIFIED_RESULT_REGEX.search(nom_page_text)
-        try:
+        if match := VERIFIED_RESULT_REGEX.search(self.filtered_content()):
             ws = match.group(1)
             wo = match.group(2)
             wn = match.group(3)
-        except AttributeError:
+        else:
             error(f"Error - no verified result found in '{self._page.title()}'")
             ask_for_help(
                 f"The nomination [[{self._page.title()}]] is closed, "
