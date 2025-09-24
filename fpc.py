@@ -637,9 +637,9 @@ class Candidate(abc.ABC):
         if self._votesCounted:
             return
         if text := self.filtered_content():
-            self._pro = len(re.findall(self._proR, text))
-            self._con = len(re.findall(self._conR, text))
-            self._neu = len(re.findall(self._neuR, text))
+            self._pro = len(self._proR.findall(text))
+            self._con = len(self._conR.findall(text))
+            self._neu = len(self._neuR.findall(text))
         else:
             error(f"Error - '{self._page.title()}' has no real content")
         self._votesCounted = True
