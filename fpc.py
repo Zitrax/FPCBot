@@ -825,7 +825,7 @@ class Candidate(abc.ABC):
             return self._creationTime
 
         try:
-            timestamp = self._page.oldest_revision.timestamp
+            timestamp = self._page.oldest_revision["timestamp"]
         except pywikibot.exceptions.PageRelatedError:
             error(
                 f"Could not ascertain creation time of '{self._page.title()}', "
@@ -877,7 +877,7 @@ class Candidate(abc.ABC):
             return self._daysSinceLastEdit
 
         try:
-            timestamp = self._page.latest_revision.timestamp
+            timestamp = self._page.latest_revision["timestamp"]
         except pywikibot.exceptions.PageRelatedError:
             return -1
         # MediaWiki timestamps are always stored in UTC,
@@ -1738,7 +1738,7 @@ class FPCandidate(Candidate):
         # literally nullify the time part of the timestamp,
         # else MediaWiki rejects the timestamp as 'Malformed input'.
         try:
-            timestamp = self._page.latest_revision.timestamp
+            timestamp = self._page.latest_revision["timestamp"]
         except pywikibot.exceptions.PageRelatedError:
             timestamp = datetime.datetime.now(datetime.UTC)
         iso_timestamp = timestamp.strftime("%Y-%m-%dT00:00:00Z")
@@ -2839,7 +2839,7 @@ def oldest_revision_user(page):
     @param page A pywikibot.Page object.
     """
     try:
-        return page.oldest_revision.user.strip()
+        return page.oldest_revision["user"].strip()
     except (pywikibot.exceptions.PageRelatedError, AttributeError):
         return ""
 
