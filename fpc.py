@@ -676,9 +676,8 @@ class Candidate(abc.ABC):
 
     def closePage(self):
         """
-        Checks whether the nomination is finished and can be closed or not.
-        If yes, adds the provisional results to the nomination subpage
-        and returns True, else returns False.
+        Check whether the nomination is finished and can be closed or not.
+        If yes, add the provisional result to the nomination subpage.
         """
         subpage_name = self._page.title()
         cut_title = self.cutTitle()
@@ -691,25 +690,24 @@ class Candidate(abc.ABC):
                     list=self._listPageName, subpage=subpage_name
                 )
             )
-            return False
+            return
 
         # Close a withdrawn or FPXed/FPDed nomination if at least one full day
         # has passed since the last edit
         if (withdrawn := self.isWithdrawn()) or self.isFPX():
             old_enough = self.daysSinceLastEdit() > 0
+            reason = "withdrawn" if withdrawn else "FPXed/FPDed"
             action = "closing" if old_enough else "but waiting a day"
-            why = "withdrawn" if withdrawn else "FPXed/FPDed"
-            out(f"{cut_title}: {why}, {action}")
-            if not old_enough:
-                return False
-            self.moveToLog(why)
-            return True
+            out(f"{cut_title}: {reason}, {action}")
+            if old_enough:
+                self.moveToLog(reason)
+            return
 
         # Is the nomination still active?
         fifth_day = self.rulesOfFifthDay()
         if not self.isDone() and not fifth_day:
             out(f"{cut_title}: (still active, ignoring)")
-            return False
+            return
 
         # Is there any other reason not to close the nomination?
         try:
@@ -721,23 +719,23 @@ class Candidate(abc.ABC):
                 f"[[{subpage_name}]]: {format_exception(exc)}. "
                 f"{PLEASE_FIX_HINT}"
             )
-            return False
+            return
         if not filtered_text:
             error(f"{cut_title}: (Error: has no real content)")
             ask_for_help(
                 f"The nomination subpage [[{subpage_name}]] "
                 f"seems to be empty. {PLEASE_FIX_HINT}"
             )
-            return False
+            return
         if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", filtered_text):
             out(f"{cut_title}: (marked as ignored, so ignoring)")
-            return False
+            return
         if self._CountedR.search(filtered_text):
             out(f"{cut_title}: (needs review, ignoring)")
-            return False
+            return
         if self._ReviewedR.search(filtered_text):
             out(f"{cut_title}: (already closed and reviewed, ignoring)")
-            return False
+            return
 
         # OK, we should close the nomination
         if self.imageCount() <= 1:
@@ -751,7 +749,6 @@ class Candidate(abc.ABC):
         summary = self.getCloseEditSummary(fifth_day)
         commit(old_text, new_text, self._page, summary)
         self.reset_filtered_content()
-        return True
 
     def fixHeading(self, text, value=None):
         """
