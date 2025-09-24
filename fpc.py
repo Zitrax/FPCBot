@@ -441,9 +441,9 @@ class Candidate(abc.ABC):
         self._page = page
         self._listPageName = listName
         self._filtered_content = None
-        self._pro = 0
-        self._con = 0
-        self._neu = 0
+        self._pro = -1
+        self._con = -1
+        self._neu = -1
         self._proR = ProR  # Regexp for positive votes
         self._conR = ConR  # Regexp for negative votes
         self._neuR = NeuR  # Regexp for neutral  votes
@@ -452,7 +452,6 @@ class Candidate(abc.ABC):
         self._ReviewedR = ReviewedR
         self._CountedR = CountedR
         self._VerifiedR = VerifiedR
-        self._votesCounted = False
         self._daysOld = -1
         self._daysSinceLastEdit = -1
         self._creationTime = None
@@ -630,19 +629,15 @@ class Candidate(abc.ABC):
             return ""
 
     def countVotes(self):
-        """
-        Counts all the votes for this nomination
-        and subtracts eventual striked out votes
-        """
-        if self._votesCounted:
-            return
+        """Count all the votes for this nomination."""
+        if self._pro > -1:
+            return  # Votes are already counted.
         if text := self.filtered_content():
             self._pro = len(self._proR.findall(text))
             self._con = len(self._conR.findall(text))
             self._neu = len(self._neuR.findall(text))
         else:
             error(f"Error - '{self._page.title()}' has no real content")
-        self._votesCounted = True
 
     def isWithdrawn(self):
         """Has the nomination been marked as withdrawn?"""
@@ -907,8 +902,7 @@ class Candidate(abc.ABC):
         """
         if self.isWithdrawn():
             return False
-        if not self._votesCounted:
-            self.countVotes()
+        self.countVotes()
         return self._pro >= 7 and (self._pro >= 2 * self._con)
 
     def isReviewed(self):
@@ -1314,14 +1308,15 @@ class FPCandidate(Candidate):
                 "of the chosen alternative.'''</small> "
                 "/~~~~}}"
             )
-        else:
-            return (
-                "{{FPC-results-unreviewed"
-                f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
-                f"|featured={yes_no(self.isPassed())}"
-                f"|gallery={gallery}"
-                "|sig=~~~~}}"
-            )
+        # A simple FP nomination
+        self.countVotes()
+        return (
+            "{{FPC-results-unreviewed"
+            f"|support={self._pro}|oppose={self._con}|neutral={self._neu}"
+            f"|featured={yes_no(self.isPassed())}"
+            f"|gallery={gallery}"
+            "|sig=~~~~}}"
+        )
 
     def getCloseEditSummary(self, fifth_day):
         """Implementation for FP candidates."""
@@ -1330,13 +1325,14 @@ class FPCandidate(Candidate):
                 "Closing for review - contains alternatives, "
                 "needs manual counting"
             )
-        else:
-            return (
-                f"Closing for review ({self._pro} support, "
-                f"{self._con} oppose, {self._neu} neutral, "
-                f"featured: {yes_no(self.isPassed())}, "
-                f"5th day: {yes_no(fifth_day)})"
-            )
+        # A simple FP nomination
+        self.countVotes()
+        return (
+            f"Closing for review ({self._pro} support, "
+            f"{self._con} oppose, {self._neu} neutral, "
+            f"featured: {yes_no(self.isPassed())}, "
+            f"5th day: {yes_no(fifth_day)})"
+        )
 
     def handlePassedCandidate(self, results):
         """
@@ -2226,6 +2222,7 @@ class DelistCandidate(Candidate):
                 "</small> ~~~~}}"
             )
         # A simple delisting nomination
+        self.countVotes()
         return (
             "{{FPC-delist-results-unreviewed"
             f"|delist={self._pro}|keep={self._con}|neutral={self._neu}"
@@ -2242,6 +2239,7 @@ class DelistCandidate(Candidate):
                 "or set delisting nomination, needs manual counting"
             )
         # A simple delisting nomination
+        self.countVotes()
         return (
             "Closing for review "
             f"({self._pro} delist, {self._con} keep, {self._neu} neutral, "
