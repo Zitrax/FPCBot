@@ -955,20 +955,20 @@ class Candidate(abc.ABC):
         self._imgCount = count
         return count
 
-    def existingResult(self):
+    def existingResults(self):
         """
-        Scans the nomination subpage of this candidate and tries to find
-        and parse the results of the nomination.
-        Returns either an empty list (if the nomination was not closed
-        or does not use one of the usual formats for the results)
-        or a list of tuples; normally it should contain just a single tuple.
+        Scan the nomination subpage of this candidate and try to find
+        and parse the verified (reviewed) results of the nomination.
+        Returns either an empty list (if the nomination was not closed,
+        if the results were not verified yet, or if the results do not use
+        one of the usual formats) or a list of tuples; if the nomination
+        has been verified correctly it should contain just a single tuple.
         The length of the tuple varies, depending on the results format,
-        but only the first four values of the tuple are important
-        for the comparison of the results:
+        but only the first four values are important for a comparison:
         [0] count of support votes,
         [1] count of oppose votes,
         [2] count of neutral votes,
-        [3] ('yes'|'no'|'featured'|'not featured').
+        [3] ('yes'|'no'|'(not )?featured'|'(not )?delisted').
         """
         text = self.filtered_content()
         # Search first for result(s) using the new template-base format,
@@ -1001,7 +1001,7 @@ class Candidate(abc.ABC):
         if self.imageCount() > 1:
             out(f"{self.cutTitle()}: (ignoring, contains alternatives)")
             return
-        results = self.existingResult()
+        results = self.existingResults()
         if not results:
             out(f"{self.cutTitle()}: (ignoring, has no results)")
             return
