@@ -2688,7 +2688,7 @@ def checkCandidates(check, list_page_name, delist, descending=True):
                 "The bot could not edit a page because it is locked: "
                 f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
             )
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             # Report exception with stack trace on the FPC talk page
             stack_trace = traceback.format_exc().rstrip()
             stack_trace = re.sub(  # Abbreviate file paths to filenames
@@ -2696,7 +2696,7 @@ def checkCandidates(check, list_page_name, delist, descending=True):
             )
             try:
                 subpage_link = f"[[{candidate.page.title()}]]"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 subpage_link = f"the invalid nomination no. {i}"
             ask_for_help(
                 f"The bot has stopped at {subpage_link} "
