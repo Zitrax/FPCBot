@@ -2867,7 +2867,9 @@ def oldest_revision_user(page: pywikibot.Page) -> str:
     @param page A pywikibot.Page object.
     """
     try:
-        return page.oldest_revision["user"].strip()
+        username = page.oldest_revision["user"]
+        assert isinstance(username, str)  # Catch errors, help typecheckers.
+        return username.strip()
     except (pywikibot.exceptions.PageRelatedError, AttributeError):
         return ""
 
@@ -3145,7 +3147,7 @@ def commit_media_info_changes(
         out(f"Changes to '{filename}' ignored.")
 
 
-def main(*args) -> None:
+def main(*args: str) -> None:
     """
     This function is the main entry point of the bot program.
     It encapsulates the program's primary behavior --
