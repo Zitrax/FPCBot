@@ -437,22 +437,22 @@ class Candidate(abc.ABC):
     _OBSOLETE_RES_REGEX: ClassVar[re.Pattern] = OBSOLETE_RESULT_REGEX
 
     # Declare types of instance variables
-    _page: pywikibot.Page
     _listPageName: str
+    _page: pywikibot.Page
     _filtered_content: str | None
-    _pro: int
-    _con: int
-    _neu: int
+    _creationTime: datetime.datetime | None
     _daysOld: int
     _daysSinceLastEdit: int
-    _creationTime: datetime.datetime | None
-    _imgCount: int | None
-    _fileName: str | None
-    _alternative: str | None
-    _setFiles: list[str] | None
     _creator: str | None
     _uploader: dict[str, str]
     _nominator: str | None
+    _imgCount: int | None
+    _fileName: str | None
+    _setFiles: list[str] | None
+    _alternative: str | None
+    _pro: int
+    _con: int
+    _neu: int
 
     def __init__(self, page: pywikibot.Page, listName: str) -> None:
         """
@@ -464,23 +464,23 @@ class Candidate(abc.ABC):
         @param listName  A string with the name of the candidate list page.
         """
         # Save passed values
-        self._page = page
         self._listPageName = listName
+        self._page = page
         # Set other instance variables to default values
         self._filtered_content = None
-        self._pro = -1
-        self._con = -1
-        self._neu = -1
+        self._creationTime = None
         self._daysOld = -1
         self._daysSinceLastEdit = -1
-        self._creationTime = None
-        self._imgCount = None
-        self._fileName = None
-        self._alternative = None
-        self._setFiles = None
         self._creator = None    # Username of the original creator
         self._uploader: dict[str, str] = {}  # Mapping: filename -> username
         self._nominator = None  # Username of the nominator
+        self._imgCount = None
+        self._fileName = None
+        self._setFiles = None
+        self._alternative = None
+        self._pro = -1
+        self._con = -1
+        self._neu = -1
 
     @property
     def page(self) -> pywikibot.Page:
