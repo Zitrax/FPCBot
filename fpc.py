@@ -456,7 +456,8 @@ class Candidate(abc.ABC):
     def __init__(self, page: pywikibot.Page, listName: str) -> None:
         """
         Although this is an abstract base class, the initializer is used
-        to set instance variables to the passed values or to default values.
+        by the concrete subclasses.  It sets all instance variables
+        to passed values and to default values resp.
 
         @param page      A pywikibot.Page object for the nomination subpage.
         @param listName  A string with the name of the candidate list page.
@@ -1301,15 +1302,8 @@ class FPCandidate(Candidate):
     # Declare types of instance variables:
     # all instance variables are inherited, see superclass.
 
-    def __init__(self, page: pywikibot.Page, listName: str) -> None:
-        """
-        The initializer calls the superclass initializer in order to set
-        instance variables to the appropriate values for this class.
-
-        @param page      A pywikibot.Page object for the nomination subpage.
-        @param listName  A string with the name of the candidate list page.
-        """
-        super().__init__(page, listName)
+    # No __init__():
+    # the class just uses the initializer of the superclass.
 
     def getResultString(self) -> str:
         """
@@ -2226,15 +2220,8 @@ class DelistCandidate(Candidate):
     # Declare types of instance variables:
     # all instance variables are inherited, see superclass.
 
-    def __init__(self, page: pywikibot.Page, listName: str) -> None:
-        """
-        The initializer calls the superclass initializer in order to set
-        instance variables to the appropriate values for this class.
-
-        @param page      A pywikibot.Page object for the nomination subpage.
-        @param listName  A string with the name of the candidate list page.
-        """
-        super().__init__(page, listName)
+    # No __init__():
+    # the class just uses the initializer of the superclass.
 
     def getResultString(self) -> str:
         """
