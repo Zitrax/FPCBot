@@ -434,6 +434,7 @@ class Candidate(abc.ABC):
     _REVIEWED_RES_REGEX: ClassVar[re.Pattern] = REVIEWED_TEMPLATE_REGEX
     _COUNTED_RES_REGEX: ClassVar[re.Pattern] = COUNTED_TEMPLATE_REGEX
     _VERIFIED_RES_REGEX: ClassVar[re.Pattern] = VERIFIED_RESULT_REGEX
+    _OBSOLETE_RES_REGEX: ClassVar[re.Pattern] = OBSOLETE_RESULT_REGEX
 
     # Declare types of instance variables
     _page: pywikibot.Page
@@ -987,13 +988,7 @@ class Candidate(abc.ABC):
         # and if this fails for result(s) in the old text-based format:
         results = self._VERIFIED_RES_REGEX.findall(text)
         if not results:
-            regex = (
-                # TODO: Clumsy programming style, will improve this soon.
-                OBSOLETE_DELIST_RESULT_REGEX
-                if isinstance(self, DelistCandidate) else
-                OBSOLETE_RESULT_REGEX
-            )
-            results = regex.findall(text)
+            results = self._OBSOLETE_RES_REGEX.findall(text)
         return results
 
     def compareResultToCount(self) -> None:
@@ -2216,6 +2211,7 @@ class DelistCandidate(Candidate):
     _REVIEWED_RES_REGEX = DELIST_REVIEWED_TEMPLATE_REGEX
     _COUNTED_RES_REGEX = DELIST_COUNTED_TEMPLATE_REGEX
     _VERIFIED_RES_REGEX = VERIFIED_DELIST_RESULT_REGEX
+    _OBSOLETE_RES_REGEX = OBSOLETE_DELIST_RESULT_REGEX
 
     # Declare types of instance variables:
     # all instance variables are inherited, see superclass.
