@@ -43,7 +43,7 @@ import sys
 import abc
 from collections.abc import Callable
 from types import FrameType
-from typing import Final, Literal
+from typing import Final, Literal, ClassVar
 import signal
 import datetime
 import time
@@ -423,6 +423,18 @@ class Candidate(abc.ABC):
     of the concrete subclasses.
     """
 
+    # Define class constants
+    # (these are the values for a normal FP nomination,
+    # subclasses must adapt them as needed)
+    _SUCCESS_KEYWORD: ClassVar[str] = "featured"
+    _FAIL_KEYWORD: ClassVar[str] = "not featured"
+    _PRO_VOTE_REGEX: ClassVar[re.Pattern] = SUPPORT_VOTE_REGEX
+    _CONTRA_VOTE_REGEX: ClassVar[re.Pattern] = OPPOSE_VOTE_REGEX
+    _NEUTRAL_VOTE_REGEX: ClassVar[re.Pattern] = NEUTRAL_VOTE_REGEX
+    _REVIEWED_RES_REGEX: ClassVar[re.Pattern] = REVIEWED_TEMPLATE_REGEX
+    _COUNTED_RES_REGEX: ClassVar[re.Pattern] = COUNTED_TEMPLATE_REGEX
+    _VERIFIED_RES_REGEX: ClassVar[re.Pattern] = VERIFIED_RESULT_REGEX
+
     # Declare types of instance variables
     _page: pywikibot.Page
     _listPageName: str
@@ -430,14 +442,6 @@ class Candidate(abc.ABC):
     _pro: int
     _con: int
     _neu: int
-    _proR: re.Pattern
-    _conR: re.Pattern
-    _neuR: re.Pattern
-    _proString: str
-    _conString: str
-    _ReviewedR: re.Pattern
-    _CountedR: re.Pattern
-    _VerifiedR: re.Pattern
     _daysOld: int
     _daysSinceLastEdit: int
     _creationTime: datetime.datetime | None
@@ -449,54 +453,22 @@ class Candidate(abc.ABC):
     _uploader: dict[str, str]
     _nominator: str | None
 
-    def __init__(
-        self,
-        page: pywikibot.Page,
-        listName: str,
-        ProR: re.Pattern,
-        ConR: re.Pattern,
-        NeuR: re.Pattern,
-        ProString: str,
-        ConString: str,
-        ReviewedR: re.Pattern,
-        CountedR: re.Pattern,
-        VerifiedR: re.Pattern,
-    ) -> None:
+    def __init__(self, page: pywikibot.Page, listName: str) -> None:
         """
         Although this is an abstract base class, the initializer is used
         to set instance variables to the passed values or to default values.
 
         @param page      A pywikibot.Page object for the nomination subpage.
         @param listName  A string with the name of the candidate list page.
-        @param ProR      A compiled regex (re.Pattern) to find positive votes.
-        @param ConR      A compiled regex (re.Pattern) to find negative votes.
-        @param NeuR      A compiled regex (re.Pattern) to find neutral votes.
-        @param ProString A string expressing a positive result.
-        @param ConString A string expressing a negative result.
-        @param ReviewedR A compiled regex (re.Pattern) for finding
-                         a reviewed results template.
-        @param CountedR  A compiled regex (re.Pattern) for finding
-                         an unreviewed results template.
-        @param VerifiedR A compiled regex (re.Pattern) used to analyse
-                         the contents of a reviewed results template.
         """
-        # Later perhaps this can be cleaned up by letting the subclasses
-        # keep the variables or (better?!) by using class constants
-        # which are adapted by the subclasses.
+        # Save passed values
         self._page = page
         self._listPageName = listName
+        # Set other instance variables to default values
         self._filtered_content = None
         self._pro = -1
         self._con = -1
         self._neu = -1
-        self._proR = ProR  # Regexp for positive votes
-        self._conR = ConR  # Regexp for negative votes
-        self._neuR = NeuR  # Regexp for neutral  votes
-        self._proString = ProString
-        self._conString = ConString
-        self._ReviewedR = ReviewedR
-        self._CountedR = CountedR
-        self._VerifiedR = VerifiedR
         self._daysOld = -1
         self._daysSinceLastEdit = -1
         self._creationTime = None
@@ -678,9 +650,9 @@ class Candidate(abc.ABC):
         if self._pro > -1:
             return  # Votes are already counted.
         if text := self.filtered_content():
-            self._pro = len(self._proR.findall(text))
-            self._con = len(self._conR.findall(text))
-            self._neu = len(self._neuR.findall(text))
+            self._pro = len(self._PRO_VOTE_REGEX.findall(text))
+            self._con = len(self._CONTRA_VOTE_REGEX.findall(text))
+            self._neu = len(self._NEUTRAL_VOTE_REGEX.findall(text))
         else:
             error(f"Error - '{self._page.title()}' has no real content")
 
@@ -770,10 +742,10 @@ class Candidate(abc.ABC):
         if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", filtered_text):
             out(f"{cut_title}: (marked as ignored, so ignoring)")
             return
-        if self._CountedR.search(filtered_text):
+        if self._COUNTED_RES_REGEX.search(filtered_text):
             out(f"{cut_title}: (needs review, ignoring)")
             return
-        if self._ReviewedR.search(filtered_text):
+        if self._REVIEWED_RES_REGEX.search(filtered_text):
             out(f"{cut_title}: (already closed and reviewed, ignoring)")
             return
 
@@ -810,7 +782,7 @@ class Candidate(abc.ABC):
                 success = False
             case _:
                 success = self.isPassed()
-        keyword = self._proString if success else self._conString
+        keyword = self._SUCCESS_KEYWORD if success else self._FAIL_KEYWORD
         # Check if the nomination correctly starts with a level 3+ heading
         text = text.lstrip()  # Silently remove irritating whitespace.
         match = re.match(r"===(.+?)===", text)
@@ -894,7 +866,10 @@ class Candidate(abc.ABC):
         if self.isIgnored():
             return "Ignored"
         if self.isDone() or self.rulesOfFifthDay():
-            text = self._proString if self.isPassed() else self._conString
+            text = (
+                self._SUCCESS_KEYWORD if self.isPassed()
+                else self._FAIL_KEYWORD
+            )
             return text.capitalize()
         return "Active"
 
@@ -958,9 +933,9 @@ class Candidate(abc.ABC):
         if neither the one nor the other applies, returns False.
         """
         text = self.filtered_content()
-        if self._ReviewedR.search(text):
+        if self._REVIEWED_RES_REGEX.search(text):
             return "Reviewed"
-        if self._CountedR.search(text):
+        if self._COUNTED_RES_REGEX.search(text):
             return "Counted"
         return False
 
@@ -1009,7 +984,7 @@ class Candidate(abc.ABC):
         text = self.filtered_content()
         # Search first for result(s) using the new template-base format,
         # and if this fails for result(s) in the old text-based format:
-        results = self._VerifiedR.findall(text)
+        results = self._VERIFIED_RES_REGEX.findall(text)
         if not results:
             regex = (
                 # TODO: Clumsy programming style, will improve this soon.
@@ -1236,7 +1211,7 @@ class Candidate(abc.ABC):
 
         # Look for verified results
         # (leaving out stricken or commented results which have been corrected)
-        results = self._VerifiedR.findall(self.filtered_content())
+        results = self._VERIFIED_RES_REGEX.findall(self.filtered_content())
         # Stop if there is not exactly one valid verified result
         if not results:
             out(f"{cut_title}: (ignoring, no verified results)")
@@ -1296,7 +1271,7 @@ class Candidate(abc.ABC):
             if success == "yes":
                 self.handlePassedCandidate(verified_result)
             else:
-                self.moveToLog(self._conString)
+                self.moveToLog(self._FAIL_KEYWORD)
         else:
             error(
                 f"{cut_title}: (Error: invalid verified "
@@ -1320,6 +1295,9 @@ class Candidate(abc.ABC):
 class FPCandidate(Candidate):
     """A candidate up for promotion."""
 
+    # Define class constants:
+    # all class constants are inherited, no changes necessary.
+
     # Declare types of instance variables:
     # all instance variables are inherited, see superclass.
 
@@ -1328,20 +1306,10 @@ class FPCandidate(Candidate):
         The initializer calls the superclass initializer in order to set
         instance variables to the appropriate values for this class.
 
-        @param page A pywikibot.Page object for the nomination subpage.
+        @param page      A pywikibot.Page object for the nomination subpage.
+        @param listName  A string with the name of the candidate list page.
         """
-        super().__init__(
-            page,
-            listName,
-            SUPPORT_VOTE_REGEX,
-            OPPOSE_VOTE_REGEX,
-            NEUTRAL_VOTE_REGEX,
-            "featured",
-            "not featured",
-            REVIEWED_TEMPLATE_REGEX,
-            COUNTED_TEMPLATE_REGEX,
-            VERIFIED_RESULT_REGEX,
-        )
+        super().__init__(page, listName)
 
     def getResultString(self) -> str:
         """
@@ -1454,7 +1422,7 @@ class FPCandidate(Candidate):
         self.addToCurrentMonth(files)
         self.notifyNominator(files)
         self.notifyUploaderAndCreator(files)
-        self.moveToLog(self._proString)
+        self.moveToLog(self._SUCCESS_KEYWORD)
 
     def addToFeaturedList(self, section_name: str, files: list[str]) -> None:
         """
@@ -2244,6 +2212,17 @@ class FPCandidate(Candidate):
 class DelistCandidate(Candidate):
     """A delisting candidate."""
 
+    # Define class constants
+    # Adapt values for the needs of this class:
+    _SUCCESS_KEYWORD = "delisted"
+    _FAIL_KEYWORD = "not delisted"
+    _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
+    _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
+    _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
+    _REVIEWED_RES_REGEX = DELIST_REVIEWED_TEMPLATE_REGEX
+    _COUNTED_RES_REGEX = DELIST_COUNTED_TEMPLATE_REGEX
+    _VERIFIED_RES_REGEX = VERIFIED_DELIST_RESULT_REGEX
+
     # Declare types of instance variables:
     # all instance variables are inherited, see superclass.
 
@@ -2252,20 +2231,10 @@ class DelistCandidate(Candidate):
         The initializer calls the superclass initializer in order to set
         instance variables to the appropriate values for this class.
 
-        @param page A pywikibot.Page object for the nomination subpage.
+        @param page      A pywikibot.Page object for the nomination subpage.
+        @param listName  A string with the name of the candidate list page.
         """
-        super().__init__(
-            page,
-            listName,
-            DELIST_VOTE_REGEX,
-            KEEP_VOTE_REGEX,
-            NEUTRAL_VOTE_REGEX,
-            "delisted",
-            "not delisted",
-            DELIST_REVIEWED_TEMPLATE_REGEX,
-            DELIST_COUNTED_TEMPLATE_REGEX,
-            VERIFIED_DELIST_RESULT_REGEX,
-        )
+        super().__init__(page, listName)
 
     def getResultString(self) -> str:
         """
@@ -2331,7 +2300,7 @@ class DelistCandidate(Candidate):
         self.removeFromGalleryPages(filename, results)
         self.removeAssessments(filename)
         self.removeAssessmentFromMediaInfo(filename)
-        self.moveToLog(self._proString)
+        self.moveToLog(self._SUCCESS_KEYWORD)
 
     def removeFromFeaturedList(self, filename: str) -> None:
         """
