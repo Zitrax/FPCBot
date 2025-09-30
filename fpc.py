@@ -688,7 +688,7 @@ class Candidate(abc.ABC):
         # If we arrive here, no rule applies
         return False
 
-    def closePage(self) -> None:
+    def close(self) -> None:
         """
         Check whether the nomination is finished and can be closed or not.
         If yes, add the provisional result to the nomination subpage.
@@ -1197,7 +1197,7 @@ class Candidate(abc.ABC):
             )
             return
 
-        # Withdrawn/FPXed/FPDed nominations are handled by closePage()
+        # Withdrawn/FPXed/FPDed nominations are handled by close()
         if self.isWithdrawn():
             out(f"{cut_title}: (ignoring, was withdrawn)")
             return
@@ -3266,10 +3266,10 @@ def main(*args: str) -> None:
             case "-close":
                 if delist:
                     out("Closing delist candidates...", heading=True)
-                    checkCandidates(Candidate.closePage, CAND_LIST_PAGE_NAME, delist=True)
+                    checkCandidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=True)
                 if fpc:
                     out("Closing FP candidates...", heading=True)
-                    checkCandidates(Candidate.closePage, CAND_LIST_PAGE_NAME, delist=False)
+                    checkCandidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=False)
             case "-info":
                 if delist:
                     out("Gathering info about delist candidates...", heading=True)
