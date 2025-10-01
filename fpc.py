@@ -394,8 +394,8 @@ class ThreadCheckCandidate(threading.Thread):
     """
 
     # Declare types of instance variables
-    _candidate: Candidate
-    _check: Callable[[Candidate], None]
+    _candidate: Candidate  # The candidate/nomination handled in this thread
+    _check: Callable[[Candidate], None]  # The method for the desired task
 
     def __init__(
         self,
@@ -426,33 +426,42 @@ class Candidate(abc.ABC):
     # Define class constants
     # (these are the values for a normal FP nomination,
     # subclasses must adapt them as needed)
+    # Keyword for the title etc. of a successful nomination:
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
+    # Keyword for the title etc. of a failed nomination:
     _FAIL_KEYWORD: ClassVar[str] = "not featured"
+    # Compiled regex to find positive votes in the nomination:
     _PRO_VOTE_REGEX: ClassVar[re.Pattern] = SUPPORT_VOTE_REGEX
+    # Compiled regex to find negative votes in the nomination:
     _CONTRA_VOTE_REGEX: ClassVar[re.Pattern] = OPPOSE_VOTE_REGEX
+    # Compiled regex to find neutral votes in the nomination:
     _NEUTRAL_VOTE_REGEX: ClassVar[re.Pattern] = NEUTRAL_VOTE_REGEX
-    _REVIEWED_RES_REGEX: ClassVar[re.Pattern] = REVIEWED_TEMPLATE_REGEX
+    # Compiled regex to find templates containing unreviewed results:
     _COUNTED_RES_REGEX: ClassVar[re.Pattern] = COUNTED_TEMPLATE_REGEX
+    # Compiled regex to find templates containing reviewed results:
+    _REVIEWED_RES_REGEX: ClassVar[re.Pattern] = REVIEWED_TEMPLATE_REGEX
+    # Compiled regex to analyse the template with reviewed results:
     _VERIFIED_RES_REGEX: ClassVar[re.Pattern] = VERIFIED_RESULT_REGEX
+    # Compiled regex to analyse the obsolete format for reviewed results:
     _OBSOLETE_RES_REGEX: ClassVar[re.Pattern] = OBSOLETE_RESULT_REGEX
 
     # Declare types of instance variables
-    _list_page_name: str
-    _page: pywikibot.Page
-    _filtered_content: str | None
-    _creation_time: datetime.datetime | None
-    _days_old: int
-    _days_since_last_edit: int
-    _creator: str | None
-    _uploader: dict[str, str]
-    _nominator: str | None
-    _image_count: int | None
-    _filename: str | None
-    _set_files: list[str] | None
-    _alternative: str | None
-    _pro: int
-    _con: int
-    _neu: int
+    _list_page_name: str  # Name of the candidates list page on Commons
+    _page: pywikibot.Page  # The nomination subpage for this candidate
+    _filtered_content: str | None  # Text of the nomination w/o comments etc.
+    _creation_time: datetime.datetime | None  # Creation time of the nomination
+    _days_old: int  # How many days passed since the nomination was created?
+    _days_since_last_edit: int  # How many days passed since it was edited?
+    _creator: str | None  # Username of the creator of the nominated image
+    _uploader: dict[str, str]  # Mapping: filename -> username of uploader
+    _nominator: str | None  # Username of the creator of the nomination
+    _image_count: int | None  # Count of (full-size) images in the nomination
+    _filename: str | None  # The name of the nominated image
+    _set_files: list[str] | None  # Names of nominated images (for set noms)
+    _alternative: str | None  # If there are alternatives: selected image name
+    _pro: int  # Count of pro votes
+    _con: int  # Count of contra votes
+    _neu: int  # Count of neutral votes
 
     def __init__(self, page: pywikibot.Page, list_name: str) -> None:
         """
@@ -471,9 +480,9 @@ class Candidate(abc.ABC):
         self._creation_time = None
         self._days_old = -1
         self._days_since_last_edit = -1
-        self._creator = None    # Username of the original creator
-        self._uploader: dict[str, str] = {}  # Mapping: filename -> username
-        self._nominator = None  # Username of the nominator
+        self._creator = None
+        self._uploader: dict[str, str] = {}
+        self._nominator = None
         self._image_count = None
         self._filename = None
         self._set_files = None
@@ -2208,8 +2217,8 @@ class DelistCandidate(Candidate):
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
     _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
     _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
-    _REVIEWED_RES_REGEX = DELIST_REVIEWED_TEMPLATE_REGEX
     _COUNTED_RES_REGEX = DELIST_COUNTED_TEMPLATE_REGEX
+    _REVIEWED_RES_REGEX = DELIST_REVIEWED_TEMPLATE_REGEX
     _VERIFIED_RES_REGEX = VERIFIED_DELIST_RESULT_REGEX
     _OBSOLETE_RES_REGEX = OBSOLETE_DELIST_RESULT_REGEX
 
