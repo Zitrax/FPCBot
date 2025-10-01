@@ -369,15 +369,15 @@ TOPICAL_FP_CATEGORY_REGEX: Final[re.Pattern] = re.compile(
 
 # GLOBALS
 
-# Auto reply yes to all questions
+# Apply all changes without asking the user
 _g_auto: bool = False
-# Auto answer no
+# Dry run, do not save any changes
 _g_dry: bool = False
 # Use threads
 _g_threads: bool = False
-# Avoid timestamps in output
+# Don't print timestamps in CLI/log output
 _g_log_no_time: bool = False
-# Pattern to match
+# Process only nominations with a name matched by this pattern
 _g_match_pattern: str = ""
 # Flag that will be set to True if CTRL-C was pressed
 _g_abort: bool = False
