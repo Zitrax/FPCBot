@@ -456,7 +456,7 @@ class Candidate(abc.ABC):
     _uploader: dict[str, str]  # Mapping: filename -> username of uploader
     _nominator: str | None  # Username of the creator of the nomination
     _image_count: int | None  # Count of (full-size) images in the nomination
-    _filename: str | None  # The name of the nominated image
+    _filename: str | None  # Name of the nominated image, empty if not found
     _set_files: list[str] | None  # Names of nominated images (for set noms)
     _alternative: str | None  # If there are alternatives: selected image name
     _pro: int  # Count of pro votes
@@ -1062,42 +1062,78 @@ class Candidate(abc.ABC):
 
     def filename(self) -> str:
         """
-        Returns the filename of this candidate
-        (for set nominations, use set_files() instead).
+        Return the filename of this candidate or, if we cannot identify
+        the nominated image, an empty string.
+        For set nominations, use set_files() instead.
         """
         # Try the selected alternative or a cached result first
         if self._alternative:
             return self._alternative
-        if self._filename:
+        if self._filename is not None:
             return self._filename
 
-        # Try to derive the filename from the name of the nomination subpage,
-        # using the standard 'File:' namespace
-        filename = PREFIX_REGEX.sub(FILE_NAMESPACE, self._page.title())
-        filename = re.sub(r" */ *\d+ *$", "", filename)  # Remove '/2' etc.
-
-        # If there is no file with that name, use the name of the first image
-        # on the nomination subpage instead
-        if not pywikibot.Page(_g_site, filename).exists():
-            warn(
-                f"Did not find image '{filename}', "
-                "trying the first image in the nomination..."
-            )
-            images = IMAGES_REGEX.findall(self.filtered_content())
-            for image_link, image_name in images:
-                if not is_just_thumbnail(image_link):
-                    filename = image_name
-                    break
+        # Try to derive the filename from the name of the nomination subpage
+        page: pywikibot.Page | None  # Help typecheckers.
+        subpage_name = self._page.title()
+        if match := PREFIX_REGEX.search(subpage_name):
+            filename = subpage_name[match.end(0):]
+            # Use standard 'File:' namespace and remove '/2' etc.
+            filename = FILE_NAMESPACE + re.sub(r" */ *\d+ *$", "", filename)
+            page = pywikibot.Page(_g_site, filename)
+            if not page.exists():
+                # Image page not found; try the 1st image in the nomination
+                page = self._first_real_image_in_nomination()
+                if page is None:
+                    error(
+                        f"{self.cut_title()}: (Error: can't find image page)"
+                    )
+                    ask_for_help(
+                        f"The nomination [[{subpage_name}]] is about "
+                        f"the image [[:{filename}]], but that file "
+                        "does not exist. Perhaps the file has been renamed. "
+                        f"{PLEASE_FIX_HINT}"
+                    )
+                    self._filename = ""
+                    return ""
+        else:
+            # Bad nomination subpage name; try the 1st image in the nomination
+            page = self._first_real_image_in_nomination()
+            if page is None:
+                error(
+                    f"{self.cut_title()}: (Error: bad nomination subpage name)"
+                )
+                ask_for_help(
+                    f"The name of the nomination subpage [[{subpage_name}]] "
+                    "is irregular, therefore the bot cannot identify "
+                    f"the nominated image. {PLEASE_FIX_HINT}"
+                )
+                self._filename = ""
+                return ""
+        # If we arrive here, 'page' should point to a valid page.
 
         # Check if the image was renamed and try to resolve the redirect
-        page = pywikibot.Page(_g_site, filename)
-        if page.exists() and page.isRedirectPage():
-            filename = page.getRedirectTarget().title()
+        if page.isRedirectPage():
+            page = page.getRedirectTarget()
         # TODO: Add more tests, catch exceptions, report missing files, etc.!
 
-        filename = filename.replace("_", " ")
-        self._filename = filename
-        return filename
+        # Use the official spelling from the file page
+        self._filename = page.title()
+        return self._filename
+
+    def _first_real_image_in_nomination(self) -> pywikibot.Page | None:
+        """
+        Return a pywikibot.Page object for the first image file
+        which is linked in reasonable size (not as a mere thumbnail)
+        in the text of the nomination subpage and actually exists.
+        If no such image file is found, return None.
+        """
+        images = IMAGES_REGEX.findall(self.filtered_content())
+        for image_link, image_name in images:
+            if not is_just_thumbnail(image_link):
+                page = pywikibot.Page(_g_site, image_name)
+                if page.exists():
+                    return page
+        return None
 
     def subpage_name(
         self,
@@ -1253,13 +1289,8 @@ class Candidate(abc.ABC):
                         f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
                     )
                     return
-        elif not pywikibot.Page(_g_site, self.filename()).exists():
-            error(f"{cut_title}: (Error: can't find image page)")
-            ask_for_help(
-                f"The nomination [[{subpage_name}]] is about the image "
-                f"[[:{self.filename()}]], but that file does not exist. "
-                f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
-            )
+        elif not self.filename():
+            # Could not identify nominated image, error already reported
             return
 
         # We should now have a candidate with verified result that we can park
@@ -1405,14 +1436,21 @@ class FPCandidate(Candidate):
                 return
 
         # Promote the new featured picture(s)
-        files = self.set_files() if self.is_set() else [self.filename()]
-        if not files:
-            error(f"{cut_title}: (ignoring, no file(s) found)")
-            ask_for_help(
-                "Cannot find the featured file(s) in the nomination "
-                f"[[{subpage_name}]]. {PLEASE_FIX_HINT}"
-            )
-            return
+        if self.is_set():
+            files = self.set_files()
+            if not files:
+                error(f"{cut_title}: (ignoring, no file(s) found)")
+                ask_for_help(
+                    "Cannot find the featured file(s) in the nomination "
+                    f"[[{subpage_name}]]. {PLEASE_FIX_HINT}"
+                )
+                return
+        else:
+            filename = self.filename()
+            if not filename:
+                # Could not identify nominated image, error already reported
+                return
+            files = [filename]
         self.add_to_featured_list(basic_gallery, files)
         self.add_to_gallery_page(full_gallery_link, files)
         self.add_assessments(files)
@@ -2288,6 +2326,9 @@ class DelistCandidate(Candidate):
             )
             return
         filename = self.filename()
+        if not filename:
+            # Could not identify nominated image, error already reported
+            return
         self.remove_from_featured_list(filename)
         self.remove_from_gallery_pages(filename, results)
         self.remove_assessments(filename)
