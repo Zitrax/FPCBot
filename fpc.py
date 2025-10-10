@@ -457,8 +457,8 @@ class Candidate(abc.ABC):
     _nominator: str | None  # Username of the creator of the nomination
     _image_count: int | None  # Count of (full-size) images in the nomination
     _filename: str | None  # Name of the nominated image, empty if not found
-    _set_files: list[str] | None  # Names of nominated images (for set noms)
     _alternative: str | None  # If there are alternatives: selected image name
+    _set_files: list[str] | None  # Names of nominated images (for set noms)
     _pro: int  # Count of pro votes
     _con: int  # Count of contra votes
     _neu: int  # Count of neutral votes
@@ -485,8 +485,8 @@ class Candidate(abc.ABC):
         self._nominator = None
         self._image_count = None
         self._filename = None
-        self._set_files = None
         self._alternative = None
+        self._set_files = None
         self._pro = -1
         self._con = -1
         self._neu = -1
@@ -1067,7 +1067,7 @@ class Candidate(abc.ABC):
         For set nominations, use set_files() instead.
         """
         # Try the selected alternative or a cached result first
-        if self._alternative:
+        if self._alternative is not None:
             return self._alternative
         if self._filename is not None:
             return self._filename
@@ -1424,6 +1424,7 @@ class FPCandidate(Candidate):
                         f"specified by the nomination [[{subpage_name}]]. "
                         f"{PLEASE_FIX_HINT}"
                     )
+                    self._alternative = ""  # Mark as invalid, like _filename.
                     return
                 self._alternative = alternative
             else:
