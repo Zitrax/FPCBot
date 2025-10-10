@@ -1071,10 +1071,14 @@ class Candidate(abc.ABC):
             return self._alternative
         if self._filename is not None:
             return self._filename
+        # Change default value from None (meaning 'not retrieved yet')
+        # to an empty string (meaning 'file not OK'; used if we return early)
+        self._filename = ""
 
         # Try to derive the filename from the name of the nomination subpage
         page: pywikibot.Page | None  # Help typecheckers.
         subpage_name = self._page.title()
+        cut_title = self.cut_title()
         if match := PREFIX_REGEX.search(subpage_name):
             filename = subpage_name[match.end(0):]
             # Use standard 'File:' namespace and remove '/2' etc.
@@ -1082,39 +1086,61 @@ class Candidate(abc.ABC):
             page = pywikibot.Page(_g_site, filename)
             if not page.exists():
                 # Image page not found; try the 1st image in the nomination
+                warn(
+                    f"{cut_title}: (Did not find '{filename}', "
+                    "trying first image...)"
+                )
                 page = self._first_real_image_in_nomination()
                 if page is None:
-                    error(
-                        f"{self.cut_title()}: (Error: can't find image page)"
-                    )
+                    error(f"{cut_title}: (Error: can't find image page)")
                     ask_for_help(
                         f"The nomination [[{subpage_name}]] is about "
                         f"the image [[:{filename}]], but that file "
                         "does not exist. Perhaps the file has been renamed. "
                         f"{PLEASE_FIX_HINT}"
                     )
-                    self._filename = ""
                     return ""
         else:
             # Bad nomination subpage name; try the 1st image in the nomination
+            warn(
+                f"{cut_title}: (Could not derive filename, "
+                "trying first image...)"
+            )
             page = self._first_real_image_in_nomination()
             if page is None:
-                error(
-                    f"{self.cut_title()}: (Error: bad nomination subpage name)"
-                )
+                error(f"{cut_title}: (Error: bad nomination subpage name)")
                 ask_for_help(
                     f"The name of the nomination subpage [[{subpage_name}]] "
                     "is irregular, therefore the bot cannot identify "
                     f"the nominated image. {PLEASE_FIX_HINT}"
                 )
-                self._filename = ""
                 return ""
         # If we arrive here, 'page' should point to a valid page.
 
         # Check if the image was renamed and try to resolve the redirect
         if page.isRedirectPage():
-            page = page.getRedirectTarget()
-        # TODO: Add more tests, catch exceptions, report missing files, etc.!
+            filename = page.title()
+            try:
+                page = page.getRedirectTarget()
+            except pywikibot.exceptions.PageRelatedError:
+                # Circular or invalid redirect etc., skip candidate
+                error(f"{cut_title}: (Error: invalid redirect)")
+                ask_for_help(
+                    f"The nomination [[{subpage_name}]] is about "
+                    f"the image [[:{filename}]], but the image page "
+                    f"contains an invalid redirect. {PLEASE_FIX_HINT}"
+                )
+                return ""
+            if not page.exists():
+                # Broken redirect, skip candidate
+                error(f"{cut_title}: (Error: broken redirect)")
+                ask_for_help(
+                    f"The nomination [[{subpage_name}]] is about "
+                    f"the image [[:{filename}]], but the image page "
+                    f"redirects to an inexistent page. {PLEASE_FIX_HINT}"
+                )
+                return ""
+            out(f"Resolved redirect: '{filename}' -> '{page.title()}'.")
 
         # Use the official spelling from the file page
         self._filename = page.title()
