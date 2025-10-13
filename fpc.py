@@ -1630,15 +1630,17 @@ class FPCandidate(Candidate):
 
         # Have we got a section anchor?
         if section:
-            # Search for the target section, i.e. a (sub)heading followed
-            # by the associated <gallery>...</gallery> element,
-            # separated by at most a single line (e.g. a 'See also' hint)
+            # Search for the target section, i.e. a (sub)heading directly
+            # followed by the associated <gallery>...</gallery> element.
+            # Between them we allow only either a single line (e.g. a
+            # 'See also' hint) which must not be a subheading, <gallery>, etc.,
+            # or a comment which can span several lines.
             section_pattern = (
-                r"(\n=+ *"
-                + re.escape(section)  # Escape chars with regex meaning.
-                + r" *=+ *\n+(?:[^<= \n][^\n]+\s+)?<gallery\b[^>]*>)\s*"
+                r"(\n=+ *" + re.escape(section) + r" *=+ *\n+"
+                r"(?:[^<= \n][^\n]+\n+|<!--.+?-->\s*)?"
+                r"<gallery\b[^>]*>)\s*"
             )
-            match = re.search(section_pattern, old_text)
+            match = re.search(section_pattern, old_text, re.MULTILINE)
             # Now match is a valid match object if we have found
             # the section, else it is None.
         else:
