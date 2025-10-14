@@ -548,7 +548,7 @@ class Candidate(abc.ABC):
         """
         if self._creator is None:
             if match := CREATOR_NAME_REGEX.search(self.filtered_content()):
-                self._creator = match.group(1).strip()
+                self._creator = match.group(1).replace("_", " ").strip()
             else:
                 self._creator = ""
         if self._creator and link:
@@ -2179,8 +2179,8 @@ class FPCandidate(Candidate):
                 )
             if (
                 creator_name
-                and creator_name != nominator_name
-                and creator_name != uploader_name
+                and not is_same_user(creator_name, nominator_name)
+                and not is_same_user(creator_name, uploader_name)
             ):
                 self._notify_uploader_or_creator(
                     filename, False, creator_name, ignored_pages, redirects
@@ -2912,6 +2912,25 @@ def y_n(value: bool) -> str:
 def user_page_link(username: str) -> str:
     """Returns a link to the user page of the user."""
     return f"[[{USER_NAMESPACE}{username}|{username}]]"
+
+
+def is_same_user(username_1: str, username_2: str) -> bool:
+    """
+    Are the two usernames effectively identical?
+
+    The Mediawiki software handles the first character of page names
+    and user names (after the namespace prefix) case-insensitively,
+    but the remaining characters case-sensitively.  We must imitate
+    this behaviour in order to compare usernames accurately.
+
+    @param username_1: string with first username.
+    @param username_2: string with second username.
+    """
+    return (
+        username_1[0].upper() == username_2[0].upper()
+        and
+        username_1[1:] == username_2[1:]
+    )
 
 
 def format_exception(exc: Exception) -> str:
