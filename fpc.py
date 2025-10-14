@@ -2020,17 +2020,12 @@ class FPCandidate(Candidate):
         else:
             title = bare_filename(filename)
             summary = f"Added [[{filename}]]"
-        creator_link = self.creator(link=True)
-        uploader_link = self.uploader(filename, link=True)
-        nominator_link = self.nominator(link=True)
-        if creator_link and creator_link != uploader_link:
-            # We omit the creator if the creator is identical to the uploader,
-            # but mention uploader and nominator separately even if they are
-            # one and the same, to keep the traditional format of the overview
-            # as far as possible in order to simplify statistical analysis.
+        if creator_link := self.creator(link=True):
             creator_hint = f"created by {creator_link}, "
         else:
             creator_hint = ""
+        uploader_link = self.uploader(filename, link=True)
+        nominator_link = self.nominator(link=True)
         new_text = old_text.replace(
             "</gallery>",
             f"{filename}|[[{self._page.title()}|{count}]] '''{title}'''<br> "
