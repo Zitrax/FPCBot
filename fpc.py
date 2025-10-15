@@ -2442,7 +2442,7 @@ class DelistCandidate(Candidate):
                     now = datetime.datetime.now(datetime.UTC)
                     entry = (
                         # Entries often end with trailing spaces, strip them
-                        f"{match.group(1).rstrip()} "
+                        f"{match.group(1).rstrip()}<br> "
                         f"'''[[{nomination_link}|Delisted]] {now:%Y-%m-%d} "
                         f"({results[1]}\u2013{results[0]})'''"
                     )
