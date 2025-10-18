@@ -1640,7 +1640,7 @@ class FPCandidate(Candidate):
                 r"(?:[^<= \n][^\n]+\n+|<!--.+?-->\s*)?"
                 r"<gallery\b[^>]*>)\s*"
             )
-            match = re.search(section_pattern, old_text, re.MULTILINE)
+            match = re.search(section_pattern, old_text, flags=re.DOTALL)
             # Now match is a valid match object if we have found
             # the section, else it is None.
         else:
