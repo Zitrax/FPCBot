@@ -599,24 +599,34 @@ class Candidate(abc.ABC):
         # Use cached result if possible
         if self._set_files is not None:
             return self._set_files
+        # Change default value from None (meaning 'not retrieved yet')
+        # to an empty list (meaning 'files not OK'; used if we return early)
+        self._set_files = []
+
         # Extract contents of the first <gallery>...</gallery> element
+        subpage_name = self._page.title()
+        cut_title = self.cut_title()
         match = re.search(
             r"<gallery[^>]*>(.+?)</gallery>",
             self.filtered_content(),
             flags=re.DOTALL,
         )
         if not match:
-            error(
-                "Error - no <gallery> found in set nomination "
-                f"'{self._page.title()}'"
+            error(f"{cut_title}: (Error: no <gallery> in set nomination)")
+            ask_for_help(
+                f"In the set nomination [[{subpage_name}]], the bot "
+                "did not find the <code><nowiki><gallery></nowiki></code> "
+                "element with the nominated images. "
+                f"Perhaps the formatting is damaged. {PLEASE_FIX_HINT}"
             )
             return []
         text_inside_gallery = match.group(1)
+
         # First try to find files which are properly listed with 'File:'
         # or 'Image:' prefix; they must be the first element on their line,
         # but leading whitespace is tolerated:
         files_list = re.findall(
-            r"^ *(?:[Ff]ile|[Ii]mage):([^\n|]+)",
+            r"^ *(?:[Ff]ile|[Ii]mage) *:([^\n|]+)",
             text_inside_gallery,
             flags=re.MULTILINE,
         )
@@ -628,17 +638,67 @@ class Candidate(abc.ABC):
                 text_inside_gallery,
                 flags=re.MULTILINE | re.IGNORECASE,
             )
-        if files_list:
-            # Appyly uniform formatting to all filenames:
-            files_list = [
-                f"{FILE_NAMESPACE}{filename.strip().replace('_', ' ')}"
-                for filename in files_list
-            ]
-        else:
-            error(
-                "Error - no images found in set nomination "
-                f"'{self._page.title()}'"
+        if not files_list:
+            # Still no files found, so we must skip this candidate
+            error(f"{cut_title}: (Error: found no images in set)")
+            ask_for_help(
+                f"The set nomination [[{subpage_name}]] seems to contain "
+                "no images. Perhaps the formatting is damaged. "
+                f"{PLEASE_FIX_HINT}"
             )
+            return []
+
+        # Format and check filenames, resolve any redirects
+        for i, filename in enumerate(files_list, start=0):
+            # Add (back) the 'File:' prefix (our search omits the prefixes)
+            filename = f"{FILE_NAMESPACE}{filename.replace('_', ' ').strip()}"
+            page = pywikibot.Page(_g_site, filename)
+            if not page.exists():
+                # File not found, skip this candidate
+                error(
+                    f"{cut_title}: (Error: can't find set image '{filename}')"
+                )
+                ask_for_help(
+                    f"The set nomination [[{subpage_name}]] lists the image "
+                    f"[[:{filename}]], but that image file does not exist. "
+                    "Perhaps it has been renamed or deleted. "
+                    f"{PLEASE_FIX_HINT}"
+                )
+                return []
+            if page.isRedirectPage():
+                try:
+                    page = page.getRedirectTarget()
+                except pywikibot.exceptions.PageRelatedError:
+                    # Circular or invalid redirect etc., skip candidate
+                    error(
+                        f"{cut_title}: (Error: invalid redirect "
+                        f"in set image '{filename}')"
+                    )
+                    ask_for_help(
+                        f"The set nomination [[{subpage_name}]] lists "
+                        f"the image [[:{filename}]], but the image page "
+                        "contains a circular or invalid redirect. "
+                        f"{PLEASE_FIX_HINT}"
+                    )
+                    return []
+                if not page.exists():
+                    # Broken redirect, skip candidate
+                    error(
+                        f"{cut_title}: (Error: broken redirect "
+                        f"in set image '{filename}')"
+                    )
+                    ask_for_help(
+                        f"The set nomination [[{subpage_name}]] lists "
+                        f"the image [[:{filename}]], but the image page "
+                        "redirects to a file or page which does not exist. "
+                        f"{PLEASE_FIX_HINT}"
+                    )
+                    return []
+                out(f"Resolved redirect: '{filename}' -> '{page.title()}'.")
+                filename = page.title()  # Update filename.
+            files_list[i] = filename
+
+        # Save and return files list
         self._set_files = files_list
         return files_list
 
@@ -1095,7 +1155,7 @@ class Candidate(abc.ABC):
                     error(f"{cut_title}: (Error: can't find image page)")
                     ask_for_help(
                         f"The nomination [[{subpage_name}]] is about "
-                        f"the image [[:{filename}]], but that file "
+                        f"the image [[:{filename}]], but that image file "
                         "does not exist. Perhaps the file has been renamed. "
                         f"{PLEASE_FIX_HINT}"
                     )
@@ -1126,18 +1186,18 @@ class Candidate(abc.ABC):
                 # Circular or invalid redirect etc., skip candidate
                 error(f"{cut_title}: (Error: invalid redirect)")
                 ask_for_help(
-                    f"The nomination [[{subpage_name}]] is about "
-                    f"the image [[:{filename}]], but the image page "
-                    f"contains an invalid redirect. {PLEASE_FIX_HINT}"
+                    f"The nomination [[{subpage_name}]] is about the image "
+                    f"[[:{filename}]], but the image page contains "
+                    f"an invalid redirect. {PLEASE_FIX_HINT}"
                 )
                 return ""
             if not page.exists():
                 # Broken redirect, skip candidate
                 error(f"{cut_title}: (Error: broken redirect)")
                 ask_for_help(
-                    f"The nomination [[{subpage_name}]] is about "
-                    f"the image [[:{filename}]], but the image page "
-                    f"redirects to an inexistent page. {PLEASE_FIX_HINT}"
+                    f"The nomination [[{subpage_name}]] is about the image "
+                    f"[[:{filename}]], but the image page redirects to a file "
+                    f"or page which does not exist. {PLEASE_FIX_HINT}"
                 )
                 return ""
             out(f"Resolved redirect: '{filename}' -> '{page.title()}'.")
@@ -1292,29 +1352,11 @@ class Candidate(abc.ABC):
             )
             return
 
-        # Check that the image page(s) exist, if not ignore this candidate
+        # Are the nominated images readily available?
         if self.is_set():
-            set_files = self.set_files()
-            if not set_files:
-                error(f"{cut_title}: (Error: found no images in set)")
-                ask_for_help(
-                    f"The set nomination [[{subpage_name}]] seems to contain "
-                    "no images. Perhaps the formatting is damaged. "
-                    f"{PLEASE_FIX_HINT}"
-                )
+            if not self.set_files():
+                # Could not find set images, error was already reported
                 return
-            for filename in set_files:
-                if not pywikibot.Page(_g_site, filename).exists():
-                    error(
-                        f"{cut_title}: (Error: can't find "
-                        f"set image '{filename}')"
-                    )
-                    ask_for_help(
-                        f"The set nomination [[{subpage_name}]] lists the "
-                        f"file [[:{filename}]], but that file does not exist. "
-                        f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
-                    )
-                    return
         elif not self.filename():
             # Could not identify nominated image, error already reported
             return
@@ -1462,22 +1504,17 @@ class FPCandidate(Candidate):
                 )
                 return
 
-        # Promote the new featured picture(s)
+        # Retrieve the image filename(s)
         if self.is_set():
             files = self.set_files()
-            if not files:
-                error(f"{cut_title}: (ignoring, no file(s) found)")
-                ask_for_help(
-                    "Cannot find the featured file(s) in the nomination "
-                    f"[[{subpage_name}]]. {PLEASE_FIX_HINT}"
-                )
-                return
         else:
             filename = self.filename()
-            if not filename:
-                # Could not identify nominated image, error already reported
-                return
-            files = [filename]
+            files = [filename] if filename else []
+        if not files:
+            # Could not identify the nominated image(s), error already reported
+            return
+
+        # Promote the new featured picture(s)
         self.add_to_featured_list(basic_gallery, files)
         self.add_to_gallery_page(full_gallery_link, files)
         self.add_assessments(files)
@@ -1723,26 +1760,10 @@ class FPCandidate(Candidate):
             page = pywikibot.Page(_g_site, filename)
             try:
                 old_text = page.get(get_redirect=False)
-            except pywikibot.exceptions.NoPageError:
+            except pywikibot.exceptions.PageRelatedError as exc:
                 # If the image has been deleted etc., we must just ignore it
-                error(
-                    f"Error - image '{filename}' not found, "
-                    "can't add {{Assessments}}."
-                )
+                error(f"Error - can't read '{filename}': {exc}")
                 continue
-            except pywikibot.exceptions.IsRedirectPageError:
-                # The image has been renamed, try to resolve the redirect
-                try:
-                    page = page.getRedirectTarget()
-                    old_text = page.get(get_redirect=False)
-                except pywikibot.exceptions.PageRelatedError:
-                    # Circular, nested or invalid redirect etc.
-                    error(
-                        f"Error - image '{filename}' moved with "
-                        "invalid redirect, can't add {{Assessments}}."
-                    )
-                    continue
-                filename = page.title()  # Update the filename.
 
             # Search and (if found) update the {{Assessments}} template
             found, up_to_date, new_text = update_assessments_template(
