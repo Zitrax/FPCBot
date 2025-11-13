@@ -238,6 +238,11 @@ COULD_NOT_READ_RECENT_FPS_LIST: Final[str] = (
     "of recent Featured pictures: {exception}. "
     "Please check the list page and fix it."
 )
+ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
+    "Therefore one or more new featured pictures are added "
+    "to the ''Unsorted'' section at the bottom of [[{page}]]. "
+    "Please sort these images into the correct section."
+)
 
 
 # Compiled regular expressions
@@ -275,7 +280,7 @@ VERIFIED_RESULT_REGEX: Final[re.Pattern] = re.compile(
     (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives: name of the winning image
     .*?\}\}
     """,
-    re.VERBOSE,
+    flags=re.VERBOSE,
 )
 VERIFIED_DELIST_RESULT_REGEX: Final[re.Pattern] = re.compile(
     r"""
@@ -286,7 +291,7 @@ VERIFIED_DELIST_RESULT_REGEX: Final[re.Pattern] = re.compile(
     \s*delisted\s*=\s*(\w+)      # (4) Delisted, should be 'yes'/'no'
     .*?\}\}
     """,
-    re.VERBOSE,
+    flags=re.VERBOSE,
 )
 
 # Simple regexes which check just whether a certain template is present or not
@@ -331,7 +336,7 @@ FPX_FPD_REGEX: Final[re.Pattern] = re.compile(
 )
 # Does the nomination contain subheadings = subsections?
 SECTION_REGEX: Final[re.Pattern] = re.compile(
-    r"^={1,4}.+={1,4}\s*$", re.MULTILINE
+    r"^={1,4}.+={1,4}\s*$", flags=re.MULTILINE
 )
 # Count the number of displayed images
 IMAGES_REGEX: Final[re.Pattern] = re.compile(
@@ -352,6 +357,16 @@ CREATOR_NAME_REGEX: Final[re.Pattern] = re.compile(
 # (sometimes people break it into several lines, so use '\s' and re.DOTALL)
 ASSESSMENTS_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
     r"\{\{\s*[Aa]ssessments\s*(\|.*?)\}\}", flags=re.DOTALL
+)
+
+# Find the associated <gallery> element right after the target subheading.
+# Between subheading and <gallery> we allow only:
+# 1. a single line (e.g. a 'See also' hint) which must not be a subheading,
+# <gallery>, etc.; or
+# 2. a comment which can span several lines.
+ASSOC_GALLERY_ELEMENT_REGEX: Final[re.Pattern] = re.compile(
+    r"((?:[^<= \n][^\n]+\n\s*| *<!--.+?-->\s*)?<gallery\b[^>]*>)\s*",
+    flags=re.DOTALL,
 )
 
 # Find 'Featured pictures of/from/by ...' categories which must be removed
@@ -1640,7 +1655,7 @@ class FPCandidate(Candidate):
             )
             return
 
-        # Check if some files are already on the page.
+        # Check if some of the new FPs are already on the page.
         # This can happen if the process has previously been interrupted.
         # We skip these files but handle any file which is not yet present.
         new_files = [
@@ -1662,54 +1677,89 @@ class FPCandidate(Candidate):
         files_for_summary = f"[[{new_files[0]}]]"
         if len(new_files) > 1:
             files_for_summary += f" and {len(new_files) - 1} more set file(s)"
+        unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(
+            page=full_page_name
+        )
 
         # Have we got a section anchor?
-        if section:
-            # Search for the target section, i.e. a (sub)heading directly
-            # followed by the associated <gallery>...</gallery> element.
-            # Between them we allow only either a single line (e.g. a
-            # 'See also' hint) which must not be a subheading, <gallery>, etc.,
-            # or a comment which can span several lines.
-            section_pattern = (
-                r"(\n=+ *" + re.escape(section) + r" *=+ *\n+"
-                r"(?:[^<= \n][^\n]+\n+|<!--.+?-->\s*)?"
-                r"<gallery\b[^>]*>)\s*"
+        if not section:
+            # There was no section anchor
+            match = None  # Flag that we need to use the 'Unsorted' section.
+            warn("No section anchor, adding FP(s) to 'Unsorted' section.")
+            ask_for_help(
+                f"The gallery link ''{gallery_link}'' in the nomination "
+                f"[[{subpage_name}]] does not specify a gallery section. "
+                f"{unsorted_hint}"
             )
-            match = re.search(section_pattern, old_text, flags=re.DOTALL)
-            # Now match is a valid match object if we have found
-            # the section, else it is None.
         else:
-            # There was no section anchor, so there is no match
-            match = None
+            # Search for the subheading matching the section anchor
+            match = re.search(
+                r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+",
+                old_text,
+            )
+            if not match:
+                warn(
+                    "Found no matching subheading, "
+                    "adding FP(s) to 'Unsorted' section."
+                )
+                ask_for_help(
+                    f"The section anchor ''{section}'' in the gallery link "
+                    f"of the nomination [[{subpage_name}]] does not match "
+                    f"any subheading on the gallery page [[{full_page_name}]] "
+                    f"letter for letter. {unsorted_hint}"
+                )
+            else:
+                # Check if that subheading opens a valid target section,
+                # i.e., if it is directly followed by the associated
+                # <gallery>...</gallery> element
+                match = ASSOC_GALLERY_ELEMENT_REGEX.match(
+                    old_text, pos=match.end(0)
+                )
+                if not match:
+                    warn(
+                        "Subheading is not a valid target, "
+                        "adding FP(s) to 'Unsorted' section."
+                    )
+                    ask_for_help(
+                        f"The gallery link ''{gallery_link}'' "
+                        f"in the nomination [[{subpage_name}]] "
+                        f"points to a heading on [[{full_page_name}]], "
+                        f"but [[{full_page_name}#{section}|that heading]] "
+                        "is not a valid target because it is not followed "
+                        "immediately by an associated "
+                        "<code><nowiki><gallery></nowiki></code> element. "
+                        "Perhaps this is a superordinate heading and the "
+                        "image should be added to one of its subsections; "
+                        f"but to which one? {unsorted_hint}"
+                    )
+        # Now match is a valid match object if we have found
+        # the section, else it is None.
 
-        # Add the new file(s) to the gallery page
+        # Add the new FP(s) to the gallery page
         if match is not None:
-            # Insert new file(s) at the top of the target section
+            # Insert new entries at the top of the target section
             new_text = (
                 f"{old_text[:match.end(1)]}\n"
                 + new_entries
                 + old_text[match.end(0):]
             )
-            summary = (
-                f"Added {files_for_summary} to section '{section}'"
-            )
+            summary = f"Added {files_for_summary} to section '{section}'"
         else:
-            # Either the section anchor was missing or empty,
-            # or we did not find the matching target section.
-            # Append the new file(s) to the 'Unsorted' section;
+            # Append the new entries to the 'Unsorted' section;
             # it should be just the last <gallery></gallery> on the page.
             gallery_end_pos = old_text.rfind("</gallery>")
             if gallery_end_pos < 0:
                 # Ouch, the page does not contain a single <gallery></gallery>
                 error(
                     "Error - found no 'Unsorted' section on "
-                    f"'{full_page_name}', can't add '{new_files[0]}'."
+                    f"'{full_page_name}', can't add new FP(s)."
                 )
                 ask_for_help(
                     f"The gallery page [[{full_page_name}]] which was "
                     f"specified by the nomination [[{subpage_name}]] "
-                    "seems to be invalid or broken. "
-                    f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
+                    "seems to be invalid or broken; the bot cannot find "
+                    "a single <code><nowiki><gallery></nowiki></code> element "
+                    f"on that page. {PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
                 )
                 return
             new_text = (
@@ -1718,27 +1768,6 @@ class FPCandidate(Candidate):
                 + old_text[gallery_end_pos:]
             )
             summary = f"Added {files_for_summary} to the 'Unsorted' section"
-            warn(
-                f"{'Invalid' if section else 'No'} gallery section, "
-                "adding image(s) to the 'Unsorted' section."
-            )
-            problem = (
-                f"does not point to a valid section on [[{full_page_name}]]. "
-                "(The section after the <code>#</code> in a gallery link "
-                "is valid if and only if it corresponds letter for letter "
-                "to a subheading which is immediately followed "
-                "by a <code><nowiki><gallery></nowiki></code> element.)"
-                if section else
-                f"does not specify the section on [[{full_page_name}]] "
-                "to which the image(s) should be added."
-            )
-            ask_for_help(
-                f"The gallery link ''{gallery_link}'' in the nomination "
-                f"[[{subpage_name}]] {problem} "
-                "Therefore one or more new featured pictures are added "
-                f"to the ''Unsorted'' section of [[{full_page_name}]]. "
-                "Please sort these images into the correct section."
-            )
         commit(old_text, new_text, page, summary)
 
     def add_assessments(self, files: list[str]) -> None:
