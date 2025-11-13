@@ -73,6 +73,7 @@ CAND_LIST_PAGE_NAME: Final[str] = f"{CAND_PREFIX}candidate list"
 TEST_LOG_PAGE_NAME: Final[str] = f"{CAND_LOG_PREFIX}January 2025"
 GALLERY_LIST_PAGE_NAME: Final[str] = "Commons:Featured pictures, list"
 FP_TALK_PAGE_NAME: Final[str] = "Commons talk:Featured picture candidates"
+UNSORTED_HEADING: Final[str] = "Unsorted"
 
 
 # Valid voting templates
@@ -1731,6 +1732,21 @@ class FPCandidate(Candidate):
                         "Perhaps this is a superordinate heading and the "
                         "image should be added to one of its subsections; "
                         f"but to which one? {unsorted_hint}"
+                    )
+                elif section == UNSORTED_HEADING:
+                    # This actually happens; it's valid, but not helpful,
+                    # so we handle the request, but also ask for help.
+                    warn("Gallery link points to 'Unsorted' section.")
+                    ask_for_help(
+                        f"The gallery link ''{gallery_link}'' in the "
+                        f"nomination [[{subpage_name}]] instructs the bot "
+                        "to put the new featured picture(s) into the "
+                        f"''Unsorted'' section of [[{full_page_name}]]. "
+                        "That is not exactly helpful because this section "
+                        "is used only for images which need to be sorted "
+                        "into a more specific section. "
+                        "So please move the new featured picture(s) "
+                        "to a more appropriate place."
                     )
         # Now match is a valid match object if we have found
         # the section, else it is None.
