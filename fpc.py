@@ -529,7 +529,7 @@ class Candidate(abc.ABC):
                 f"Se:{self.section_count():02d} "
                 f"Im:{self.image_count():02d} "
                 f"W:{y_n(self.is_withdrawn() or self.is_fpx())} "
-                f"S:{y_n(self.is_passed())} "
+                f"S:{'?' if self.is_ignored() else y_n(self.is_passed())} "
                 f"({self.status_string()})"
             )
         except pywikibot.exceptions.NoPageError:
@@ -1006,6 +1006,7 @@ class Candidate(abc.ABC):
         Check whether the nomination is successful acc. to the current votes.
         NB: This method doesn't consider the age of the nomination,
         please check that with is_done() and rules_of_fifth_day().
+        NB: This method cannot properly handle nominations with alternatives.
         """
         if self.is_withdrawn():
             return False
