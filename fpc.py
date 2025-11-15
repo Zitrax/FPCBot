@@ -1679,86 +1679,19 @@ class FPCandidate(Candidate):
         files_for_summary = f"[[{new_files[0]}]]"
         if len(new_files) > 1:
             files_for_summary += f" and {len(new_files) - 1} more set file(s)"
-        unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(
-            page=full_page_name
+
+        # Search for the section to which we have to add the new FPs
+        insertion_range = self._find_gallery_insertion_range(
+            gallery_link, full_page_name, section, old_text
         )
 
-        # Have we got a section anchor?
-        if not section:
-            # There was no section anchor
-            match = None  # Flag that we need to use the 'Unsorted' section.
-            warn("No section anchor, adding FP(s) to 'Unsorted' section.")
-            ask_for_help(
-                f"The gallery link ''{gallery_link}'' in the nomination "
-                f"[[{subpage_name}]] does not specify a gallery section. "
-                f"{unsorted_hint}"
-            )
-        else:
-            # Search for the subheading matching the section anchor
-            match = re.search(
-                r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+",
-                old_text,
-            )
-            if not match:
-                warn(
-                    "Found no matching subheading, "
-                    "adding FP(s) to 'Unsorted' section."
-                )
-                ask_for_help(
-                    f"The section anchor ''{section}'' in the gallery link "
-                    f"of the nomination [[{subpage_name}]] does not match "
-                    f"any subheading on the gallery page [[{full_page_name}]] "
-                    f"letter for letter. {unsorted_hint}"
-                )
-            else:
-                # Check if that subheading opens a valid target section,
-                # i.e., if it is directly followed by the associated
-                # <gallery>...</gallery> element
-                match = ASSOC_GALLERY_ELEMENT_REGEX.match(
-                    old_text, pos=match.end(0)
-                )
-                if not match:
-                    warn(
-                        "Subheading is not a valid target, "
-                        "adding FP(s) to 'Unsorted' section."
-                    )
-                    ask_for_help(
-                        f"The gallery link ''{gallery_link}'' "
-                        f"in the nomination [[{subpage_name}]] "
-                        f"points to a heading on [[{full_page_name}]], "
-                        f"but [[{full_page_name}#{section}|that heading]] "
-                        "is not a valid target because it is not followed "
-                        "immediately by an associated "
-                        "<code><nowiki><gallery></nowiki></code> element. "
-                        "Perhaps this is a superordinate heading and the "
-                        "image should be added to one of its subsections; "
-                        f"but to which one? {unsorted_hint}"
-                    )
-                elif section == UNSORTED_HEADING:
-                    # This actually happens; it's valid, but not helpful,
-                    # so we handle the request, but also ask for help.
-                    warn("Gallery link points to 'Unsorted' section.")
-                    ask_for_help(
-                        f"The gallery link ''{gallery_link}'' in the "
-                        f"nomination [[{subpage_name}]] instructs the bot "
-                        "to put the new featured picture(s) into the "
-                        f"''Unsorted'' section of [[{full_page_name}]]. "
-                        "That is not exactly helpful because this section "
-                        "is used only for images which need to be sorted "
-                        "into a more specific section. "
-                        "So please move the new featured picture(s) "
-                        "to a more appropriate place."
-                    )
-        # Now match is a valid match object if we have found
-        # the section, else it is None.
-
         # Add the new FP(s) to the gallery page
-        if match is not None:
+        if insertion_range is not None:
             # Insert new entries at the top of the target section
             new_text = (
-                f"{old_text[:match.end(1)]}\n"
+                f"{old_text[:insertion_range.start]}\n"
                 + new_entries
-                + old_text[match.end(0):]
+                + old_text[insertion_range.stop:]
             )
             summary = f"Added {files_for_summary} to section '{section}'"
         else:
@@ -1786,6 +1719,96 @@ class FPCandidate(Candidate):
             )
             summary = f"Added {files_for_summary} to the 'Unsorted' section"
         commit(old_text, new_text, page, summary)
+
+    def _find_gallery_insertion_range(
+        self,
+        gallery_link: str,
+        full_page_name: str,
+        section: str,
+        old_text: str,
+    ) -> range | None:
+        """Search for the section on a gallery page into which we have
+        to insert the new featured picture(s).
+
+        Returns:
+        If successful, a range object describing the index values
+        of the characters which should be replaced by the new entries;
+        or None if we did not find a valid target section and have to use
+        the 'Unsorted' section instead.
+        """
+        subpage_name = self._page.title()
+        unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(
+            page=full_page_name
+        )
+
+        # Have we got a section anchor?
+        if not section:
+            # There was no section anchor
+            warn("No section anchor, adding FP(s) to 'Unsorted' section.")
+            ask_for_help(
+                f"The gallery link ''{gallery_link}'' in the nomination "
+                f"[[{subpage_name}]] does not specify a gallery section. "
+                f"{unsorted_hint}"
+            )
+            return None
+
+        # Search for the subheading matching the section anchor
+        match = re.search(
+            r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+", old_text
+        )
+        if not match:
+            warn(
+                "Found no matching subheading, "
+                "adding FP(s) to 'Unsorted' section."
+            )
+            ask_for_help(
+                f"The section anchor ''{section}'' in the gallery link "
+                f"of the nomination [[{subpage_name}]] does not match "
+                f"any subheading on the gallery page [[{full_page_name}]] "
+                f"letter for letter. {unsorted_hint}"
+            )
+            return None
+
+        # Check if that subheading opens a valid target section,
+        # i.e., whether it is directly followed by the associated
+        # <gallery>...</gallery> element or not
+        match = ASSOC_GALLERY_ELEMENT_REGEX.match(old_text, pos=match.end(0))
+        if not match:
+            warn(
+                "Subheading is not a valid target, "
+                "adding FP(s) to 'Unsorted' section."
+            )
+            ask_for_help(
+                f"The gallery link ''{gallery_link}'' "
+                f"in the nomination [[{subpage_name}]] "
+                f"points to a heading on [[{full_page_name}]], "
+                f"but [[{full_page_name}#{section}|that heading]] "
+                "is not a valid target because it is not followed "
+                "immediately by an associated "
+                "<code><nowiki><gallery></nowiki></code> element. "
+                "Perhaps this is a superordinate heading and the "
+                "image should be added to one of its subsections; "
+                f"but to which one? {unsorted_hint}"
+            )
+            return None
+
+        # If we arrive here, we have found a valid target section.
+        # Check if that section is just the 'Unsorted' section
+        # (this actually happens; it's valid, but not helpful,
+        # so we handle the request, but also ask for help).
+        if section == UNSORTED_HEADING:
+            warn("Gallery link points to 'Unsorted' section.")
+            ask_for_help(
+                f"The gallery link ''{gallery_link}'' in the nomination "
+                f"[[{subpage_name}]] instructs the bot to put the new "
+                "featured picture(s) into the ''Unsorted'' section "
+                f"of [[{full_page_name}]]. That is not exactly helpful "
+                "because this section is used only for images "
+                "which need to be sorted into a more specific section. "
+                "So please move the new featured picture(s) "
+                "to a more appropriate place."
+            )
+        return range(match.end(1), match.end(0))
 
     def add_assessments(self, files: list[str]) -> None:
         """
