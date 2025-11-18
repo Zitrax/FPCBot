@@ -353,6 +353,8 @@ CREATOR_NAME_REGEX: Final[re.Pattern] = re.compile(
     r"[Cc]reated +(?:(?:and|\&) +(?:[a-z]+ +)?uploaded +)?by +"
     r"\[\[[Uu]ser:([^|\]\n]+)[|\]]"
 )
+# Search for first entry in (or end of) <gallery>...</gallery> contents
+GALLERY_ENTRY_START_REGEX: Final[re.Pattern] = re.compile(r">(?: *\n)*")
 
 # Find the {{Assessments}} template on an image description page
 # (sometimes people break it into several lines, so use '\s' and re.DOTALL)
@@ -1681,43 +1683,23 @@ class FPCandidate(Candidate):
             files_for_summary += f" and {len(new_files) - 1} more set file(s)"
 
         # Search for the section to which we have to add the new FPs
-        insert_at = self._find_gallery_insertion_place(
+        if insert_at := self._find_gallery_insertion_place(
             gallery_link, full_page_name, section, old_text
-        )
+        ):
+            summary = f"Added {files_for_summary} to section '{section}'"
+        elif insert_at := self._find_unsorted_insertion_place(
+            full_page_name, old_text
+        ):
+            summary = f"Added {files_for_summary} to the 'Unsorted' section"
+        else:  # Serious error with gallery page, already reported
+            return
 
         # Add the new FP(s) to the gallery page
-        if insert_at is not None:
-            # Insert new entries at the top of the target section
-            new_text = (
-                f"{old_text[:insert_at.start]}\n"
-                + new_entries
-                + old_text[insert_at.stop:]
-            )
-            summary = f"Added {files_for_summary} to section '{section}'"
-        else:
-            # Append the new entries to the 'Unsorted' section;
-            # it should be just the last <gallery></gallery> on the page.
-            gallery_end_pos = old_text.rfind("</gallery>")
-            if gallery_end_pos < 0:
-                # Ouch, the page does not contain a single <gallery></gallery>
-                error(
-                    "Error - found no 'Unsorted' section on "
-                    f"'{full_page_name}', can't add new FP(s)."
-                )
-                ask_for_help(
-                    f"The gallery page [[{full_page_name}]] which was "
-                    f"specified by the nomination [[{subpage_name}]] "
-                    "seems to be invalid or broken; the bot cannot find "
-                    "a single <code><nowiki><gallery></nowiki></code> element "
-                    f"on that page. {PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
-                )
-                return
-            new_text = (
-                old_text[:gallery_end_pos]
-                + new_entries
-                + old_text[gallery_end_pos:]
-            )
-            summary = f"Added {files_for_summary} to the 'Unsorted' section"
+        new_text = (
+            f"{old_text[:insert_at.start]}\n"
+            + new_entries
+            + old_text[insert_at.stop:]
+        )
         commit(old_text, new_text, page, summary)
 
     def _find_gallery_insertion_place(
@@ -1810,6 +1792,39 @@ class FPCandidate(Candidate):
                 "to a more appropriate place."
             )
         return slice(match.end(1), match.end(0))
+
+    def _find_unsorted_insertion_place(
+        self,
+        full_page_name: str,
+        old_text: str,
+    ) -> slice | None:
+        """Search for the start of the <gallery>...</gallery> element
+        of the 'Unsorted' section in order to insert the new FP(s);
+        it should be just the last <gallery> element on the gallery page.
+
+        Returns:
+        If successful, a slice object describing the index values
+        of the characters which should be replaced by the new entries;
+        or None if we did not even find a usabale 'Unsorted' section.
+        """
+        if (start := old_text.rfind("<gallery")) >= 0:
+            if match := GALLERY_ENTRY_START_REGEX.search(old_text, pos=start):
+                return slice(match.start(0) + 1, match.end(0))
+        error(
+            "Error - found no 'Unsorted' section on "
+            f"'{full_page_name}', can't add new FP(s)."
+        )
+        ask_for_help(
+            f"The gallery page [[{full_page_name}]] which was "
+            f"specified by the nomination [[{self._page.title()}]] "
+            "seems to be invalid or broken. The bot did not find "
+            "a valid <code><nowiki><gallery></nowiki></code> element "
+            "for the ''Unsorted'' section on that page. "
+            "Either there is no such section or the formatting of its "
+            "<code><nowiki><gallery></nowiki></code> element is damaged. "
+            f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
+        )
+        return None
 
     def add_assessments(self, files: list[str]) -> None:
         """
