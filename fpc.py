@@ -1496,8 +1496,8 @@ class FPCandidate(Candidate):
 
         # If there is more than one image, search for the selected alternative
         if self.image_count() > 1:
-            if len(results) > 5 and results[5]:
-                alternative = results[5]
+            if len(results) > 5 and results[5].strip():
+                alternative = results[5].replace("_", " ").strip()
                 if not pywikibot.Page(_g_site, alternative).exists():
                     error(
                         f"{cut_title}: (ignoring, specified alternative "
