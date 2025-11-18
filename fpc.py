@@ -1681,17 +1681,17 @@ class FPCandidate(Candidate):
             files_for_summary += f" and {len(new_files) - 1} more set file(s)"
 
         # Search for the section to which we have to add the new FPs
-        insertion_range = self._find_gallery_insertion_range(
+        insert_at = self._find_gallery_insertion_place(
             gallery_link, full_page_name, section, old_text
         )
 
         # Add the new FP(s) to the gallery page
-        if insertion_range is not None:
+        if insert_at is not None:
             # Insert new entries at the top of the target section
             new_text = (
-                f"{old_text[:insertion_range.start]}\n"
+                f"{old_text[:insert_at.start]}\n"
                 + new_entries
-                + old_text[insertion_range.stop:]
+                + old_text[insert_at.stop:]
             )
             summary = f"Added {files_for_summary} to section '{section}'"
         else:
@@ -1720,18 +1720,19 @@ class FPCandidate(Candidate):
             summary = f"Added {files_for_summary} to the 'Unsorted' section"
         commit(old_text, new_text, page, summary)
 
-    def _find_gallery_insertion_range(
+    def _find_gallery_insertion_place(
         self,
         gallery_link: str,
         full_page_name: str,
         section: str,
         old_text: str,
-    ) -> range | None:
-        """Search for the section on a gallery page into which we have
-        to insert the new featured picture(s).
+    ) -> slice | None:
+        """
+        Search for the start of the <gallery>...</gallery> element
+        of the section to which we have to add the new featured picture(s).
 
         Returns:
-        If successful, a range object describing the index values
+        If successful, a slice object describing the index values
         of the characters which should be replaced by the new entries;
         or None if we did not find a valid target section and have to use
         the 'Unsorted' section instead.
@@ -1808,7 +1809,7 @@ class FPCandidate(Candidate):
                 "So please move the new featured picture(s) "
                 "to a more appropriate place."
             )
-        return range(match.end(1), match.end(0))
+        return slice(match.end(1), match.end(0))
 
     def add_assessments(self, files: list[str]) -> None:
         """
