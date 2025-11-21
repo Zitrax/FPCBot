@@ -2779,7 +2779,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
     candidates: list[Candidate] = []  # Needs type hint: list is invariant.
     redirects: list[tuple[str, str]] = []
 
-    for full_entry, subpage_name in subpage_entries:
+    for _, subpage_name in subpage_entries:
         # Skip nominations which are not of the expected type
         if bool(re.search(r"/ *[Rr]emoval */", subpage_name)) != delist:
             continue
@@ -2788,6 +2788,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             comparison_name = PREFIX_REGEX.sub("", subpage_name).lower()
             if match_pattern not in comparison_name:
                 continue
+        subpage: pywikibot.Page | None  # Help typecheckers.
         subpage = pywikibot.Page(_g_site, subpage_name)
         # Check if nomination exists (filter out damaged links)
         if not subpage.exists():
@@ -2799,36 +2800,54 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             )
             continue
         # Check for redirects and and resolve them
-        if subpage.isRedirectPage():
-            try:
-                subpage = subpage.getRedirectTarget()
-            except pywikibot.exceptions.PageRelatedError:
-                # Circular or invalid redirect etc.
-                error(
-                    "Error - invalid nomination redirect page "
-                    f"'{subpage_name}', ignoring."
-                )
-                ask_for_help(
-                    f"The nomination subpage [[{subpage_name}]] "
-                    f"contains an invalid redirect. {PLEASE_FIX_HINT}"
-                )
-                continue
-            new_name = subpage.title()
-            out(f"Nomination '{subpage_name}' has been renamed to '{new_name}'")
-            redirects.append((full_entry, f"{{{{{new_name}}}}}"))
+        subpage = _resolve_nomination_subpage_redirect(subpage, redirects)
+        if subpage is None:
+            # Error during resolving, ignore nomination
+            continue
         # OK, seems the nomination is fine -- append candidate object
         candidates.append(candidate_class(subpage, list_page_name))
 
     # If we have found any redirects, update the candidates page
     if redirects:
         new_text = old_text
-        for full_entry, new_entry in redirects:
-            new_text = new_text.replace(full_entry, new_entry, 1)
+        for old_name, new_name in redirects:
+            new_text = new_text.replace(old_name, new_name, 1)
         summary = (
             f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
         )
         commit(old_text, new_text, page, summary)
     return candidates
+
+
+def _resolve_nomination_subpage_redirect(
+    subpage: pywikibot.Page,
+    redirects: list[tuple[str, str]],
+) -> pywikibot.Page | None:
+    """Check if a nomination subpage contains a redirect and try to resolve it.
+
+    Returns:
+    If successful, a pywikibot.Page object of the real nomination subpage;
+    if an error occurs, returns None.
+    """
+    if subpage.isRedirectPage():
+        old_name = subpage.title()
+        try:
+            subpage = subpage.getRedirectTarget()
+        except pywikibot.exceptions.PageRelatedError:
+            # Circular or invalid redirect etc.
+            error(
+                "Error - invalid nomination redirect page "
+                f"'{old_name}', ignoring."
+            )
+            ask_for_help(
+                f"The nomination subpage [[{old_name}]] "
+                f"contains an invalid redirect. {PLEASE_FIX_HINT}"
+            )
+            return None
+        new_name = subpage.title()
+        out(f"Nomination '{old_name}' has been renamed to '{new_name}'")
+        redirects.append((old_name, new_name))
+    return subpage
 
 
 def check_candidates(
