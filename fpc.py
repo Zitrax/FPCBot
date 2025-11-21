@@ -256,6 +256,11 @@ ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
 
 # Compiled regular expressions
 
+# Identify reasonably valid FP nomination subpage names
+VALID_NOMINATION_NAME_START_REGEX: Final[re.Pattern] = re.compile(
+    CAND_PREFIX.replace(" ", r"[ _]")
+    + r" *(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:)"
+)
 # Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
 # or to replace both by the standard 'File:' namespace.
 # Removes also any possible crap between the prefix and the namespace
@@ -2876,6 +2881,25 @@ def _rename_nomination_subpage_with_bad_title(
     if an error occurs, returns None.
     """
     old_name = subpage.title()
+    # Check for invalid names which do not start with the obligatory prefix
+    # or do not even allow to determine the nomination type
+    # (we do not try to repair such names because the intent is unclear)
+    if not VALID_NOMINATION_NAME_START_REGEX.match(old_name):
+        error(f"Error - invalid nomination name: '{old_name}'.")
+        ask_for_help(
+            f"The nomination subpage [[{old_name}]] has an invalid name: "
+            f"it does not begin with the obligatory ''{CAND_PREFIX}'' or "
+            "contains neither the <code>File:</code> namespace prefix "
+            "nor the signal word <code>/Set/</code>. "
+            "Therefore the type of the nomination is undefined. "
+            "The bot may fail to handle that nomination correctly, "
+            "the {{tl|Assessments}} template will not be able "
+            "to link to that nomination, "
+            "and editors will be confused, too. "
+            f"{PLEASE_RENAME_HINT.format(subpage=old_name)}"
+        )
+        return None
+    # Check for fixable problems: space after namespace prefix, etc.
     new_name = re.sub(r" */ *(?:[Ff]ile|[Ii]mage) *: *", "/File:", old_name)
     new_name = re.sub(r" */ *[Ss]et */ *", "/Set/", new_name)
     new_name = re.sub(r" */ *[Rr]emoval */ *", "/removal/", new_name)
