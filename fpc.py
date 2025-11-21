@@ -219,8 +219,16 @@ KEEP_TEMPLATES: Final[tuple[str, ...]] = (
 
 # Shared messages
 
+NOMINATION_SUBPAGE_RENAMED: Final[str] = (
+    "Fixed nomination subpage name because it could cause problems "
+    "with [[Template:Assessments]] and other tools."
+)
 PLEASE_FIX_HINT: Final[str] = (
     "Please check and fix this so that the bot can process the nomination."
+)
+PLEASE_RENAME_HINT: Final[str] = (
+    "Please rename [[{subpage}]] to a suitable name "
+    "so that the bot can process the nomination."
 )
 SERIOUS_PROBLEM_CHECK_PAGE: Final[str] = (
     "This is a serious problem, please check that page."
@@ -2804,6 +2812,11 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
         if subpage is None:
             # Error during resolving, ignore nomination
             continue
+        # Rename subpages with bad title (space after namespace prefix, etc.)
+        subpage = _rename_nomination_subpage_with_bad_title(subpage, redirects)
+        if subpage is None:
+            # Error during renaming, ignore nomination
+            continue
         # OK, seems the nomination is fine -- append candidate object
         candidates.append(candidate_class(subpage, list_page_name))
 
@@ -2847,6 +2860,55 @@ def _resolve_nomination_subpage_redirect(
         new_name = subpage.title()
         out(f"Nomination '{old_name}' has been renamed to '{new_name}'")
         redirects.append((old_name, new_name))
+    return subpage
+
+
+def _rename_nomination_subpage_with_bad_title(
+    subpage: pywikibot.Page,
+    redirects: list[tuple[str, str]],
+) -> pywikibot.Page | None:
+    """Check if a nomination subpage has a bad title which causes problems.
+    If yes, try to rename the subpage; if we cannot remedy the problem,
+    report it on the FPC talk page.
+
+    Returns:
+    If successful, a pywikibot.Page object with the renamed subpage;
+    if an error occurs, returns None.
+    """
+    old_name = subpage.title()
+    new_name = re.sub(r" */ *(?:[Ff]ile|[Ii]mage) *: *", "/File:", old_name)
+    new_name = re.sub(r" */ *[Ss]et */ *", "/Set/", new_name)
+    new_name = re.sub(r" */ *[Rr]emoval */ *", "/removal/", new_name)
+    if new_name != old_name:
+        if pywikibot.Page(_g_site, new_name).exists():
+            error(
+                "Error - could not fix name of nomination subpage "
+                f"'{old_name}', ignoring."
+            )
+            ask_for_help(
+                f"The nomination subpage [[{old_name}]] has a tricky name: "
+                "it contains irritating spaces around the namespace prefix "
+                "etc., or uses the old <code>Image:</code> namespace. "
+                "This can confuse the {{tl|Assessments}} template and "
+                "similar tools, and does not help the FP maintainers. "
+                f"The bot tried to rename the subpage to [[{new_name}]], "
+                "but there is already a subpage with that name. "
+                f"{PLEASE_RENAME_HINT.format(subpage=old_name)}"
+            )
+            return None
+        out(f"\nAbout to rename nomination '{old_name}' to '{new_name}':")
+        if _confirm_changes(old_name, summary=NOMINATION_SUBPAGE_RENAMED):
+            subpage = subpage.move(
+                new_name,
+                reason=NOMINATION_SUBPAGE_RENAMED,
+                noredirect=False,  # Creating a redirect releases us
+                # from the need to update all links in the nomination subpage
+                # and also keeps any external links working.
+            )
+            out(f"Renamed nomination '{old_name}' to '{new_name}'.")
+            redirects.append((old_name, new_name))
+        else:
+            out(f"Renaming of '{old_name}' ignored.")
     return subpage
 
 
