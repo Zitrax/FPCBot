@@ -2901,12 +2901,23 @@ def _rename_nomination_subpage_with_bad_title(
             subpage = subpage.move(
                 new_name,
                 reason=NOMINATION_SUBPAGE_RENAMED,
-                noredirect=False,  # Creating a redirect releases us
-                # from the need to update all links in the nomination subpage
-                # and also keeps any external links working.
+                noredirect=False,  # Avoid problems with any links.
             )
             out(f"Renamed nomination '{old_name}' to '{new_name}'.")
             redirects.append((old_name, new_name))
+            # Update all self-links (and all links to the nominated image)
+            # in the nomination subpage
+            old_text = subpage.get(get_redirect=False)
+            new_text = old_text.replace(old_name, new_name)
+            new_text = re.sub(
+                r"(\[\[:?|/) *(?:[Ff]ile|[Ii]mage) *: *", r"\1File:", new_text
+            )
+            if new_text != old_text:
+                summary = "Updated links after renaming nomination subpage"
+                commit(old_text, new_text, subpage, summary)
+            # NB: If for any reason this update fails (or is not confirmed
+            # in interactive mode) the self-links in the nomination still work
+            # thanks to the redirect created above.
         else:
             out(f"Renaming of '{old_name}' ignored.")
     return subpage
