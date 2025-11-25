@@ -254,20 +254,29 @@ ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
 )
 
 
-# Compiled regular expressions
+# Regular expressions
+
+# Building patterns
+CAND_PREFIX_PATTERN: Final[str] = r"^" + CAND_PREFIX.replace(" ", r"[ _]")
+MIDDLE_NOMINATION_NAME_PATTERN: Final[str] = (
+    r" *(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:) *"
+)
 
 # Identify reasonably valid FP nomination subpage names
 VALID_NOMINATION_NAME_START_REGEX: Final[re.Pattern] = re.compile(
-    CAND_PREFIX.replace(" ", r"[ _]")
-    + r" *(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:)"
+    CAND_PREFIX_PATTERN + MIDDLE_NOMINATION_NAME_PATTERN
 )
-# Used to remove the nomination page prefix and the 'File:'/'Image:' namespace
-# or to replace both by the standard 'File:' namespace.
-# Removes also any possible crap between the prefix and the namespace
-# and faulty spaces between namespace and filename (sometimes users
-# accidentally add such spaces when creating nominations).
-PREFIX_REGEX: Final[re.Pattern] = re.compile(
-    CAND_PREFIX.replace(" ", r"[ _]") + r".*?([Ff]ile|[Ii]mage): *"
+# Remove the candidate prefix
+CAND_PREFIX_REGEX: Final[re.Pattern] = re.compile(CAND_PREFIX_PATTERN)
+# Remove the middle part of nomination names (after deleting the prefix)
+MIDDLE_NOMINATION_NAME_REGEX: Final[re.Pattern] = re.compile(
+    MIDDLE_NOMINATION_NAME_PATTERN
+)
+# Remove or replace the candidate prefix and the 'File:'/'Image:' namespace,
+# plus any possible crap between the prefix and the namespace
+# and faulty spaces before and after the namespace.
+FULL_FILE_PREFIX_REGEX: Final[re.Pattern] = re.compile(
+    CAND_PREFIX_PATTERN + r".*?(?:[Ff]ile|[Ii]mage) *: *"
 )
 
 # Look for results using the old, text-based results format
@@ -1171,7 +1180,7 @@ class Candidate(abc.ABC):
         page: pywikibot.Page | None  # Help typecheckers.
         subpage_name = self._page.title()
         cut_title = self.cut_title()
-        if match := PREFIX_REGEX.search(subpage_name):
+        if match := FULL_FILE_PREFIX_REGEX.search(subpage_name):
             filename = subpage_name[match.end(0):]
             # Use standard 'File:' namespace and remove '/2' etc.
             filename = FILE_NAMESPACE + re.sub(r" */ *\d+ *$", "", filename)
@@ -1276,14 +1285,9 @@ class Candidate(abc.ABC):
         """
         name = self._page.title()
         name = name.replace("_", " ")
-        name = re.sub(wikipattern(CAND_PREFIX), "", name, count=1).strip()
+        name = CAND_PREFIX_REGEX.sub("", name, count=1).strip()
         if not keep_prefix:
-            name = re.sub(
-                r"^(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:) *",
-                "",
-                name,
-                count=1,
-            )
+            name = MIDDLE_NOMINATION_NAME_REGEX.sub("", name, count=1)
         if not keep_number:  # Remove trailing '.../2' etc. of repeated noms.
             name = re.sub(r" */ *\d+ *$", "", name, count=1)
         return name
@@ -2798,7 +2802,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             continue
         # Skip nominations which do not match the '-match' argument
         if match_pattern:
-            comparison_name = PREFIX_REGEX.sub("", subpage_name).lower()
+            comparison_name = FULL_FILE_PREFIX_REGEX.sub("", subpage_name).lower()
             if match_pattern not in comparison_name:
                 continue
         subpage: pywikibot.Page | None  # Help typecheckers.
