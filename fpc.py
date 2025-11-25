@@ -2802,7 +2802,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             continue
         # Skip nominations which do not match the '-match' argument
         if match_pattern:
-            comparison_name = FULL_FILE_PREFIX_REGEX.sub("", subpage_name).lower()
+            comparison_name = CAND_PREFIX_REGEX.sub("", subpage_name).lower()
             if match_pattern not in comparison_name:
                 continue
         subpage: pywikibot.Page | None  # Help typecheckers.
