@@ -1604,7 +1604,7 @@ class FPCandidate(Candidate):
             r"\n==\s*\{\{\{\s*\d+\s*\|\s*" + esc_name + r"\s*\}\}\}\s*==\s*"
             r"<gallery[^\n>]*>(.+?)</gallery>",
             old_text,
-            flags=re.DOTALL,
+            flags=re.DOTALL | re.IGNORECASE,
         )
         if not match:
             error(f"Error - can't find gallery section '{section_name}'.")
@@ -1754,7 +1754,9 @@ class FPCandidate(Candidate):
 
         # Search for the subheading matching the section anchor
         match = re.search(
-            r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+", old_text
+            r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+",
+            old_text,
+            flags=re.IGNORECASE,
         )
         if not match:
             warn(
