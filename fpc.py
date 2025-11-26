@@ -1599,9 +1599,9 @@ class FPCandidate(Candidate):
         # Find the correct section and its <gallery> element;
         # remove the last entry/entries from the <gallery> element,
         # keeping the 3 newest ones, and insert the new FP before them.
-        esc_name = wikipattern(section_name)
+        esc_section = re.escape(section_name)
         match = re.search(
-            r"\n==\s*\{\{\{\s*\d+\s*\|\s*" + esc_name + r"\s*\}\}\}\s*==\s*"
+            r"\n==\s*\{\{\{\s*\d+\s*\|\s*" + esc_section + r"\s*\}\}\}\s*==\s*"
             r"<gallery[^\n>]*>(.+?)</gallery>",
             old_text,
             flags=re.DOTALL | re.IGNORECASE,
@@ -1753,8 +1753,12 @@ class FPCandidate(Candidate):
             return None
 
         # Search for the subheading matching the section anchor
+        # We handle spaces before colons as optional (these spaces are common
+        # in subheadings on biology gallery pages, users often forget them).
+        esc_section = re.escape(section)
+        esc_section = re.sub(r"(?:\\? )*:", r" *:", esc_section)
         match = re.search(
-            r"\n=+ *" + re.escape(section) + r" *=+(?: *\n)+",
+            r"\n=+ *" + esc_section + r" *=+(?: *\n)+",
             old_text,
             flags=re.IGNORECASE,
         )
