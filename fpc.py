@@ -3080,13 +3080,13 @@ def strip_tag(text: str, tag: str) -> str:
 
 def clean_gallery_link(gallery_link: str) -> str:
     """
-    Clean the gallery link: remove leading/trailing whitespace,
-    replace underscores and non-breaking spaces by plain spaces
-    (underscores are present if users just copy the link,
+    Clean the gallery link: replace underscores and non-breaking spaces
+    by plain spaces (underscores are present if users just copy the link,
     a NBSP can be entered by accident with some keyboard settings),
+    replace double spaces by a single one, remove leading/trailing whitespace,
     and replace %-encoded characters by their plain text counterparts.
     """
-    link = gallery_link.replace("_", " ").replace("\u00A0", " ").strip()
+    link = re.sub(r"[ _\u00A0]+", " ", gallery_link).strip()
     if "%" in link:
         try:
             link = urllib.parse.unquote(link, errors="strict")
