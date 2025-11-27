@@ -1312,7 +1312,7 @@ class Candidate(abc.ABC):
         log_link = f"{CAND_LOG_PREFIX}{month} {year}"
         log_page = pywikibot.Page(_g_site, log_link)
         try:
-            old_log_text = log_page.get(get_redirect=True).strip()
+            old_log_text = log_page.get(get_redirect=False).strip()
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
@@ -1332,7 +1332,7 @@ class Candidate(abc.ABC):
 
         # Remove nomination from the list of current nominations
         candidates_list_page = pywikibot.Page(_g_site, self._list_page_name)
-        old_cand_text = candidates_list_page.get(get_redirect=True)
+        old_cand_text = candidates_list_page.get(get_redirect=False)
         pattern = r" *\{\{\s*" + wikipattern(subpage_name) + r"\s*\}\} *\n?"
         new_cand_text = re.sub(pattern, "", old_cand_text, count=1)
         if old_cand_text == new_cand_text:
@@ -2107,7 +2107,7 @@ class FPCandidate(Candidate):
         monthpage = f"{CHRONO_ARCHIVE_PREFIX}{month} {year}"
         page = pywikibot.Page(_g_site, monthpage)
         try:
-            old_text = page.get(get_redirect=True)
+            old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.NoPageError:
             old_text = ""
 
