@@ -1312,7 +1312,7 @@ class Candidate(abc.ABC):
         log_link = f"{CAND_LOG_PREFIX}{month} {year}"
         log_page = pywikibot.Page(_g_site, log_link)
         try:
-            old_log_text = log_page.get(get_redirect=True)
+            old_log_text = log_page.get(get_redirect=True).strip()
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
 
@@ -1324,7 +1324,9 @@ class Candidate(abc.ABC):
                 "candidate is already in the log."
             )
         else:
-            new_log_text = old_log_text + "\n{{" + subpage_name + "}}"
+            new_log_text = f"{{{{{subpage_name}}}}}"
+            if old_log_text:
+                new_log_text = f"{old_log_text}\n{new_log_text}"
             summary = f"Added [[{subpage_name}]]{why}"
             commit(old_log_text, new_log_text, log_page, summary)
 
