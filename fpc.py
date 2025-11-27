@@ -3582,13 +3582,6 @@ def main(*args: str) -> None:
                         delist=False,
                         descending=False,
                     )
-            case "-close":
-                if delist:
-                    out("Closing delist candidates...", heading=True)
-                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=True)
-                if fpc:
-                    out("Closing FP candidates...", heading=True)
-                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=False)
             case "-info":
                 if delist:
                     out("Gathering info about delist candidates...", heading=True)
@@ -3596,6 +3589,13 @@ def main(*args: str) -> None:
                 if fpc:
                     out("Gathering info about FP candidates...", heading=True)
                     check_candidates(Candidate.print_all_info, CAND_LIST_PAGE_NAME, delist=False)
+            case "-close":
+                if delist:
+                    out("Closing delist candidates...", heading=True)
+                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=True)
+                if fpc:
+                    out("Closing FP candidates...", heading=True)
+                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=False)
             case "-park":
                 if _g_threads and _g_auto:
                     warn("Auto-parking using threads is disabled for now...")
