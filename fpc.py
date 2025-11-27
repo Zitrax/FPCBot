@@ -1601,7 +1601,7 @@ class FPCandidate(Candidate):
         # keeping the 3 newest ones, and insert the new FP before them.
         esc_section = re.escape(section_name)
         match = re.search(
-            r"\n==\s*\{\{\{\s*\d+\s*\|\s*" + esc_section + r"\s*\}\}\}\s*==\s*"
+            r"\n==\s*\{\{\{\s*\d+\s*\|\s*(" + esc_section + r")\s*\}\}\}\s*==\s*"
             r"<gallery[^\n>]*>(.+?)</gallery>",
             old_text,
             flags=re.DOTALL | re.IGNORECASE,
@@ -1619,17 +1619,18 @@ class FPCandidate(Candidate):
                 "and add the new FP by hand to the correct section."
             )
             return
-        entries = match.group(1).strip().splitlines()
+        real_section_name = match.group(1)
+        entries = match.group(2).strip().splitlines()
         formatted = "\n".join(entry.strip() for entry in entries[:3])
         new_text = (
-            old_text[:match.start(1)]
+            old_text[:match.start(2)]
             + f"\n{filename}|{bare_filename(filename)}\n"
             + f"{formatted}\n"
-            + old_text[match.end(1):]
+            + old_text[match.end(2):]
         )
 
         # Commit the new text
-        summary = f"Added [[{filename}]] to section '{section_name}'"
+        summary = f"Added [[{filename}]] to section '{real_section_name}'"
         commit(old_text, new_text, page, summary)
 
     def add_to_gallery_page(self, gallery_link: str, files: list[str]) -> None:
@@ -1700,10 +1701,14 @@ class FPCandidate(Candidate):
             files_for_summary += f" and {len(new_files) - 1} more set file(s)"
 
         # Search for the section to which we have to add the new FPs
-        if insert_at := self._find_gallery_insertion_place(
+        insert_at: slice | None  # Help typecheckers.
+        if result := self._find_gallery_insertion_place(
             gallery_link, full_page_name, section, old_text
         ):
-            summary = f"Added {files_for_summary} to section '{section}'"
+            real_section_name, insert_at = result
+            summary = (
+                f"Added {files_for_summary} to section '{real_section_name}'"
+            )
         elif insert_at := self._find_unsorted_insertion_place(
             full_page_name, old_text
         ):
@@ -1725,14 +1730,16 @@ class FPCandidate(Candidate):
         full_page_name: str,
         section: str,
         old_text: str,
-    ) -> slice | None:
+    ) -> tuple[str, slice] | None:
         """
         Search for the start of the <gallery>...</gallery> element
         of the section to which we have to add the new featured picture(s).
 
         Returns:
-        If successful, a slice object describing the index values
-        of the characters which should be replaced by the new entries;
+        If successful, a tuple containing
+        [0] the official subheading of the target section and
+        [1] a slice object describing the index values of the characters
+        which should be replaced by the new entries;
         or None if we did not find a valid target section and have to use
         the 'Unsorted' section instead.
         """
@@ -1758,7 +1765,7 @@ class FPCandidate(Candidate):
         esc_section = re.escape(section)
         esc_section = re.sub(r"(?:\\? )*:", r" *:", esc_section)
         match = re.search(
-            r"\n=+ *" + esc_section + r" *=+(?: *\n)+",
+            r"\n=+ *(" + esc_section + r") *=+(?: *\n)+",
             old_text,
             flags=re.IGNORECASE,
         )
@@ -1774,6 +1781,7 @@ class FPCandidate(Candidate):
                 f"letter for letter. {unsorted_hint}"
             )
             return None
+        real_section_name = match.group(1)
 
         # Check if that subheading opens a valid target section,
         # i.e., whether it is directly followed by the associated
@@ -1788,7 +1796,7 @@ class FPCandidate(Candidate):
                 f"The gallery link ''{gallery_link}'' "
                 f"in the nomination [[{subpage_name}]] "
                 f"points to a heading on [[{full_page_name}]], "
-                f"but [[{full_page_name}#{section}|that heading]] "
+                f"but [[{full_page_name}#{real_section_name}|that heading]] "
                 "is not a valid target because it is not followed "
                 "immediately by an associated "
                 "<code><nowiki><gallery></nowiki></code> element. "
@@ -1802,7 +1810,7 @@ class FPCandidate(Candidate):
         # Check if that section is just the 'Unsorted' section
         # (this actually happens; it's valid, but not helpful,
         # so we handle the request, but also ask for help).
-        if section == UNSORTED_HEADING:
+        if real_section_name == UNSORTED_HEADING:
             warn("Gallery link points to 'Unsorted' section.")
             ask_for_help(
                 f"The gallery link ''{gallery_link}'' in the nomination "
@@ -1814,7 +1822,7 @@ class FPCandidate(Candidate):
                 "So please move the new featured picture(s) "
                 "to a more appropriate place."
             )
-        return slice(match.end(1), match.end(0))
+        return (real_section_name, slice(match.end(1), match.end(0)))
 
     def _find_unsorted_insertion_place(
         self,
