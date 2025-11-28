@@ -1170,7 +1170,7 @@ class Candidate(abc.ABC):
         if match := FULL_FILE_PREFIX_REGEX.search(subpage_name):
             filename = subpage_name[match.end(0):]
             # Use standard 'File:' namespace and remove '/2' etc.
-            filename = FILE_NAMESPACE + re.sub(r" */ *\d+ *$", "", filename)
+            filename = FILE_NAMESPACE + re.sub(r" */ *\d+ *$", "", filename, count=1)
             page = pywikibot.Page(_g_site, filename)
             if not page.exists():
                 # Image page not found; try the 1st image in the nomination
@@ -1477,7 +1477,7 @@ class FPCandidate(Candidate):
         # Some methods need the full gallery link with section anchor,
         # others only the gallery page name or even just the basic gallery.
         full_gallery_link = clean_gallery_link(results[4])
-        gallery_page = re.sub(r"#.*", "", full_gallery_link).rstrip()
+        gallery_page = re.sub(r"#.*$", "", full_gallery_link, count=1).rstrip()
         if not gallery_page:
             error(f"{cut_title}: (ignoring, gallery not defined)")
             ask_for_help(
@@ -2762,7 +2762,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             continue
         # Skip nominations which do not match the '-match' argument
         if match_pattern:
-            comparison_name = CAND_PREFIX_REGEX.sub("", subpage_name).lower()
+            comparison_name = CAND_PREFIX_REGEX.sub("", subpage_name, count=1).lower()
             if match_pattern not in comparison_name:
                 continue
         subpage: pywikibot.Page | None  # Help typecheckers.
@@ -2859,9 +2859,9 @@ def _rename_nomination_subpage_with_bad_title(
         )
         return None
     # Check for fixable problems: space after namespace prefix, etc.
-    new_name = re.sub(r" */ *(?:[Ff]ile|[Ii]mage) *: *", "/File:", old_name)
-    new_name = re.sub(r" */ *[Ss]et */ *", "/Set/", new_name)
-    new_name = re.sub(r" */ *[Rr]emoval */ *", "/removal/", new_name)
+    new_name = re.sub(r" */ *(?:[Ff]ile|[Ii]mage) *: *", "/File:", old_name, count=1)
+    new_name = re.sub(r" */ *[Ss]et */ *", "/Set/", new_name, count=1)
+    new_name = re.sub(r" */ *[Rr]emoval */ *", "/removal/", new_name, count=1)
     if new_name != old_name:
         if pywikibot.Page(_g_site, new_name).exists():
             error(
