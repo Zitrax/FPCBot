@@ -244,7 +244,7 @@ LIST_INCLUDES_MISSING_SUBPAGE: Final[str] = (
 )
 COULD_NOT_READ_RECENT_FPS_LIST: Final[str] = (
     f"The bot could not read [[{GALLERY_LIST_PAGE_NAME}|the list]] "
-    "of recent Featured pictures: {exception}. "
+    "of recent featured pictures: {exception}. "
     "Please check the list page and fix it."
 )
 ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
@@ -1585,7 +1585,7 @@ class FPCandidate(Candidate):
         if not match:
             error(f"Error - can't find gallery section '{section_name}'.")
             ask_for_help(
-                f"The bot could not add the new Featured picture [[:{filename}]] "
+                f"The bot could not add the new featured picture [[:{filename}]] "
                 f"to the list at [[{GALLERY_LIST_PAGE_NAME}]] "
                 f"because it did not find the section ''{section_name}''. "
                 "Either there is no subheading with that name, "
@@ -1935,7 +1935,7 @@ class FPCandidate(Candidate):
             error(f"Error - could not create Site object for Wikidata: {exc}")
             file_links = ", ".join(f"[[:{filename}]]" for filename in files)
             ask_for_help(
-                "The bot could not add a Featured picture assessment claim "
+                "The bot could not add a featured picture assessment claim "
                 "to the Structured data of one or more new FP(s) because "
                 "creating and connecting a Pywikibot <code>Site</code> object "
                 f"for Wikidata has failed: {format_exception(exc)}. "
