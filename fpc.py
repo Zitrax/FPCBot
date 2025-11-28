@@ -300,8 +300,8 @@ VERIFIED_RESULT_REGEX: Final[re.Pattern] = re.compile(
     \s*neutral\s*=\s*(\d+)\s*\|            # (3) Neutral votes
     \s*featured\s*=\s*(\w+)\s*\|           # (4) Featured, should be 'yes'/'no'
     \s*gallery\s*=\s*([^|\n]*)             # (5) Gallery link (if featured)
-    (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives: name of the winning image
-    .*?\}\}
+    (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives:
+    .*?\}\}                                #     name of the winning image
     """,
     flags=re.VERBOSE,
 )
@@ -390,8 +390,7 @@ ASSESSMENTS_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
 # <gallery>, etc.; or
 # 2. a comment which can span several lines.
 ASSOC_GALLERY_ELEMENT_REGEX: Final[re.Pattern] = re.compile(
-    r"((?:[^<= \n][^\n]+\n\s*| *<!--.+?-->\s*)?<gallery\b[^>]*>)\s*",
-    flags=re.DOTALL,
+    r"((?:[^<= \n][^\n]+\n\s*| *<!--.+?-->\s*)?<gallery\b[^>]*>)\s*", flags=re.DOTALL
 )
 
 # Find 'Featured pictures of/from/by ...' categories which must be removed
@@ -566,9 +565,7 @@ class Candidate(abc.ABC):
         The filtered version is cached because we need it very often.
         """
         if self._filtered_content is None:
-            self._filtered_content = filter_content(
-                self._page.get(get_redirect=False)
-            )
+            self._filtered_content = filter_content(self._page.get(get_redirect=False))
         return self._filtered_content
 
     def reset_filtered_content(self) -> None:
@@ -682,9 +679,8 @@ class Candidate(abc.ABC):
             # Still no files found, so we must skip this candidate
             error(f"{cut_title}: (Error: found no images in set)")
             ask_for_help(
-                f"The set nomination [[{subpage_name}]] seems to contain "
-                "no images. Perhaps the formatting is damaged. "
-                f"{PLEASE_FIX_HINT}"
+                f"The set nomination [[{subpage_name}]] seems to contain no images. "
+                f"Perhaps the formatting is damaged. {PLEASE_FIX_HINT}"
             )
             return []
 
@@ -695,14 +691,11 @@ class Candidate(abc.ABC):
             page = pywikibot.Page(_g_site, filename)
             if not page.exists():
                 # File not found, skip this candidate
-                error(
-                    f"{cut_title}: (Error: can't find set image '{filename}')"
-                )
+                error(f"{cut_title}: (Error: can't find set image '{filename}')")
                 ask_for_help(
                     f"The set nomination [[{subpage_name}]] lists the image "
                     f"[[:{filename}]], but that image file does not exist. "
-                    "Perhaps it has been renamed or deleted. "
-                    f"{PLEASE_FIX_HINT}"
+                    f"Perhaps it has been renamed or deleted. {PLEASE_FIX_HINT}"
                 )
                 return []
             if page.isRedirectPage():
@@ -715,10 +708,9 @@ class Candidate(abc.ABC):
                         f"in set image '{filename}')"
                     )
                     ask_for_help(
-                        f"The set nomination [[{subpage_name}]] lists "
-                        f"the image [[:{filename}]], but the image page "
-                        "contains a circular or invalid redirect. "
-                        f"{PLEASE_FIX_HINT}"
+                        f"The set nomination [[{subpage_name}]] lists the image "
+                        f"[[:{filename}]], but the image page contains "
+                        f"a circular or invalid redirect. {PLEASE_FIX_HINT}"
                     )
                     return []
                 if not page.exists():
@@ -728,10 +720,9 @@ class Candidate(abc.ABC):
                         f"in set image '{filename}')"
                     )
                     ask_for_help(
-                        f"The set nomination [[{subpage_name}]] lists "
-                        f"the image [[:{filename}]], but the image page "
-                        "redirects to a file or page which does not exist. "
-                        f"{PLEASE_FIX_HINT}"
+                        f"The set nomination [[{subpage_name}]] lists the image "
+                        f"[[:{filename}]], but the image page redirects to a file "
+                        f"or page which does not exist. {PLEASE_FIX_HINT}"
                     )
                     return []
                 out(f"Resolved redirect: '{filename}' -> '{page.title()}'.")
@@ -838,16 +829,15 @@ class Candidate(abc.ABC):
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"{cut_title}: (Error: is not readable)")
             ask_for_help(
-                "The bot could not read the nomination subpage "
-                f"[[{subpage_name}]]: {format_exception(exc)}. "
-                f"{PLEASE_FIX_HINT}"
+                f"The bot could not read the nomination subpage [[{subpage_name}]]: "
+                f"{format_exception(exc)}. {PLEASE_FIX_HINT}"
             )
             return
         if not filtered_text:
             error(f"{cut_title}: (Error: has no real content)")
             ask_for_help(
-                f"The nomination subpage [[{subpage_name}]] "
-                f"seems to be empty. {PLEASE_FIX_HINT}"
+                f"The nomination subpage [[{subpage_name}]] seems to be empty. "
+                f"{PLEASE_FIX_HINT}"
             )
             return
         if re.search(r"\{\{\s*FPC-closed-ignored.*\}\}", filtered_text):
@@ -951,7 +941,7 @@ class Candidate(abc.ABC):
             timestamp = self._page.oldest_revision["timestamp"]
         except pywikibot.exceptions.PageRelatedError:
             error(
-                f"Could not ascertain creation time of '{self._page.title()}', "
+                f"Couldn't determine creation time of '{self._page.title()}', "
                 "returning now()"
             )
             return datetime.datetime.now(datetime.UTC)
@@ -977,10 +967,7 @@ class Candidate(abc.ABC):
         if self.is_ignored():
             return "Ignored"
         if self.is_done() or self.rules_of_fifth_day():
-            text = (
-                self._SUCCESS_KEYWORD if self.is_passed()
-                else self._FAIL_KEYWORD
-            )
+            text = self._SUCCESS_KEYWORD if self.is_passed() else self._FAIL_KEYWORD
             return text.capitalize()
         return "Active"
 
@@ -1187,26 +1174,19 @@ class Candidate(abc.ABC):
             page = pywikibot.Page(_g_site, filename)
             if not page.exists():
                 # Image page not found; try the 1st image in the nomination
-                warn(
-                    f"{cut_title}: (Did not find '{filename}', "
-                    "trying first image...)"
-                )
+                warn(f"{cut_title}: (Did not find '{filename}', trying first image...)")
                 page = self._first_real_image_in_nomination()
                 if page is None:
                     error(f"{cut_title}: (Error: can't find image page)")
                     ask_for_help(
-                        f"The nomination [[{subpage_name}]] is about "
-                        f"the image [[:{filename}]], but that image file "
-                        "does not exist. Perhaps the file has been renamed. "
-                        f"{PLEASE_FIX_HINT}"
+                        f"The nomination [[{subpage_name}]] is about the image "
+                        f"[[:{filename}]], but that image file does not exist. "
+                        f"Perhaps the file has been renamed. {PLEASE_FIX_HINT}"
                     )
                     return ""
         else:
             # Bad nomination subpage name; try the 1st image in the nomination
-            warn(
-                f"{cut_title}: (Could not derive filename, "
-                "trying first image...)"
-            )
+            warn(f"{cut_title}: (Could not derive filename, trying first image...)")
             page = self._first_real_image_in_nomination()
             if page is None:
                 error(f"{cut_title}: (Error: bad nomination subpage name)")
@@ -1228,8 +1208,8 @@ class Candidate(abc.ABC):
                 error(f"{cut_title}: (Error: invalid redirect)")
                 ask_for_help(
                     f"The nomination [[{subpage_name}]] is about the image "
-                    f"[[:{filename}]], but the image page contains "
-                    f"an invalid redirect. {PLEASE_FIX_HINT}"
+                    f"[[:{filename}]], but the image page contains a circular "
+                    f"or invalid redirect. {PLEASE_FIX_HINT}"
                 )
                 return ""
             if not page.exists():
@@ -1415,10 +1395,7 @@ class Candidate(abc.ABC):
             else:
                 self.move_to_log(self._FAIL_KEYWORD)
         else:
-            error(
-                f"{cut_title}: (Error: invalid verified "
-                f"success status '{success}')"
-            )
+            error(f"{cut_title}: (Error: invalid verified success status '{success}')")
             ask_for_help(
                 f"The verified success status <code>{success}</code> "
                 f"in the results template of [[{subpage_name}]] "
@@ -1476,10 +1453,7 @@ class FPCandidate(Candidate):
     def get_close_edit_summary(self, fifth_day: bool) -> str:
         """Implementation for FP candidates."""
         if self.image_count() > 1:
-            return (
-                "Closing for review - contains alternatives, "
-                "needs manual counting"
-            )
+            return "Closing for review - contains alternatives, needs manual counting"
         # A simple FP nomination
         self.count_votes()
         return (
@@ -1611,8 +1585,8 @@ class FPCandidate(Candidate):
         if not match:
             error(f"Error - can't find gallery section '{section_name}'.")
             ask_for_help(
-                "The bot could not add the new Featured picture "
-                f"[[:{filename}]] to the list at [[{GALLERY_LIST_PAGE_NAME}]] "
+                f"The bot could not add the new Featured picture [[:{filename}]] "
+                f"to the list at [[{GALLERY_LIST_PAGE_NAME}]] "
                 f"because it did not find the section ''{section_name}''. "
                 "Either there is no subheading with that name, "
                 "or it is not followed immediately by a valid "
@@ -1672,10 +1646,9 @@ class FPCandidate(Candidate):
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read gallery page '{full_page_name}': {exc}")
             ask_for_help(
-                "The bot could not read the gallery page "
-                f"[[{full_page_name}]] which was specified by "
-                f"the nomination [[{subpage_name}]]: {format_exception(exc)}. "
-                f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
+                f"The bot could not read the gallery page [[{full_page_name}]] "
+                f"which was specified by the nomination [[{subpage_name}]]: "
+                f"{format_exception(exc)}. {PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
             )
             return
 
@@ -1683,8 +1656,7 @@ class FPCandidate(Candidate):
         # This can happen if the process has previously been interrupted.
         # We skip these files but handle any file which is not yet present.
         new_files = [
-            file for file in files
-            if not re.search(wikipattern(file), old_text)
+            file for file in files if not re.search(wikipattern(file), old_text)
         ]
         if not new_files:
             # Not a single file needs to be added, so we can stop here.
@@ -1695,8 +1667,7 @@ class FPCandidate(Candidate):
             return
         # Format the new entries and a hint for the edit summary
         new_entries = "".join(
-            f"{filename}|{bare_filename(filename)}\n"
-            for filename in new_files
+            f"{filename}|{bare_filename(filename)}\n" for filename in new_files
         )
         files_for_summary = f"[[{new_files[0]}]]"
         if len(new_files) > 1:
@@ -1708,12 +1679,8 @@ class FPCandidate(Candidate):
             gallery_link, full_page_name, section, old_text
         ):
             real_section_name, insert_at = result
-            summary = (
-                f"Added {files_for_summary} to section '{real_section_name}'"
-            )
-        elif insert_at := self._find_unsorted_insertion_place(
-            full_page_name, old_text
-        ):
+            summary = f"Added {files_for_summary} to section '{real_section_name}'"
+        elif insert_at := self._find_unsorted_insertion_place(full_page_name, old_text):
             summary = f"Added {files_for_summary} to the 'Unsorted' section"
         else:  # Serious error with gallery page, already reported
             return
@@ -1746,9 +1713,7 @@ class FPCandidate(Candidate):
         the 'Unsorted' section instead.
         """
         subpage_name = self._page.title()
-        unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(
-            page=full_page_name
-        )
+        unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(page=full_page_name)
 
         # Have we got a section anchor?
         if not section:
@@ -1772,10 +1737,7 @@ class FPCandidate(Candidate):
             flags=re.IGNORECASE,
         )
         if not match:
-            warn(
-                "Found no matching subheading, "
-                "adding FP(s) to 'Unsorted' section."
-            )
+            warn("Found no matching subheading, adding FP(s) to 'Unsorted' section.")
             ask_for_help(
                 f"The section anchor ''{section}'' in the gallery link "
                 f"of the nomination [[{subpage_name}]] does not match "
@@ -1791,7 +1753,7 @@ class FPCandidate(Candidate):
         match = ASSOC_GALLERY_ELEMENT_REGEX.match(old_text, pos=match.end(0))
         if not match:
             warn(
-                "Subheading is not a valid target, "
+                "Target subheading not followed immediately by <gallery>, "
                 "adding FP(s) to 'Unsorted' section."
             )
             ask_for_help(
@@ -2012,8 +1974,7 @@ class FPCandidate(Candidate):
                                 "after": 0,
                                 "before": 0,
                                 "timezone": 0,
-                                "calendarmodel":
-                                "http://www.wikidata.org/entity/Q1985727",
+                                "calendarmodel": "http://www.wikidata.org/entity/Q1985727",
                             },
                             "type": "time",
                         },
@@ -2035,8 +1996,7 @@ class FPCandidate(Candidate):
                 statements = structured_data["statements"]
             except KeyError:
                 error(
-                    "Error - no 'statements' entry in structured data "
-                    f"for '{filename}'."
+                    f"Error - no 'statements' entry in structured data for '{filename}'."
                 )
                 continue
 
@@ -2058,8 +2018,8 @@ class FPCandidate(Candidate):
             # Add the claim if necessary
             if claim_already_present:
                 out(
-                    "Skipping add_assessment_to_media_info() "
-                    f"for '{filename}', FP assessment claim already present."
+                    f"Skipping add_assessment_to_media_info() for '{filename}', "
+                    "FP assessment claim already present."
                 )
             else:
                 # We must use a new Claim instance with every file,
@@ -2068,9 +2028,7 @@ class FPCandidate(Candidate):
                     site=fp_claim_site, data=fp_claim_data
                 )
                 try:
-                    commit_media_info_changes(
-                        filename, media_info, [], [fp_claim]
-                    )
+                    commit_media_info_changes(filename, media_info, [], [fp_claim])
                 except pywikibot.exceptions.LockedPageError:
                     error(f"Error - '{filename}' is locked.")
 
@@ -2092,7 +2050,7 @@ class FPCandidate(Candidate):
             wo = match.group(2)
             wn = match.group(3)
         else:
-            error(f"Error - no verified result found in '{self._page.title()}'")
+            error(f"Error - no verified result in '{self._page.title()}'.")
             ask_for_help(
                 f"The nomination [[{self._page.title()}]] is closed, "
                 "but does not contain a valid verified result. "
@@ -2130,7 +2088,7 @@ class FPCandidate(Candidate):
                 # an empty gallery must yield a count of 1, as we need it.
                 count = match.group(1).count("\n")
             else:
-                error(f"Error - no valid <gallery> element in '{monthpage}'")
+                error(f"Error - no valid <gallery> element in '{monthpage}'.")
                 ask_for_help(
                     f"The monthly overview page [[{monthpage}]] is missing "
                     "a <code><nowiki><gallery></nowiki></code> element. "
@@ -2217,9 +2175,7 @@ class FPCandidate(Candidate):
             # Since August 2025 we use an improved version of the template.
             nomination_link = self._page.title()
             set_title = self.subpage_name(keep_prefix=False, keep_number=False)
-            template = (
-                f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
-            )
+            template = f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
@@ -2321,8 +2277,8 @@ class FPCandidate(Candidate):
                     f"Skipping creator notification for '{filename}', "
                     + (
                         "creator is identical to nominator/uploader."
-                        if creator_name else
-                        "can't identify the creator."
+                        if creator_name
+                        else "can't identify the creator."
                     )
                 )
 
@@ -2553,9 +2509,7 @@ class DelistCandidate(Candidate):
         if not file_page.exists():
             error(f"Error - image '{filename}' not found.")
             return
-        using_pages = file_page.using_pages(
-            namespaces=["Commons"], filterredir=False
-        )
+        using_pages = file_page.using_pages(namespaces=["Commons"], filterredir=False)
         for page in using_pages:
             page_name = page.title()
             if not page_name.startswith(FP_PREFIX):
@@ -2583,9 +2537,7 @@ class DelistCandidate(Candidate):
                         f"({results[1]}\u2013{results[0]})'''"
                     )
                     new_text = (
-                        old_text[:match.start(1)]
-                        + entry
-                        + old_text[match.end(1):]
+                        f"{old_text[:match.start(1)]}{entry}{old_text[match.end(1):]}"
                     )
                 else:
                     # Did not find the image.  That's OK e.g. for the overview
@@ -2606,10 +2558,7 @@ class DelistCandidate(Candidate):
                     old_text,
                 )
                 if n == 0:
-                    error(
-                        f"Error - could not remove '{filename}' "
-                        f"from '{page_name}'."
-                    )
+                    error(f"Error - could not remove '{filename}' from '{page_name}'.")
                     continue
                 summary = f"Removed [[{filename}]] per [[{nomination_link}]]"
             if new_text != old_text:
@@ -2657,10 +2606,7 @@ class DelistCandidate(Candidate):
         try:
             commit(old_text, new_text, image_page, summary)
         except pywikibot.exceptions.LockedPageError:
-            error(
-                f"Error - '{filename}' is locked, "
-                "can't update {{Assessments}}."
-            )
+            error(f"Error - '{filename}' is locked, can't update {{Assessments}}.")
 
     def remove_assessment_from_media_info(self, filename: str) -> None:
         """
@@ -2693,9 +2639,7 @@ class DelistCandidate(Candidate):
                 claims_to_remove.append(claim)
         if claims_to_remove:
             try:
-                commit_media_info_changes(
-                    filename, media_info, claims_to_remove, []
-                )
+                commit_media_info_changes(filename, media_info, claims_to_remove, [])
             except pywikibot.exceptions.LockedPageError:
                 error(f"Error - '{filename}' is locked.")
         else:
@@ -2850,9 +2794,7 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
         new_text = old_text
         for old_name, new_name in redirects:
             new_text = new_text.replace(old_name, new_name, 1)
-        summary = (
-            f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
-        )
+        summary = f"Resolved {len(redirects)} redirect(s) to renamed nomination(s)"
         commit(old_text, new_text, page, summary)
     return candidates
 
@@ -2873,10 +2815,7 @@ def _resolve_nomination_subpage_redirect(
             subpage = subpage.getRedirectTarget()
         except pywikibot.exceptions.PageRelatedError:
             # Circular or invalid redirect etc.
-            error(
-                "Error - invalid nomination redirect page "
-                f"'{old_name}', ignoring."
-            )
+            error(f"Error - invalid nomination redirect page '{old_name}', ignoring.")
             ask_for_help(
                 f"The nomination subpage [[{old_name}]] "
                 f"contains an invalid redirect. {PLEASE_FIX_HINT}"
@@ -3162,8 +3101,7 @@ def is_same_user(username_1: str, username_2: str) -> bool:
     """
     return (
         username_1[0].upper() == username_2[0].upper()
-        and
-        username_1[1:] == username_2[1:]
+        and username_1[1:] == username_2[1:]
     )
 
 
@@ -3185,10 +3123,7 @@ def is_fp_assessment_claim(claim: pywikibot.page.Claim) -> bool:
     # If this fails because of format variations etc.,
     # use a regex comparison or explore the nested data values.
     plain = repr(claim)
-    return (
-        "'property': 'P6731'" in plain
-        and "'numeric-id': 63348049" in plain
-    )
+    return "'property': 'P6731'" in plain and "'numeric-id': 63348049" in plain
 
 
 def oldest_revision_user(page: pywikibot.Page) -> str:
@@ -3288,10 +3223,10 @@ def update_assessments_template(
             params += f"|featured={fstr}"
             after = len(params)
         # Search and update/append 'com-nom' parameter
+        # (the end of the regex is so complicated because we want to leave
+        # any whitespace after the 'com-nom' value unchanged,
+        # therefore it must be excluded from group 2)
         if m := re.search(
-            # NB: The end of the regex is so complicated because we want
-            # to leave any whitespace after the 'com-nom' value unchanged,
-            # therefore it must be excluded from group 2.
             r"\|\s*(com-nom|subpage)\s*=\s*(.+?)\s*(?:$|[{}|\n])", params
         ):
             if m.group(1) == "subpage":
@@ -3299,22 +3234,14 @@ def update_assessments_template(
                 # of 'subpage' and 'com-nom' is identical
                 params = f"{params[:m.start(1)]}com-nom{params[m.end(1):]}"
             if m.group(2) != com_nom_value:
-                params = (
-                    f"{params[:m.start(2)]}{com_nom_value}{params[m.end(2):]}"
-                )
+                params = f"{params[:m.start(2)]}{com_nom_value}{params[m.end(2):]}"
         else:
             # Insert new 'com-nom' right after the 'featured' parameter
-            params = (
-                f"{params[:after]}|com-nom={com_nom_value}{params[after:]}"
-            )
+            params = f"{params[:after]}|com-nom={com_nom_value}{params[after:]}"
         # Check and assemble result
         if params == match.group(1):
             return (True, True, old_text)
-        new_text = (
-            old_text[:match.start(1)]
-            + params
-            + old_text[match.end(1):]
-        )
+        new_text = f"{old_text[:match.start(1)]}{params}{old_text[match.end(1):]}"
         return (True, False, new_text)
     return (False, False, old_text)
 
@@ -3440,14 +3367,10 @@ def commit_media_info_changes(
     # Show the diff
     out(f"\nAbout to change the Media Info (structured data) of '{filename}':")
     if claims_to_remove:
-        removing = "- " + "\n- ".join(
-            repr(claim) for claim in claims_to_remove
-        )
+        removing = "- " + "\n- ".join(repr(claim) for claim in claims_to_remove)
         pywikibot.stdout(f"<<lightred>>{removing}<<default>>")
     if claims_to_add:
-        adding = "+ " + "\n+ ".join(
-            repr(claim) for claim in claims_to_add
-        )
+        adding = "+ " + "\n+ ".join(repr(claim) for claim in claims_to_add)
         pywikibot.stdout(f"<<lightgreen>>{adding}<<default>>")
 
     # Decide whether to save the changes
@@ -3528,10 +3451,7 @@ def main(*args: str) -> None:
                 try:
                     _g_match_pattern = local_args[i + 1]
                 except IndexError:
-                    error(
-                        "Error - '-match' must be followed by a pattern, "
-                        "aborting."
-                    )
+                    error("Error - '-match' must be followed by a pattern, aborting.")
                     sys.exit()
                 i += 1  # Skip the pattern argument.
             case _:
@@ -3559,9 +3479,7 @@ def main(*args: str) -> None:
         # To present a helpful error message, abort before handling even
         # the first argument and report all invalid arguments at once.
         formatted = ", ".join(f"'{arg}'" for arg in sorted(invalid_args))
-        error(
-            f"Error - unknown argument(s) {formatted}; aborting, see '-help'."
-        )
+        error(f"Error - unknown argument(s) {formatted}; aborting, see '-help'.")
         sys.exit()
 
     # Call the appropriate functions to perform the desired tasks
@@ -3587,10 +3505,18 @@ def main(*args: str) -> None:
             case "-info":
                 if delist:
                     out("Gathering info about delist candidates...", heading=True)
-                    check_candidates(Candidate.print_all_info, CAND_LIST_PAGE_NAME, delist=True)
+                    check_candidates(
+                        Candidate.print_all_info,
+                        CAND_LIST_PAGE_NAME,
+                        delist=True,
+                    )
                 if fpc:
                     out("Gathering info about FP candidates...", heading=True)
-                    check_candidates(Candidate.print_all_info, CAND_LIST_PAGE_NAME, delist=False)
+                    check_candidates(
+                        Candidate.print_all_info,
+                        CAND_LIST_PAGE_NAME,
+                        delist=False,
+                    )
             case "-close":
                 if delist:
                     out("Closing delist candidates...", heading=True)
@@ -3610,9 +3536,7 @@ def main(*args: str) -> None:
                     check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, delist=False)
             case _:
                 # This means we have forgotten to update the invalid_args test.
-                error(
-                    f"Error - unknown argument '{arg}'; aborting, see '-help'."
-                )
+                error(f"Error - unknown argument '{arg}'; aborting, see '-help'.")
                 sys.exit()
 
 
