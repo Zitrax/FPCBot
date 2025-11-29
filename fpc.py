@@ -2110,6 +2110,7 @@ class FPCandidate(Candidate):
                     "Please check the page."
                 )
                 return
+            job = "Added"
         else:
             # The page does not exist yet (new month) or is empty,
             # so create its contents from scratch.
@@ -2120,15 +2121,16 @@ class FPCandidate(Candidate):
                 "<gallery>\n</gallery>"
             )
             count = 1
+            job = "Started new archival page, added"
 
         # Assemble the new entry and append it to the end of the gallery
         if self.is_set():
             set_name = self.subpage_name(keep_prefix=False, keep_number=False)
             title = f"Set: {set_name} ({len(files)} files)"
-            summary = f"Added set [[{self._page.title()}|{set_name}]]"
+            summary = f"{job} set [[{self._page.title()}|{set_name}]]"
         else:
             title = bare_filename(filename)
-            summary = f"Added [[{filename}]]"
+            summary = f"{job} [[{filename}]]"
         if creator_link := self.creator(link=True):
             creator_hint = f"created by {creator_link}, "
         else:
