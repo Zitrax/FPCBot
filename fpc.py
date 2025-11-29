@@ -1295,6 +1295,21 @@ class Candidate(abc.ABC):
             old_log_text = log_page.get(get_redirect=False).strip()
         except pywikibot.exceptions.NoPageError:
             old_log_text = ""
+        except pywikibot.exceptions.IsRedirectPageError:
+            # Try to resolve the redirect
+            try:
+                log_page = log_page.getRedirectTarget()
+                old_log_text = log_page.get(get_redirect=False).strip()
+            except pywikibot.exceptions.PageRelatedError as exc:
+                # Circular, nested or invalid redirect etc.
+                error(f"Log page '{log_link}' was moved, redirect is invalid.")
+                ask_for_help(
+                    f"The log page [[{log_link}]] has been renamed, "
+                    f"but the bot could not resolve the redirect: "
+                    f"{format_exception(exc)}. {PLEASE_FIX_HINT}"
+                )
+                return
+            out(f"Resolved redirect: '{log_link}' -> '{log_page.title()}'")
 
         # Append nomination to the log page
         if re.search(wikipattern(subpage_name), old_log_text):
