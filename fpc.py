@@ -74,6 +74,7 @@ TEST_LOG_PAGE_NAME: Final[str] = f"{CAND_LOG_PREFIX}January 2025"
 GALLERY_LIST_PAGE_NAME: Final[str] = "Commons:Featured pictures, list"
 FP_TALK_PAGE_NAME: Final[str] = "Commons talk:Featured picture candidates"
 UNSORTED_HEADING: Final[str] = "Unsorted"
+MAX_ENTRIES_PER_LOG_PART: Final[int] = 100
 
 
 # Valid voting templates
@@ -257,16 +258,16 @@ ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
 # Regular expressions
 
 # Building patterns
-CAND_PREFIX_PATTERN: Final[str] = r"^" + CAND_PREFIX.replace(" ", r"[ _]")
+CAND_PREFIX_PATTERN: Final[str] = CAND_PREFIX.replace(" ", r"[ _]")
 MIDDLE_NOMINATION_NAME_PATTERN: Final[str] = (
     r" *(?:[Rr]emoval */ *)?(?:[Ss]et */|(?:[Ff]ile|[Ii]mage) *:) *"
 )
 
 # Identify reasonably valid FP nomination subpage names
 VALID_NOMINATION_NAME_START_REGEX: Final[re.Pattern] = re.compile(
-    CAND_PREFIX_PATTERN + MIDDLE_NOMINATION_NAME_PATTERN
+    f"^{CAND_PREFIX_PATTERN}{MIDDLE_NOMINATION_NAME_PATTERN}"
 )
-# Remove the candidate prefix
+# Find or remove the candidate prefix
 CAND_PREFIX_REGEX: Final[re.Pattern] = re.compile(CAND_PREFIX_PATTERN)
 # Remove the middle part of nomination names (after deleting the prefix)
 MIDDLE_NOMINATION_NAME_REGEX: Final[re.Pattern] = re.compile(
@@ -276,7 +277,7 @@ MIDDLE_NOMINATION_NAME_REGEX: Final[re.Pattern] = re.compile(
 # plus any possible crap between the prefix and the namespace
 # and faulty spaces before and after the namespace.
 FULL_FILE_PREFIX_REGEX: Final[re.Pattern] = re.compile(
-    CAND_PREFIX_PATTERN + r".*?(?:[Ff]ile|[Ii]mage) *: *"
+    f"^{CAND_PREFIX_PATTERN}" + r".*?(?:[Ff]ile|[Ii]mage) *: *"
 )
 
 # Look for results using the old, text-based results format
@@ -422,9 +423,24 @@ _g_match_pattern: str = ""
 _g_abort: bool = False
 # Pywikibot Site object
 _g_site: pywikibot.site.BaseSite | None = None
+# Number of the current log part
+_g_log_part_no: int | None = None
 
 
 # CLASSES
+
+class DataAlreadyPresentError(Exception):
+    """
+    The data we wanted to add is already present on the page.
+    This can happen if the process has previously been interrupted.
+    """
+    pass
+
+
+class CouldNotAddDataError(Exception):
+    """Error during data insertion on a Commons page."""
+    pass
+
 
 class ThreadCheckCandidate(threading.Thread):
     """
@@ -1272,6 +1288,126 @@ class Candidate(abc.ABC):
             name = re.sub(r" */ *\d+ *$", "", name, count=1)
         return name
 
+    def _get_current_log_page(
+        self,
+        year: int,
+        month: str,  # Full English month name
+        subpage_name: str,
+    ) -> tuple[pywikibot.Page, int, str]:
+        """
+        Find and read the current FPC log page, creating it if necessary.
+
+        Until November 2005, we just used one FPC log page per month.
+        But long log pages were not rendered correctly because they contain
+        too many template transclusions.  Therefore now we split
+        the monthly log into parts containing at most MAX_ENTRIES_PER_LOG_PART
+        nominations each.  This has made the search for the current log page
+        more complicated, it includes creating a new part if the old one
+        has reached the threshold.  We save the current part number of the log
+        in a global variable to speed up the handling of the next nomination.
+
+        Returns:
+        A tuple with
+        [0] a Pyikibot page object for the current part of the log;
+        [1] an integer with the number of the current part of the log;
+        [2] a string with the current text of the current part of the log,
+            empty if we have just started a new part of the log.
+
+        Raises:
+        DataAlreadyPresentError: the nomination is already listed in the log;
+            that's fine, we can remove it from the candidate list.
+        CouldNotAddDataError: Due to an error the nomimation cannot be added
+            to the log; an error description is passed in the exception,
+            we have to report it and must not remove the nomination.
+        """
+        global _g_log_part_no
+
+        # Find the name of the current part of the log for the current month
+        if _g_log_part_no is not None:
+            part_no = _g_log_part_no
+            log_page_name = build_log_page_name(month, year, _g_log_part_no)
+        else:
+            part_no = 1
+            log_page_name = build_log_page_name(month, year, 1)
+            if pywikibot.Page(_g_site, log_page_name).exists():
+                # There is already at least one log part for the month,
+                # find the last existing part
+                for i in range(2, 1001):
+                    next_page_name = build_log_page_name(month, year, i)
+                    if not pywikibot.Page(_g_site, next_page_name).exists():
+                        break
+                    log_page_name = next_page_name
+                    part_no = i
+                else:
+                    error("Error - no free log part page name?")
+                    raise CouldNotAddDataError(
+                        "The bot tried to generate a new part of the FPC log "
+                        f"for {month} {year}, but did not find a free page "
+                        f"from [[{build_log_page_name(month, year, 1)}]] "
+                        f"up to [[{next_page_name}]]. "
+                        "''Something is rotten in the state of Commons'', "
+                        f"or in the code of the bot."
+                    )
+            # Implict else: create a new log for the new month, part 1.
+
+        # Read the current part of the log
+        log_page = pywikibot.Page(_g_site, log_page_name)
+        try:
+            log_text = log_page.get(get_redirect=False).strip()
+        except pywikibot.exceptions.NoPageError:
+            out(f"Starting new log page '{log_page_name}'...")
+            log_text = ""
+        except pywikibot.exceptions.IsRedirectPageError:
+            # Try to resolve the redirect
+            try:
+                log_page = log_page.getRedirectTarget()
+                log_text = log_page.get(get_redirect=False).strip()
+            except pywikibot.exceptions.PageRelatedError as exc:
+                # Circular, nested or invalid redirect etc.
+                error(f"Log page '{log_page_name}' was moved, redirect is invalid.")
+                raise CouldNotAddDataError(
+                    f"The log page [[{log_page_name}]] has been renamed, "
+                    f"but the bot could not resolve the redirect: "
+                    f"{format_exception(exc)}."
+                ) from exc
+            out(f"Resolved redirect: '{log_page_name}' -> '{log_page.title()}'")
+            log_page_name = log_page.title()
+
+        # Check the existing text of the current log part
+        if log_text:
+            # Is the nomination already in the log?
+            # This can happen if the process has previously been interrupted.
+            if re.search(wikipattern(subpage_name), log_text):
+                raise DataAlreadyPresentError(subpage_name)
+            # Is the log page already full?
+            count = len(CAND_PREFIX_REGEX.findall(log_text))
+            if count >= MAX_ENTRIES_PER_LOG_PART:
+                # We have to start a new log part; it must not exist yet
+                part_no += 1
+                log_page_name = build_log_page_name(month, year, part_no)
+                log_page = pywikibot.Page(_g_site, log_page_name)
+                if log_page.exists():
+                    error(f"Error - log page '{log_page_name}' already exists")
+                    raise CouldNotAddDataError(
+                        "The bot tried to generate a new part of the FPC log "
+                        f"for {month} {year}, but the page [[{log_page_name}]] "
+                        "already exists. Either there is a bug in the bot, "
+                        "or the log pages are in a muddle."
+                    )
+                out(f"Moving on to new log part '{log_page_name}'...")
+                log_text = ""
+                count = 0
+        else:
+            count = 0
+
+        # Update the global value to handle the next candidate more easily;
+        # if this entry reaches the limit, the next one must start a new part
+        _g_log_part_no = (
+            part_no if (count + 1) < MAX_ENTRIES_PER_LOG_PART
+            else part_no + 1
+        )
+        return (log_page, part_no, log_text)
+
     def move_to_log(self, reason: str | None = None) -> None:
         """
         Remove this candidate from the list of current candidates
@@ -1282,47 +1418,40 @@ class Candidate(abc.ABC):
         as well as for delisting candidates.
         """
         subpage_name = self._page.title()
-        why = f" ({reason})" if reason else ""
 
-        # Find and read the log page for this month
-        # (if it does not exist yet it is just created from scratch)
+        # Append nomination to the current log page
         now = datetime.datetime.now(datetime.UTC)
-        year = now.year
-        month = now.strftime("%B")  # Full local month name, here: English
-        log_link = f"{CAND_LOG_PREFIX}{month} {year}"
-        log_page = pywikibot.Page(_g_site, log_link)
         try:
-            old_log_text = log_page.get(get_redirect=False).strip()
-        except pywikibot.exceptions.NoPageError:
-            old_log_text = ""
-        except pywikibot.exceptions.IsRedirectPageError:
-            # Try to resolve the redirect
-            try:
-                log_page = log_page.getRedirectTarget()
-                old_log_text = log_page.get(get_redirect=False).strip()
-            except pywikibot.exceptions.PageRelatedError as exc:
-                # Circular, nested or invalid redirect etc.
-                error(f"Log page '{log_link}' was moved, redirect is invalid.")
-                ask_for_help(
-                    f"The log page [[{log_link}]] has been renamed, "
-                    f"but the bot could not resolve the redirect: "
-                    f"{format_exception(exc)}. {PLEASE_FIX_HINT}"
-                )
-                return
-            out(f"Resolved redirect: '{log_link}' -> '{log_page.title()}'")
-
-        # Append nomination to the log page
-        if re.search(wikipattern(subpage_name), old_log_text):
-            # This can happen if the process has previously been interrupted.
+            log_page, part_no, old_log_text = self._get_current_log_page(
+                now.year, now.strftime("%B"), subpage_name
+            )
+        except DataAlreadyPresentError:
+            # Great, we are already done here and can remove the nomination.
             out(
                 f"Skipping add in move_to_log() for '{subpage_name}', "
                 "candidate is already in the log."
             )
+        except CouldNotAddDataError as exc:
+            ask_for_help(
+                f"{exc} Please add [[{subpage_name}]] to the correct log page "
+                "to ensure the log is complete, and search for the cause "
+                "of this error and fix it."
+            )
+            # So we must not remove the nomination from the candidate list!
+            return
         else:
-            new_log_text = f"{{{{{subpage_name}}}}}"
             if old_log_text:
-                new_log_text = f"{old_log_text}\n{new_log_text}"
-            summary = f"Added [[{subpage_name}]]{why}"
+                new_log_text = f"{old_log_text}\n{{{{{subpage_name}}}}}"
+            else:
+                new_log_text = (
+                    "{{FPC log page header"
+                    f"|month={now:%m}|year={now.year}|part={part_no}"
+                    "}}\n\n"  # Empty line
+                    f"{{{{{subpage_name}}}}}"
+                )
+            job = "Added" if old_log_text else "Started new log page, added"
+            why = f" ({reason})" if reason else ""
+            summary = f"{job} [[{subpage_name}]]{why}"
             commit(old_log_text, new_log_text, log_page, summary)
 
         # Remove nomination from the list of current nominations
@@ -3120,6 +3249,11 @@ def is_same_user(username_1: str, username_2: str) -> bool:
         username_1[0].upper() == username_2[0].upper()
         and username_1[1:] == username_2[1:]
     )
+
+
+def build_log_page_name(month_name: str, year: int, part: int) -> str:
+    """Assemble the page name of a FPC log page."""
+    return f"{CAND_LOG_PREFIX}{month_name} {year}-{part}"
 
 
 def format_exception(exc: Exception) -> str:
