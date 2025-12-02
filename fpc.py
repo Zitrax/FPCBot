@@ -510,6 +510,8 @@ class Candidate(abc.ABC):
     # Define class constants
     # (these are the values for a normal FP nomination,
     # subclasses must adapt them as needed)
+    # Three-letter code of the nomination type for -info:
+    _TYPE: ClassVar[str] = "FPC"
     # Keyword for the title etc. of a successful nomination:
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
     # Keyword for the title etc. of a failed nomination:
@@ -589,6 +591,7 @@ class Candidate(abc.ABC):
             self.count_votes()
             out(
                 f"{self.cut_title()}: "
+                f"{self._TYPE} "
                 f"P:{self._pro:02d} "
                 f"C:{self._con:02d} "
                 f"N:{self._neu:02d} "
@@ -2541,6 +2544,7 @@ class DelistCandidate(Candidate):
 
     # Define class constants
     # Adapt values for the needs of this class:
+    _TYPE = "Del"
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
