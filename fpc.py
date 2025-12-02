@@ -43,7 +43,7 @@ import sys
 import abc
 from collections.abc import Callable
 from types import FrameType
-from typing import Final, Literal, ClassVar
+from typing import Final, Literal, Type, ClassVar, NamedTuple
 import signal
 import datetime
 import time
@@ -440,6 +440,35 @@ class DataAlreadyPresentError(Exception):
 class CouldNotAddDataError(Exception):
     """Error during data insertion on a Commons page."""
     pass
+
+
+class CandidateTypesToProcess(NamedTuple):
+    """Class keeping track of the types of nominations we want to process."""
+    fp: bool
+    delist: bool
+
+    def candidate_class(self, subpage_name: str) -> Type[Candidate] | None:
+        """
+        Should we process that nomination, and with which class?
+
+        @param subpage_name: Full name of a nomination subpage.
+
+        Returns:
+        The correct Candidate subclass to be used for that nomination,
+        or None if we should not process that type of nomination.
+        """
+        if re.search(r"/ *[Rr]emoval */", subpage_name):
+            return DelistCandidate if self.delist else None
+        else:
+            return FPCandidate if self.fp else None
+
+    def describe(self) -> str:
+        """Summarize the types of candidates up to processing."""
+        types = [
+            entry[1] for entry in zip(self, self._fields)  # pylint: disable=no-member
+            if entry[0]
+        ]
+        return f"{', '.join(types)} candidates"
 
 
 class ThreadCheckCandidate(threading.Thread):
@@ -2854,7 +2883,10 @@ def error(text: str, newline: bool = True) -> None:
     pywikibot.stdout(f"<<lightred>>{text}<<default>>", newline=newline)
 
 
-def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
+def find_candidates(
+    list_page_name: str,
+    which_types: CandidateTypesToProcess,
+) -> list[Candidate]:
     """
     Returns a list with candidate objects for all nomination subpages,
     either from the page with the current candidates or from a log page
@@ -2864,16 +2896,13 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
     (so the returned candidate objects point to the actual nominations)
     and the page with the list of candidates is updated.
 
-    @param list_page_name The name either of the page with the list of
-        current candidates or of the log page that we want to check.
-    @param delist         Specify True to get only delist nominations,
-        False to get only FP nominations.
+    @param list_page_name: The name either of the page with the list
+         of current candidates or of the log page that we want to check.
+    @param which_types: A CandidateTypesToProcess object, specifying
+        which types of nominations we should process.
     """
     # Extract nomination subpage names
-    out(
-        f"Extracting {'delist' if delist else 'FP'} candidates, "
-        "checking for redirects..."
-    )
+    out(f"Extracting {which_types.describe()}, checking for redirects...")
     page = pywikibot.Page(_g_site, list_page_name)
     try:
         old_text = page.get(get_redirect=False)
@@ -2897,14 +2926,13 @@ def find_candidates(list_page_name: str, delist: bool) -> list[Candidate]:
             "Please check whether this is correct or not."
         )
         return []
-    candidate_class = DelistCandidate if delist else FPCandidate
     match_pattern = _g_match_pattern.lower()
     candidates: list[Candidate] = []  # Needs type hint: list is invariant.
     redirects: list[tuple[str, str]] = []
 
     for _, subpage_name in subpage_entries:
         # Skip nominations which are not of the expected type
-        if bool(re.search(r"/ *[Rr]emoval */", subpage_name)) != delist:
+        if not (candidate_class := which_types.candidate_class(subpage_name)):
             continue
         # Skip nominations which do not match the '-match' argument
         if match_pattern:
@@ -3055,20 +3083,20 @@ def _rename_nomination_subpage_with_bad_title(
 def check_candidates(
     check: Callable[[Candidate], None],
     list_page_name: str,
-    delist: bool,
+    which_types: CandidateTypesToProcess,
     descending: bool = True,
 ) -> None:
     """
     Calls a function on each candidate found on the specified page.
 
-    @param check      A method of the Candidate class which should be called
+    @param check: A method of the Candidate class which should be called
         on each candidate.
-    @param list_page_name The name of the page which includes all nominations;
+    @param list_page_name: The name of the page which includes all nominations;
         i.e. either the page with the list of current candidates
         or a log page that we want to check for test purposes.
-    @param delist     Specify True to get only delist nominations,
-        False to get only FP nominations.
-    @param descending Specify True if the page puts the newest entries first,
+    @param which_types: A CandidateTypesToProcess object, specifying
+        which types of nominations we should process.
+    @param descending: Specify True if the page puts the newest entries first,
         False if it runs from the oldest to the newest entry.
         So we can always handle the candidates in chronological order.
     """
@@ -3079,10 +3107,10 @@ def check_candidates(
         _g_site.login()
 
     # Find all current candidates
-    candidates = find_candidates(list_page_name, delist)
+    candidates = find_candidates(list_page_name, which_types)
     if not candidates:
         out(
-            f"Found no {'delist' if delist else 'FP'} candidates"
+            f"Found no {which_types.describe()}"
             f"{' matching the -match argument' if _g_match_pattern else ''}."
         )
         return
@@ -3564,8 +3592,8 @@ def main(*args: str) -> None:
     global _g_site
 
     # Define default values
-    delist = False
-    fpc = False
+    fpc = delist = False
+    task_args = []
 
     # Acquire CLI arguments, let Pywikibot handle the global arguments
     # (including '-help') and get the rest as a simple list
@@ -3580,7 +3608,6 @@ def main(*args: str) -> None:
     _g_site = pywikibot.Site()
 
     # First look for arguments which act as options for all tasks
-    task_args = []
     i = 0
     while i < len(local_args):
         arg = local_args[i]
@@ -3591,10 +3618,10 @@ def main(*args: str) -> None:
                 _g_dry = True
             case "-threads":
                 _g_threads = True
-            case "-delist":
-                delist = True
             case "-fpc":
                 fpc = True
+            case "-delist":
+                delist = True
             case "-notime":
                 _g_log_no_time = True
             case "-match":
@@ -3610,9 +3637,9 @@ def main(*args: str) -> None:
         i += 1
 
     # If neither -fpc nor -delist is used we handle all candidates
-    if not delist and not fpc:
-        delist = True
-        fpc = True
+    if not (fpc or delist):
+        fpc = delist = True
+    which_types = CandidateTypesToProcess(fpc, delist)
 
     # We can't use the interactive mode with threads
     if _g_threads and (not _g_dry and not _g_auto):
@@ -3637,54 +3664,27 @@ def main(*args: str) -> None:
     for arg in task_args:
         match arg:
             case "-test":
-                if delist:
-                    out("Recounting votes for delist candidates...", heading=True)
-                    check_candidates(
-                        Candidate.compare_result_to_count,
-                        TEST_LOG_PAGE_NAME,
-                        delist=True,
-                        descending=False,
-                    )
-                if fpc:
-                    out("Recounting votes for FP candidates...", heading=True)
-                    check_candidates(
-                        Candidate.compare_result_to_count,
-                        TEST_LOG_PAGE_NAME,
-                        delist=False,
-                        descending=False,
-                    )
+                out("Recounting votes for testing...", heading=True)
+                check_candidates(
+                    Candidate.compare_result_to_count,
+                    TEST_LOG_PAGE_NAME,
+                    which_types,
+                    descending=False,
+                )
             case "-info":
-                if delist:
-                    out("Gathering info about delist candidates...", heading=True)
-                    check_candidates(
-                        Candidate.print_all_info,
-                        CAND_LIST_PAGE_NAME,
-                        delist=True,
-                    )
-                if fpc:
-                    out("Gathering info about FP candidates...", heading=True)
-                    check_candidates(
-                        Candidate.print_all_info,
-                        CAND_LIST_PAGE_NAME,
-                        delist=False,
-                    )
+                out("Gathering information about candidates...", heading=True)
+                check_candidates(
+                    Candidate.print_all_info, CAND_LIST_PAGE_NAME, which_types
+                )
             case "-close":
-                if delist:
-                    out("Closing delist candidates...", heading=True)
-                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=True)
-                if fpc:
-                    out("Closing FP candidates...", heading=True)
-                    check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, delist=False)
+                out("Closing finished candidates...", heading=True)
+                check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, which_types)
             case "-park":
                 if _g_threads and _g_auto:
                     warn("Auto-parking using threads is disabled for now...")
                     sys.exit()
-                if delist:
-                    out("Parking delist candidates...", heading=True)
-                    check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, delist=True)
-                if fpc:
-                    out("Parking FP candidates...", heading=True)
-                    check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, delist=False)
+                out("Parking finished candidates...", heading=True)
+                check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, which_types)
             case _:
                 # This means we have forgotten to update the invalid_args test.
                 error(f"Error - unknown argument '{arg}'; aborting, see '-help'.")
