@@ -497,6 +497,7 @@ class ThreadCheckCandidate(threading.Thread):
     def run(self) -> None:
         """Execute the desired task for the candidate."""
         self._check(self._candidate)
+        self._candidate.clear_cache()
 
 
 class Candidate(abc.ABC):
@@ -618,6 +619,11 @@ class Candidate(abc.ABC):
 
     def reset_filtered_content(self) -> None:
         """Flag filtered content as outdated after changing page contents."""
+        self._filtered_content = None
+
+    def clear_cache(self) -> None:
+        """Clear cached page contents."""
+        self._page.clear_cache()
         self._filtered_content = None
 
     def creator(self, link: bool) -> str:
@@ -3135,6 +3141,7 @@ def check_candidates(
                 thread.start()
             else:
                 check(candidate)
+                candidate.clear_cache()
         except pywikibot.exceptions.NoPageError as exc:
             error(f"Error - no such page: '{exc}'")
             ask_for_help(
