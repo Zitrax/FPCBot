@@ -54,7 +54,6 @@ import traceback
 
 # Third-party imports
 import pywikibot
-from pywikibot import config
 
 
 # CONSTANTS
@@ -3135,7 +3134,7 @@ def check_candidates(
 
         try:
             if _g_threads:
-                while threading.active_count() >= config.max_external_links:
+                while threading.active_count() >= pywikibot.config.max_external_links:
                     time.sleep(0.1)
                 thread = ThreadCheckCandidate(candidate, check)
                 thread.start()
