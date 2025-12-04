@@ -3594,16 +3594,7 @@ def main(*args: str) -> None:
     in this case pass strings with the same values as the CLI arguments,
     then the '*args' packs all these values into a single tuple.
     """
-    global _g_auto
-    global _g_dry
-    global _g_threads
-    global _g_log_no_time
-    global _g_match_pattern
     global _g_site
-
-    # Define default values
-    fpc = delist = False
-    task_args = []
 
     # Acquire CLI arguments, let Pywikibot handle the global arguments
     # (including '-help') and get the rest as a simple list
@@ -3617,7 +3608,29 @@ def main(*args: str) -> None:
     # Pywikibot can create the site object only after handling the arguments
     _g_site = pywikibot.Site()
 
+    # Inspect local arguments and perform the desired task(s)
+    task_args, which_types = _inspect_local_arguments(local_args)
+    for task in task_args:
+        _handle_task(task, which_types)
+    out("Done.", heading=True)
+
+
+def _inspect_local_arguments(
+    local_args: list[str]
+) -> tuple[list[str], CandidateTypesToProcess]:
+    """Derive desired task(s) and options from the local arguments."""
+    global _g_auto
+    global _g_dry
+    global _g_threads
+    global _g_log_no_time
+    global _g_match_pattern
+
+    # Define default values
+    fpc = delist = False
+    task_args = []
+
     # First look for arguments which act as options for all tasks
+    # and extract the task arguments, keeping them in the desired order
     i = 0
     while i < len(local_args):
         arg = local_args[i]
@@ -3656,7 +3669,7 @@ def main(*args: str) -> None:
         error("Error - '-threads' must be used with '-dry' or '-auto'.")
         sys.exit()
 
-    # Check task arguments
+    # Check the task arguments
     if not task_args:
         error(
             "Error - you need to specify at least one task "
@@ -3664,41 +3677,42 @@ def main(*args: str) -> None:
         )
         sys.exit()
     if invalid_args := set(task_args) - {"-test", "-info", "-close", "-park"}:
-        # To present a helpful error message, abort before handling even
+        # To provide a helpful error message, abort before handling even
         # the first argument and report all invalid arguments at once.
         formatted = ", ".join(f"'{arg}'" for arg in sorted(invalid_args))
         error(f"Error - unknown argument(s) {formatted}; aborting, see '-help'.")
         sys.exit()
 
-    # Call the appropriate functions to perform the desired tasks
-    for arg in task_args:
-        match arg:
-            case "-test":
-                out("Recounting votes for testing...", heading=True)
-                check_candidates(
-                    Candidate.compare_result_to_count,
-                    TEST_LOG_PAGE_NAME,
-                    which_types,
-                    descending=False,
-                )
-            case "-info":
-                out("Gathering information about candidates...", heading=True)
-                check_candidates(
-                    Candidate.print_all_info, CAND_LIST_PAGE_NAME, which_types
-                )
-            case "-close":
-                out("Closing finished candidates...", heading=True)
-                check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, which_types)
-            case "-park":
-                if _g_threads and _g_auto:
-                    warn("Auto-parking using threads is disabled for now...")
-                    sys.exit()
-                out("Parking finished candidates...", heading=True)
-                check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, which_types)
-            case _:
-                # This means we have forgotten to update the invalid_args test.
-                error(f"Error - unknown argument '{arg}'; aborting, see '-help'.")
+    return (task_args, which_types)
+
+
+def _handle_task(task: str, which_types: CandidateTypesToProcess) -> None:
+    """Perform the desired task for all concerned nominations."""
+    match task:
+        case "-test":
+            out("Recounting votes for testing...", heading=True)
+            check_candidates(
+                Candidate.compare_result_to_count,
+                TEST_LOG_PAGE_NAME,
+                which_types,
+                descending=False,
+            )
+        case "-info":
+            out("Gathering information about candidates...", heading=True)
+            check_candidates(Candidate.print_all_info, CAND_LIST_PAGE_NAME, which_types)
+        case "-close":
+            out("Closing finished candidates...", heading=True)
+            check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, which_types)
+        case "-park":
+            if _g_threads and _g_auto:
+                warn("Auto-parking using threads is disabled for now...")
                 sys.exit()
+            out("Parking finished candidates...", heading=True)
+            check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, which_types)
+        case _:
+            # This means we have forgotten to update the invalid_args test.
+            error(f"Error - unknown argument '{task}'; aborting, see '-help'.")
+            sys.exit()
 
 
 def signal_handler(signal_number: int, frame: FrameType | None) -> None:
