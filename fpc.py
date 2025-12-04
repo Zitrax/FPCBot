@@ -3163,24 +3163,7 @@ def check_candidates(
                 f"because that page is locked: {format_exception(exc)}. "
                 f"{SERIOUS_PROBLEM_CHECK_PAGE}"
             )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            # Report exception with stack trace on the FPC talk page
-            stack_trace = traceback.format_exc().rstrip()
-            stack_trace = re.sub(  # Abbreviate file paths to filenames
-                r'(File ").+?/([^/\n]+\.py")', r"\1\2", stack_trace
-            )
-            try:
-                subpage_link = f"[[{candidate.page.title()}]]"
-            except Exception:  # pylint: disable=broad-exception-caught
-                subpage_link = f"the invalid nomination no. {i}"
-            ask_for_help(
-                f"The bot has stopped at {subpage_link} "
-                "because of an uncaught exception:\n"
-                f"<pre>{stack_trace}</pre>\n"
-                "Developers, please look into this."
-            )
-            # Raise the exception again to enable normal error logging
-            raise exc
+        # These exceptions just stop the candidate, continue with the next one.
         if _g_abort:
             break
 
@@ -3617,9 +3600,24 @@ def main(*args: str) -> None:
     _g_site = pywikibot.Site()
 
     # Inspect local arguments and perform the desired task(s)
-    task_args, which_types = _inspect_local_arguments(local_args)
-    for task in task_args:
-        _handle_task(task, which_types)
+    try:
+        task_args, which_types = _inspect_local_arguments(local_args)
+        for task in task_args:
+            _handle_task(task, which_types)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # 'Last resort' exception handler:
+        # report exception with stack trace on the FPC talk page
+        stack_trace = traceback.format_exc().rstrip()
+        stack_trace = re.sub(  # Abbreviate file paths to filenames
+            r'(File ").+?/([^/\n]+\.py")', r"\1\2", stack_trace
+        )
+        ask_for_help(
+            "The bot has stopped because of an uncaught exception: "
+            f"{format_exception(exc)}. Abbreviated stack trace:\n"
+            f"<pre>{stack_trace}</pre>\n"
+            "Developers, please look into this."
+        )
+        raise exc  # Stop the bot and enable full error logging.
     out("Done.", heading=True)
 
 
