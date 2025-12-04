@@ -3131,7 +3131,6 @@ def check_candidates(
     for i, candidate in enumerate(candidates, start=1):
         if not _g_threads:
             out(f"({i:03d}/{total:03d}) ", newline=False, date=True)
-
         try:
             if _g_threads:
                 while threading.active_count() >= pywikibot.config.max_external_links:
@@ -3144,15 +3143,25 @@ def check_candidates(
         except pywikibot.exceptions.NoPageError as exc:
             error(f"Error - no such page: '{exc}'")
             ask_for_help(
-                "The bot could not find a page (perhaps it has been renamed "
+                f"During the processing of [[{candidate.page.title()}]], "
+                "the bot could not find a page (perhaps it has been renamed "
                 f"without leaving a redirect): {format_exception(exc)}. "
                 f"{SERIOUS_PROBLEM_CHECK_PAGE}"
+            )
+        except pywikibot.exceptions.IsRedirectPageError as exc:
+            error(f"Error - unexpected redirect: '{exc}'")
+            ask_for_help(
+                f"During the processing of [[{candidate.page.title()}]], "
+                "the bot found that a page contains an unexpected redirect: "
+                f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
             )
         except pywikibot.exceptions.LockedPageError as exc:
             error(f"Error - page is locked: '{exc}'")
             ask_for_help(
-                "The bot could not edit a page because it is locked: "
-                f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
+                f"During the processing of [[{candidate.page.title()}]], "
+                "the bot could not save changes to the text of a page "
+                f"because that page is locked: {format_exception(exc)}. "
+                f"{SERIOUS_PROBLEM_CHECK_PAGE}"
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
             # Report exception with stack trace on the FPC talk page
@@ -3172,7 +3181,6 @@ def check_candidates(
             )
             # Raise the exception again to enable normal error logging
             raise exc
-
         if _g_abort:
             break
 
