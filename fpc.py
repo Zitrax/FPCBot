@@ -3112,8 +3112,6 @@ def check_candidates(
     if _g_site is None:  # Test is also necessary to help typecheckers.
         error("Fatal error - _g_site not initialized, call main() first.")
         return
-    if not _g_site.logged_in():
-        _g_site.login()
 
     # Find all current candidates
     candidates = find_candidates(list_page_name, which_types)
@@ -3598,6 +3596,8 @@ def main(*args: str) -> None:
 
     # Pywikibot can create the site object only after handling the arguments
     _g_site = pywikibot.Site()
+    if not _g_site.logged_in():
+        _g_site.login()
 
     # Inspect local arguments and perform the desired task(s)
     try:
