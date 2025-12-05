@@ -2050,16 +2050,17 @@ class FPCandidate(Candidate):
                     r"\n== *\{\{ *int:license-header *\}\} *==", old_text
                 ):
                     end = match.start(0)
+                elif template_pos := find_template_pos(
+                    old_text, r"(?:[Oo]bject[ _])?[Ll]ocation(?:[ _]dec)?"
+                ):
+                    end = template_pos.stop
+                elif template_pos := find_template_pos(
+                    old_text,
+                    r"[Ii]nformation|[Aa]rtwork|[Pp]hotograph|[Aa]rt[ _][Pp]hoto",
+                ):
+                    end = template_pos.stop
                 else:
-                    end = find_end_of_template(
-                        old_text, r"(?:[Oo]bject[ _])?[Ll]ocation(?:[ _]dec)?"
-                    )
-                    if not end:
-                        end = find_end_of_template(
-                            old_text,
-                            r"[Ii]nformation|[Aa]rtwork"
-                            r"|[Pp]hotograph|[Aa]rt[ _][Pp]hoto",
-                        )
+                    end = 0
                 if end:
                     # Use no empty line before, 1 empty line after the template
                     new_text = (
@@ -3319,10 +3320,13 @@ def oldest_revision_user(page: pywikibot.Page) -> str:
         return ""
 
 
-def find_end_of_template(text: str, template_names: str) -> int:
+def find_template_pos(
+    text: str,
+    template_names: str,
+    pos: int = 0,
+) -> slice | None:
     """
-    Search for the end of a template.  Returns the position of the first
-    character after the template, or 0 if the template is not found.
+    Search for a template to find its start and stop character indices.
     We use a specific function because normal regexes as supported by
     Python's 're' module can't properly deal with nested templates.
 
@@ -3330,10 +3334,19 @@ def find_end_of_template(text: str, template_names: str) -> int:
     @param template_names String with the allowed template name(s);
     handled as a regex fragment, so you can supply several names
     by separating them with '|' or by using '(?:...)?', etc.
+    @param pos            Optional: Start position of the search.
+    This allows you to search for the next template instance etc.
+
+    Returns:
+    A slice with the positions of the first character of the template
+    as start and the position of the first character after the template
+    as stop value; or None if no template was found.
     """
-    match = re.search(r"(\{\{\s*" + template_names + r"\s*)[|{}]", text)
+    # NB: we need parens around template_names because it may contain '|'.
+    pattern = re.compile(r"(\{\{\s*(?:" + template_names + r")\s*)[|{}]")
+    match = pattern.search(text, pos=pos)
     if not match:
-        return 0
+        return None
     lvl = 0
     cp = match.end(1)
 
@@ -3343,18 +3356,18 @@ def find_end_of_template(text: str, template_names: str) -> int:
 
         # If we see no end tag, we give up
         if ne == -1:
-            return 0
+            return None
 
         # Handle case when there are no more start tags
         if ns == -1:
             if not lvl:
-                return ne + 2
+                return slice(match.start(0), ne + 2)
             else:
                 lvl -= 1
                 cp = ne + 2
 
         elif not lvl and ne < ns:
-            return ne + 2
+            return slice(match.start(0), ne + 2)
         elif ne < ns:
             lvl -= 1
             cp = ne + 2
@@ -3362,7 +3375,7 @@ def find_end_of_template(text: str, template_names: str) -> int:
             lvl += 1
             cp = ns + 2
     # Apparently we never found it
-    return 0
+    return None
 
 
 def update_assessments_template(
