@@ -3173,16 +3173,17 @@ def filter_content(text: str) -> str:
     when counting votes etc.
 
     Currently this includes:
-    * the <s> tag for striking out votes
+    * comments
+    * the <s>, <strike>, <del> tags for striking out text
     * the <nowiki> tag which is just for displaying syntax
     * image notes
     * collapse boxes
-    * comments
     """
-    text = strip_tag(text, "[Ss]")
-    text = strip_tag(text, "[Nn]owiki")
-    text = strip_tag(text, "[Ss]trike")
-    text = strip_tag(text, "[Dd]el")
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    text = strip_tag(text, "s")
+    text = strip_tag(text, "strike")
+    text = strip_tag(text, "del")
+    text = strip_tag(text, "nowiki")
     text = re.sub(
         r"\{\{\s*[Ii]mageNote\s*\|.*?\}\}.*?\{\{\s*[iI]mageNoteEnd.*?\}\}",
         "",
@@ -3196,13 +3197,17 @@ def filter_content(text: str) -> str:
         text,
         flags=re.DOTALL,
     )
-    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     return text
 
 
 def strip_tag(text: str, tag: str) -> str:
-    """Will simply take a tag and remove a specified tag."""
-    return re.sub(r"(?s)<%s>.*?</%s>" % (tag, tag), "", text)
+    """Remove all instances of a HTML tag (incl. contents) from the text."""
+    return re.sub(
+        r"<%s(?:\s[^>]*)?>.*?</%s\s*>" % (tag, tag),
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
 
 
 def clean_gallery_link(gallery_link: str) -> str:
