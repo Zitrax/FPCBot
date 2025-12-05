@@ -3181,10 +3181,7 @@ def filter_content(text: str) -> str:
     * collapse boxes
     """
     text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
-    text = strip_tag(text, "s")
-    text = strip_tag(text, "strike")
-    text = strip_tag(text, "del")
-    text = strip_tag(text, "nowiki")
+    text = strip_tags(text, r"s(?:trike)?|del|nowiki")
     text = strip_templates(text, r"[Ss]trikethrough")
     text = re.sub(
         r"\{\{\s*[Ii]mageNote\s*\|.*?\}\}.*?\{\{\s*[iI]mageNoteEnd.*?\}\}",
@@ -3202,10 +3199,17 @@ def filter_content(text: str) -> str:
     return text
 
 
-def strip_tag(text: str, tag: str) -> str:
-    """Remove all instances of a HTML tag (incl. contents) from the text."""
+def strip_tags(text: str, tags: str) -> str:
+    """
+    Remove all instances of HTML tag(s) (incl. contents) from the text.
+
+    @param text Wikitext of the page you want to filter.
+    @param tags String with the allowed tag name(s);
+    handled as a regex fragment, so you can supply several names
+    by separating them with '|' or by using '(?:...)?', etc.
+    """
     return re.sub(
-        r"<%s(?:\s[^>]*)?>.*?</%s\s*>" % (tag, tag),
+        "<(" + tags + r")(?:\s[^>]*)?>.*?</\1\s*>",
         "",
         text,
         flags=re.DOTALL | re.IGNORECASE,
