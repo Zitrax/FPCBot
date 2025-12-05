@@ -3176,6 +3176,7 @@ def filter_content(text: str) -> str:
     * comments
     * the <s>, <strike>, <del> tags for striking out text
     * the <nowiki> tag which is just for displaying syntax
+    * the {{Strikethrough|...}} template
     * image notes
     * collapse boxes
     """
@@ -3184,6 +3185,7 @@ def filter_content(text: str) -> str:
     text = strip_tag(text, "strike")
     text = strip_tag(text, "del")
     text = strip_tag(text, "nowiki")
+    text = strip_templates(text, r"[Ss]trikethrough")
     text = re.sub(
         r"\{\{\s*[Ii]mageNote\s*\|.*?\}\}.*?\{\{\s*[iI]mageNoteEnd.*?\}\}",
         "",
@@ -3208,6 +3210,22 @@ def strip_tag(text: str, tag: str) -> str:
         text,
         flags=re.DOTALL | re.IGNORECASE,
     )
+
+
+def strip_templates(text: str, template_names: str) -> str:
+    """
+    Remove all instances of the specified template(s) from the text.
+
+    @param text           Wikitext of the page you want to filter.
+    @param template_names String with the allowed template name(s);
+    handled as a regex fragment, so you can supply several names
+    by separating them with '|' or by using '(?:...)?', etc.
+    """
+    pos = 0
+    while tmpl_pos := find_template_pos(text, template_names, pos):
+        text = f"{text[:tmpl_pos.start]}{text[tmpl_pos.stop:]}"
+        pos = tmpl_pos.start
+    return text
 
 
 def clean_gallery_link(gallery_link: str) -> str:
