@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""
-This script runs as FPCBot on Wikimedia Commons.
+"""This script runs as FPCBot on Wikimedia Commons.
+
 It counts the votes in featured picture nominations,
 closes and archives finished nominations,
-informs uploaders and nominators about the success
-and adds newly promoted featured pictures to the gallery pages.
+adds freshly promoted featured pictures to the gallery pages,
+and informs uploaders and nominators about the success.
+It also processes delisting nominations.
 
 Programmed by Daniel78 at Commons.
+Updated by Eatcha, KTC, Aristeas and other Commons users.
 
-The script is based on Pywikibot.  Therefore you can use it with
-Pywikibot options (so-called global options); to list them,
-use '-help:global' or run 'pwb.py -help'.
+The script is based on Pywikibot.  Therefore you can use it
+with Pywikibot options (so-called global options);
+to list them, use '-help:global' or run 'pwb.py -help'.
 
 In addition, the script understands the following
 command line arguments for tasks and (local) options:
@@ -25,16 +27,16 @@ Tasks:
 
 Options:
 
--auto           Do not ask before commiting edits to articles.
--dry            Do not submit any edits, just print them.
+-auto           Do not ask before committing edits to pages.
+-dry            Do not commit any edits, just print them.
 -threads        Use threads to speed things up
                 (must be used with '-auto' and/or '-dry').
--fpc            Handle the featured candidates (if neither -fpc
-                nor -delist is used all candidates are handled).
--delist         Handle the delisting candidates (if neither -fpc
-                nor -delist is used all candidates are handled).
+-fpc            Process featured picture candidates (if neither '-fpc'
+                nor '-delist' is used all candidates are processed).
+-delist         Process delisting candidates (if neither '-fpc'
+                nor '-delist' is used all candidates are processed).
 -notime         Avoid displaying timestamps in log output.
--match pattern  Only operate on candidates matching this pattern.
+-match pattern  Only operate on nominations matching this pattern.
 """
 
 # Standard library imports
@@ -429,8 +431,8 @@ _g_log_part_no: int | None = None
 # CLASSES
 
 class DataAlreadyPresentError(Exception):
-    """
-    The data we wanted to add is already present on the page.
+    """The data we wanted to add are already present on the page.
+
     This can happen if the process has previously been interrupted.
     """
     pass
@@ -442,7 +444,14 @@ class CouldNotAddDataError(Exception):
 
 
 class CandidateTypesToProcess(NamedTuple):
-    """Class keeping track of the types of nominations we want to process."""
+    """Class keeping track of the types of nominations we want to process.
+
+    Attributes:
+        fp: Boolean indicating whether to process FP candidates or not.
+        delist: Boolean indicating whether to process delisting candidates.
+    """
+
+    # Declare types of instance variables
     fp: bool
     delist: bool
 
@@ -471,10 +480,7 @@ class CandidateTypesToProcess(NamedTuple):
 
 
 class ThreadCheckCandidate(threading.Thread):
-    """
-    A simple thread subclass representing and handling the execution
-    of one of the bot's task on a certain candidate (nomination).
-    """
+    """A thread executing one of the bot's task on a single candidate."""
 
     # Declare types of instance variables
     _candidate: Candidate  # The candidate/nomination handled in this thread
@@ -500,10 +506,10 @@ class ThreadCheckCandidate(threading.Thread):
 
 
 class Candidate(abc.ABC):
-    """
-    Abstract base class for featured picture candidates/nominations,
-    bundles all common properties and methods.
-    The individual candidates/nominations are represented by instances
+    """A featured picture candidate (nomination).
+
+    This abstract base class bundles all common attributes and methods.
+    All individual candidates (nominations) are represented by instances
     of the concrete subclasses.
     """
 
@@ -1593,7 +1599,11 @@ class Candidate(abc.ABC):
 
 
 class FPCandidate(Candidate):
-    """A candidate up for promotion."""
+    """A featured picture candidate.
+
+    Each instance of this class represents a featured picture nomination;
+    the class is used both for single-file and set nominations.
+    """
 
     # Define class constants:
     # all class constants are inherited, no changes necessary.
@@ -2546,7 +2556,12 @@ class FPCandidate(Candidate):
 
 
 class DelistCandidate(Candidate):
-    """A delisting candidate."""
+    """A delisting candidate.
+
+    Each instance of this class represents a delisting nomination.
+    NB: The class handles only the delisting of individual FPs,
+    set delisting nominations will be implemented soon.
+    """
 
     # Define class constants
     # Adapt values for the needs of this class:
@@ -2903,7 +2918,6 @@ def find_candidates(
     with closed nominations.
     The list retains the original order of entries and omits damaged links.
     If we find redirects to renamed nomination subpages, they are resolved
-    (so the returned candidate objects point to the actual nominations)
     and the page with the list of candidates is updated.
 
     @param list_page_name: The name either of the page with the list
