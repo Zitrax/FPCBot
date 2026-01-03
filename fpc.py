@@ -2852,10 +2852,16 @@ class DelistCandidate(Candidate):
 # FUNCTIONS
 
 def wikipattern(text: str) -> str:
-    """
-    Prepares a filename, page name etc. so that it can be used in a regex
-    and that spaces and underscores are handled as interchangeable,
-    as usual in MediaWiki filenames, page names etc.
+    """Prepare a filename, page name etc. for the use in a regex.
+
+    Args:
+        text: A short wikitext string, typically a filename or page name.
+
+    Returns:
+        A copy of the string in which all characters that have a special
+        regex meaning have been escaped, and in which spaces and underscores
+        are treated as interchangeable, as usual in MediaWiki filenames,
+        page names, etc.
     """
     return re.sub(r"(?:\\ |_)", r"[ _]", re.escape(text))
 
@@ -2871,7 +2877,15 @@ def out(
     date: bool = False,
     heading: bool = False,
 ) -> None:
-    """Output information or status messages to the console or log."""
+    """Output information or status messages to the console or log.
+
+    Args:
+        text: The message that should be printed or logged.
+        newline: Whether to end the line after the message or not.
+        date: Whether to output date and time before the message or not.
+        heading: Whether this is a heading or other emphasized text, or not;
+            emphasized text is printed to the console in blue.
+    """
     if heading:
         text = f"<<lightblue>>{text}<<default>>"
     dstr = (
@@ -2883,28 +2897,37 @@ def out(
 
 
 def warn(text: str, newline: bool = True) -> None:
-    """
-    Output a warning to the console or log.  We use this if something
-    does not work as expected, but it's probably not necessary to take action.
+    """Output a warning to the console or log.
 
-    TODO: Consider to use pywikibot.warning() instead of pywikibot.stdout(),
-    but first clarify whether any log settings need to be be changed
-    on the server then.
+    Use this if something does not work as expected, but it is probably
+    not necessary to take action.
+    The text of the warning is printed to the console in yellow.
+
+    Args:
+        text: The warning that should be printed or logged.
+        newline: Whether to end the line after the warning or not.
     """
+    # TODO: Consider to use pywikibot.warning() instead of pywikibot.stdout(),
+    # but first clarify whether any log settings need to be be changed
+    # on the server then.
     pywikibot.stdout(f"<<lightyellow>>{text}<<default>>", newline=newline)
 
 
 def error(text: str, newline: bool = True) -> None:
-    """
-    Output an error message to the console or log.  We use this
-    if something does not work and it's probably necessary to take action,
-    e.g. to fix the wikitext of a nomination or gallery page, etc.,
-    or to improve the code of the bot program.
+    """Output an error message to the console or log.
 
-    TODO: Consider to use pywikibot.error() instead of pywikibot.stdout(),
-    but first clarify whether any log settings need to be be changed
-    on the server then.
+    Use this if something does not work and it is probably necessary
+    to take action, e.g. to fix the wikitext of a nomination or page,
+    or to improve the code of the bot program.
+    The text of the error message is printed to the console in red.
+
+    Args:
+        text: The error message that should be printed or logged.
+        newline: Whether to end the line after the message or not.
     """
+    # TODO: Consider to use pywikibot.error() instead of pywikibot.stdout(),
+    # but first clarify whether any log settings need to be be changed
+    # on the server then.
     pywikibot.stdout(f"<<lightred>>{text}<<default>>", newline=newline)
 
 
@@ -2912,18 +2935,23 @@ def find_candidates(
     list_page_name: str,
     which_types: CandidateTypesToProcess,
 ) -> list[Candidate]:
-    """
-    Returns a list with candidate objects for all nomination subpages,
-    either from the page with the current candidates or from a log page
-    with closed nominations.
-    The list retains the original order of entries and omits damaged links.
+    """Build a list with candidate objects for all nominations.
+
+    The list is based either on the FPC list page with the current candidates
+    or on a log page with closed nominations.
+    It retains the original order of entries and omits faulty entries.
     If we find redirects to renamed nomination subpages, they are resolved
+    (so the candidate objects point to the actual nominations),
     and the page with the list of candidates is updated.
 
-    @param list_page_name: The name either of the page with the list
-         of current candidates or of the log page that we want to check.
-    @param which_types: A CandidateTypesToProcess object, specifying
-        which types of nominations we should process.
+    Args:
+        list_page_name: Name of the page on Commons which lists
+            the candidates (technically: transcludes the nomination subpages).
+        which_types: A CandidateTypesToProcess object, specifying
+            which types of nominations we should process.
+
+    Returns:
+        A list of Candidate objects, in the same order as on the list page.
     """
     # Extract nomination subpage names
     out(f"Extracting {which_types.describe()}, checking for redirects...")
@@ -3001,11 +3029,24 @@ def _resolve_nomination_subpage_redirect(
     subpage: pywikibot.Page,
     redirects: list[tuple[str, str]],
 ) -> pywikibot.Page | None:
-    """Check if a nomination subpage contains a redirect and try to resolve it.
+    """Check if a nomination subpage is a redirect and try to resolve it.
+
+    Sometimes nomination subpages are renamed, leaving a redirect which is
+    still listed (transcluded) in the list of candidates.  We have to deal
+    with the nomination subpage of every candidate several times,
+    therefore we try to find and resolve all such redirects right at the
+    beginning of each bot run when we read the list of candidates.
+
+    Args:
+        subpage: A pywikibot.Page object for the nomination subpage.
+        redirects: This list is used to collect all resolved redirects.
+            If the page is found to be redirect that can be resolved,
+            the function appends a tuple with the old and the new page name
+            to this list.
 
     Returns:
-    If successful, a pywikibot.Page object of the real nomination subpage;
-    if an error occurs, returns None.
+        If successful, a pywikibot.Page object for the real nomination
+        subpage; if an error occurs, just None.
     """
     if subpage.isRedirectPage():
         old_name = subpage.title()
@@ -3029,13 +3070,21 @@ def _rename_nomination_subpage_with_bad_title(
     subpage: pywikibot.Page,
     redirects: list[tuple[str, str]],
 ) -> pywikibot.Page | None:
-    """Check if a nomination subpage has a bad title which causes problems.
-    If yes, try to rename the subpage; if we cannot remedy the problem,
-    report it on the FPC talk page.
+    """Rename nomination subpages with problematic titles.
+
+    The function checks if a nomination subpage has a bad title which can
+    cause problems.  If yes, it tries to rename that subpage; if this is
+    not possible, it reports the problem on the FPC talk page.
+
+    Args:
+        subpage: A pywikibot.Page object for the nomination subpage.
+        redirects: This list is used to collect all resolved redirects.
+            If the page gets renamed, the function appends a tuple
+            with the old and the new page name to this list.
 
     Returns:
-    If successful, a pywikibot.Page object with the renamed subpage;
-    if an error occurs, returns None.
+        If successful, a pywikibot.Page object for the renamed subpage;
+        if an error occurs, returns None.
     """
     old_name = subpage.title()
     # Check for invalid names which do not start with the obligatory prefix
@@ -3110,19 +3159,19 @@ def check_candidates(
     which_types: CandidateTypesToProcess,
     descending: bool = True,
 ) -> None:
-    """
-    Calls a function on each candidate found on the specified page.
+    """Call a function on each nomination found in the list of candidates.
 
-    @param check: A method of the Candidate class which should be called
-        on each candidate.
-    @param list_page_name: The name of the page which includes all nominations;
-        i.e. either the page with the list of current candidates
-        or a log page that we want to check for test purposes.
-    @param which_types: A CandidateTypesToProcess object, specifying
-        which types of nominations we should process.
-    @param descending: Specify True if the page puts the newest entries first,
-        False if it runs from the oldest to the newest entry.
-        So we can always handle the candidates in chronological order.
+    Args:
+        check: A method of the Candidate class which should be called
+            on each candidate.
+        list_page_name: The name of the page which includes all nominations;
+            i.e. either the page with the list of current candidates
+            or a log page that we want to check for test purposes.
+        which_types: A CandidateTypesToProcess object, specifying
+            which types of nominations we should process.
+        descending: Specify True if the page puts the newest entries first,
+            False if it runs from the oldest to the newest entry.
+            So we can always handle the candidates in chronological order.
     """
     if _g_site is None:  # Test is also necessary to help typecheckers.
         error("Fatal error - _g_site not initialized, call main() first.")
@@ -3182,9 +3231,7 @@ def check_candidates(
 
 
 def filter_content(text: str) -> str:
-    """
-    Filter out all content that should not be taken into account
-    when counting votes etc.
+    """Filter out content that must be ignored when counting votes etc.
 
     Currently this includes:
     * comments
@@ -3193,6 +3240,12 @@ def filter_content(text: str) -> str:
     * the {{Strikethrough|...}} template
     * image notes
     * collapse boxes
+
+    Args:
+        text: The wikitext string that should be filtered.
+
+    Returns:
+        The filtered text.
     """
     text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     text = strip_tags(text, r"s(?:trike)?|del|nowiki")
@@ -3214,13 +3267,16 @@ def filter_content(text: str) -> str:
 
 
 def strip_tags(text: str, tags: str) -> str:
-    """
-    Remove all instances of HTML tag(s) (incl. contents) from the text.
+    """Remove all instances of some HTML tag(s) (incl. contents) from the text.
 
-    @param text Wikitext of the page you want to filter.
-    @param tags String with the allowed tag name(s);
-    handled as a regex fragment, so you can supply several names
-    by separating them with '|' or by using '(?:...)?', etc.
+    Args:
+        text: The wikitext you want to free from the HTML tag(s).
+        tags: String with the name(s) of the HTML tags you want to remove;
+            handled as a regex fragment, so you can supply several names
+            by separating them with '|' or by using '(?:...)?', etc.
+
+    Returns:
+        The filtered text.
     """
     return re.sub(
         "<(" + tags + r")(?:\s[^>]*)?>.*?</\1\s*>",
@@ -3231,13 +3287,16 @@ def strip_tags(text: str, tags: str) -> str:
 
 
 def strip_templates(text: str, template_names: str) -> str:
-    """
-    Remove all instances of the specified template(s) from the text.
+    """Remove all instances of the specified template(s) from the text.
 
-    @param text           Wikitext of the page you want to filter.
-    @param template_names String with the allowed template name(s);
-    handled as a regex fragment, so you can supply several names
-    by separating them with '|' or by using '(?:...)?', etc.
+    Args:
+        text: The wikitext you want to free from the template(s).
+        template_names: String with the names of the template(s) to remove;
+            handled as a regex fragment, so you can supply several names
+            by separating them with '|' or by using '(?:...)?', etc.
+
+    Returns:
+        The filtered text.
     """
     pos = 0
     while tmpl_pos := find_template_pos(text, template_names, pos):
@@ -3247,12 +3306,21 @@ def strip_templates(text: str, template_names: str) -> str:
 
 
 def clean_gallery_link(gallery_link: str) -> str:
-    """
-    Clean the gallery link: replace underscores and non-breaking spaces
-    by plain spaces (underscores are present if users just copy the link,
-    a NBSP can be entered by accident with some keyboard settings),
-    replace double spaces by a single one, remove leading/trailing whitespace,
-    and replace %-encoded characters by their plain text counterparts.
+    """Clean and polish a gallery link.
+
+    The function
+    * replaces underscores and non-breaking spaces by plain spaces
+      (underscores are present if users just copy the link,
+      a NBSP can be entered by accident with some keyboard settings);
+    * replaces double spaces by a single one;
+    * removes leading/trailing whitespace;
+    * replaces %-encoded characters by their plain text counterparts.
+
+    Args:
+        gallery_link: The gallery link from the nomination.
+
+    Returns:
+        The polished gallery link.
     """
     link = re.sub(r"[ _\u00A0]+", " ", gallery_link).strip()
     if "%" in link:
@@ -3265,9 +3333,15 @@ def clean_gallery_link(gallery_link: str) -> str:
 
 
 def bare_filename(filename: str) -> str:
-    """
-    Returns the bare filename without 'File:' prefix and w/o file extension.
-    Useful for labels, image captions, etc.
+    """Return the bare filename without 'File:' prefix and file extension.
+
+    This is useful for labels, image captions, etc.
+
+    Args:
+        filename: The name of a file on Commons, e.g. 'File:Test 1.jpg'.
+
+    Returns:
+        The bare name of that file, e.g. 'Test 1'.
     """
     return re.sub(
         r"^(?:[Ff]ile|[Ii]mage):(.+?)\.\w{2,4}$",
@@ -3276,9 +3350,15 @@ def bare_filename(filename: str) -> str:
         count=1,
     ).strip()
 
-
 def is_just_thumbnail(image_link: str) -> bool:
-    """Is the image link from a nomination subpage just a thumbnail or icon?"""
+    """Find out if a wikitext image link is just a thumbnail or icon.
+
+    Args:
+        image_link: A wikitext image link, e.g. '[[File:Test.jpg|thumb]]'.
+
+    Returns:
+        True if the link represents just a thumbnail or icon, else False.
+    """
     if IMAGE_THUMB_REGEX.search(image_link):
         return True
     size = IMAGE_SIZE_REGEX.search(image_link)
@@ -3288,31 +3368,34 @@ def is_just_thumbnail(image_link: str) -> bool:
 
 
 def yes_no(value: bool) -> str:
-    """Translates a boolean value to 'yes' and 'no' resp."""
+    """Translate a boolean value to 'yes' and 'no' resp."""
     return "yes" if value else "no"
 
 
 def y_n(value: bool) -> str:
-    """Translates a boolean value to 'Y' and 'N' resp., for use in tables."""
+    """Translate a boolean value to 'Y' and 'N' resp., for use in tables."""
     return "Y" if value else "N"
 
 
 def user_page_link(username: str) -> str:
-    """Returns a link to the user page of the user."""
+    """Build a link to the user page of the specified user."""
     return f"[[{USER_NAMESPACE}{username}|{username}]]"
 
 
 def is_same_user(username_1: str, username_2: str) -> bool:
-    """
-    Are the two usernames effectively identical?
+    """Find out if two usernames are effectively identical.
 
-    The Mediawiki software handles the first character of page names
+    The MediaWiki software handles the first character of page names
     and user names (after the namespace prefix) case-insensitively,
     but the remaining characters case-sensitively.  We must imitate
-    this behaviour in order to compare usernames accurately.
+    that behaviour in order to compare usernames accurately.
 
-    @param username_1: string with first username.
-    @param username_2: string with second username.
+    Args:
+        username_1: The first username.
+        username_2: The second username.
+
+    Returns:
+        True if the two usernames are effectively identical, else False.
     """
     return (
         username_1[0].upper() == username_2[0].upper()
@@ -3321,23 +3404,36 @@ def is_same_user(username_1: str, username_2: str) -> bool:
 
 
 def build_log_page_name(month_name: str, year: int, part: int) -> str:
-    """Assemble the page name of a FPC log page."""
+    """Assemble the page name of a FPC log page.
+
+    Args:
+        month_name: The English name of a month, e.g. 'January'.
+        year: The year as an integer, e.g. 2025.
+        part: The current part of the monthly log, e.g. 1, 2, 3 ...
+
+    Returns:
+        The full page name of the current log page part,
+        e.g. 'Commons:Featured picture candidates/Log/January 2025-1'.
+    """
     return f"{CAND_LOG_PREFIX}{month_name} {year}-{part}"
 
 
 def format_exception(exc: Exception) -> str:
     """Format an exception nicely in order to use it in requests for help."""
-    # Pywikibot exception messages often (but not always) end with '.'
+    # Pywikibot exception messages often (but not always) end with '.',
+    # therefore we remove any trailing period to allow us to integrate
+    # the message nicely into a full sentence.
     message = str(exc).strip().rstrip(".")
     name = type(exc).__name__
     return f"''{message}'' (<code>{name}</code>)"
 
 
 def is_fp_assessment_claim(claim: pywikibot.page.Claim) -> bool:
-    """
-    Does the Pywikibot page.Claim object 'claim' represent a
-    'Commons quality assessment' (P6731) claim with the value
-    'Wikimedia Commons featured picture' (Q63348049)?
+    """Find out if a Claim object is a FP assessment claim.
+
+    The function tests whether a Pywikibot page.Claim object
+    represents a 'Commons quality assessment' (P6731) claim
+    with the value 'Wikimedia Commons featured picture' (Q63348049).
     """
     # For now a simple string comparison seems sufficient.
     # If this fails because of format variations etc.,
@@ -3347,11 +3443,15 @@ def is_fp_assessment_claim(claim: pywikibot.page.Claim) -> bool:
 
 
 def oldest_revision_user(page: pywikibot.Page) -> str:
-    """
-    Returns the name of the user who has created the oldest (first) revision
-    of a page on Wikimedia Commons; on errors just returns ''.
+    """Return the name of the user who has originally created a Commons page.
 
-    @param page A pywikibot.Page object.
+    Args:
+        page: A pywikibot.Page object for a page (e.g. the description page
+            of an image or a nomination subpage) on Commons.
+
+    Returns:
+        The name of the user who has created the oldest (first) revision
+        of the page; on errors just ''.
     """
     try:
         username = page.oldest_revision["user"]
@@ -3366,22 +3466,23 @@ def find_template_pos(
     template_names: str,
     pos: int = 0,
 ) -> slice | None:
-    """
-    Search for a template to find its start and stop character indices.
-    We use a specific function because normal regexes as supported by
-    Python's 're' module can't properly deal with nested templates.
+    """Search for a template to find its start and stop character indices.
 
-    @param text           Wikitext of the page you want to search.
-    @param template_names String with the allowed template name(s);
-    handled as a regex fragment, so you can supply several names
-    by separating them with '|' or by using '(?:...)?', etc.
-    @param pos            Optional: Start position of the search.
-    This allows you to search for the next template instance etc.
+    We use a specific function because normal regexes as supported by
+    Python's 're' module cannot properly deal with nested templates.
+
+    Args:
+        text: The wikitext of the page you want to search.
+        template_names: String with the allowed template name(s);
+            handled as a regex fragment, so you can supply several names
+            by separating them with '|' or by using '(?:...)?', etc.
+        pos: Start position of the search (optional).  This allows you
+            to search for the next template instance etc.
 
     Returns:
-    A slice with the positions of the first character of the template
-    as start and the position of the first character after the template
-    as stop value; or None if no template was found.
+        A slice with the positions of the first character of the template
+        as start and the position of the first character after the template
+        as stop value; or None if the template was not found.
     """
     # NB: we need parens around template_names because it may contain '|'.
     pattern = re.compile(r"(\{\{\s*(?:" + template_names + r")\s*)[|{}]")
@@ -3424,22 +3525,27 @@ def update_assessments_template(
     featured_value: Literal[1, 2],
     com_nom_value: str,
 ) -> tuple[bool, bool, str]:
-    """Update the {{Assessments}} template on an image description page,
-    if present, to use the specified 'featured' and 'com-nom' values.
+    """Update the {{Assessments}} template on an image description page.
+
     This function is used both for FP and delisting candidates.
+    If the wikitext of an image description page already contains
+    an {{Assessments}} template, the function updates it to
+    the specified 'featured' and 'com-nom' values.
     It also updates the old 'subpage' parameter name to 'com-nom',
-    but preserves the code formatting of the {{Assessments}} template
+    but preserves the wikitext formatting of the {{Assessments}} template
     because sometimes users format it with spaces, newlines, etc.
 
-    Arguments:
-    @param old_text: the text of the image description page.
-    @param featured_value: new value for 'featured' parameter, 1 or 2.
-    @param com_nom_value: new value for the 'com-nom' parameter.
+    Args:
+        old_text: The wikitext of the image description page.
+        featured_value: New value for the 'featured' parameter;
+            possible values: 1 (featured) or 2 (formerly featured).
+        com_nom_value: New value for the 'com-nom' parameter.
 
-    Returns a tuple, containing
-    [0] bool: did the text contain an {{Assessments}} template?
-    [1] bool: if there was a template, was it already up-to-date?
-    [2] str: the updated text of the image description page.
+    Returns:
+        A tuple, containing:
+        [0] bool: Did the text contain an {{Assessments}} template?
+        [1] bool: If there was a template, was it already up-to-date?
+        [2] str: The updated text of the image description page.
     """
     if match := ASSESSMENTS_TEMPLATE_REGEX.search(old_text):
         params = match.group(1)
@@ -3479,15 +3585,20 @@ def update_assessments_template(
 
 
 def ask_for_help(message: str) -> None:
-    """
-    Adds a short notice to the FPC talk page, asking for help with a problem.
-    This is useful if the problem is very probably caused by a broken link,
-    a wikitext syntax error, etc. on a Commons page, i.e. issues a normal
-    human editor can correct easily.
+    """Add a short notice to the FPC talk page, asking for help.
 
-    @param message A concise description of the problem in one or two
-    short, but complete sentences; normally they should end with a request
-    to change this or that in order to help the bot.
+    The request for help feature was introduced in July 2025 to allow
+    a simple communication between the bot program and the FPC regulars.
+    It allows users to recognize and to fix problems without having
+    to search and decipher the log files.  It is especially useful
+    if the problem is very probably caused by a broken link, some
+    wikitext syntax error, etc. on a Commons page, i.e. simple issues
+    a normal human editor can correct easily.
+
+    Args:
+        message: A concise description of the problem in one or two
+            short, but complete sentences; normally they should end
+            with a request to change this or that to help the bot.
     """
     talk_page = pywikibot.Page(_g_site, FP_TALK_PAGE_NAME)
     try:
@@ -3505,18 +3616,16 @@ def ask_for_help(message: str) -> None:
 
 
 def _confirm_changes(page_name: str, summary: str | None = None) -> bool:
-    """
-    Subroutine with shared code for asking whether the proposed changes
-    should be saved or discarded.
+    """Ask the supervising user whether to save or discard the changes.
 
-    @param page_name: Name (title) of the Wikimedia Commons page.
-    @param summary:   Optional string with the edit summary;
-        omit if there is no custom edit summary, i.e. for Media Info
-        (structured data) changes.
+    Args:
+        page_name: Name (title) of the page on Wikimedia Commons.
+        summary: Optional string with the edit summary; omit if there is
+            no custom edit summary, e.g. for structured data changes.
 
     Returns:
-    True if changes should be saved, False if changes should be discarded.
-    (If the user decides to quit, we quit immediately, no return value.)
+        True if changes should be saved, False if changes should be discarded.
+        (If the user decides to quit, we quit immediately, no return value.)
     """
     if _g_dry:
         return False
@@ -3547,15 +3656,16 @@ def commit(
     page: pywikibot.Page,
     summary: str,
 ) -> None:
-    """
-    This will commit the new text of the page.
-    Unless running in automatic mode it first shows the diff and asks
-    whether the user accepts the changes or not.
+    """Commit the new text of the page.
 
-    @param old_text Old text of the page, used to show the diff.
-    @param new_text New text of the page to be submitted.
-    @param page     Pywikibot Page object for the concerned Commons page.
-    @param summary  The edit summary for the page history.
+    Unless running in automatic mode the function first shows a diff
+    and asks whether the supervising user accepts the changes or not.
+
+    Args:
+        old_text: Old text of the page, used to show the diff.
+        new_text: New text of the page to be submitted.
+        page: Pywikibot Page object for the concerned page on Commons.
+        summary: The edit summary for the page history.
     """
     # Show the diff
     page_name = page.title()
@@ -3580,19 +3690,21 @@ def commit_media_info_changes(
     claims_to_remove: list[pywikibot.page.Claim],
     claims_to_add: list[pywikibot.page.Claim],
 ) -> None:
-    """
-    When changing the Media Info (structured data) for an image,
-    we cannot use the normal commit mechanism.
-    So we print kind of a self-made diff; in interactive mode we ask
+    """Apply changes to the Media Info (structured data) of an image.
+
+    When changing the Media Info (structured data) for an image, we cannot
+    use the normal commit mechanism.  Therefore we print a kind of
+    home-made diff.  In interactive mode we ask the supervising user
     whether to save the changes or not; if yes, we apply the changes.
 
-    @param filename:         Name of the affected image file.
-    @param media_info:       A Pywikibot MediaInfo instance representing
-        the Media Info (structured data) for the image.
-    @param claims_to_remove: list of Pywikibot Claim instances
-        representing the statement(s) to be removed; can be empty.
-    @param claims_to_add:    list of Pywikibot Claim instances
-        representing the statement(s) to be added; can be empty.
+    Args:
+        filename: Name of the affected image file.
+        media_info: A Pywikibot MediaInfo instance representing
+            the Media Info (structured data) for the image.
+        claims_to_remove: A list of Pywikibot Claim instances
+            representing the statement(s) to be removed; can be empty.
+        claims_to_add: A list of Pywikibot Claim instances
+            representing the statement(s) to be added; can be empty.
     """
     assert claims_to_remove or claims_to_add
 
@@ -3624,18 +3736,20 @@ def commit_media_info_changes(
 
 
 def main(*args: str) -> None:
-    """
-    This function is the main entry point of the bot program.
-    It encapsulates the program's primary behavior --
-    parsing and checking command-line arguments, defining global variables,
-    selecting the desired tasks and calling the appropriate functions.
+    """Run the bot program.
 
-    @param *args: If you run this script in the usual way as bot program,
-    this function is called without any arguments and uses the CLI arguments.
-    However for test purposes etc. one could consider to import the script
-    like a module and to call this method from Python code;
-    in this case pass strings with the same values as the CLI arguments,
-    then the '*args' packs all these values into a single tuple.
+    This function is the main entry point of the bot program.
+    It parses and checks the CLI arguments, defines global variables,
+    selects the desired tasks and calls the appropriate functions.
+
+    Args:
+        *args: If you run the script in the usual way as bot program,
+            this function is called without any arguments and uses
+            the CLI arguments.  However for test purposes etc. you can
+            import the script like a module and call this method
+            from Python code.  In this case pass strings with the same
+            values as the CLI arguments, then '*args' packs all these
+            values into a single tuple.
     """
     global _g_site
 
@@ -3678,7 +3792,18 @@ def main(*args: str) -> None:
 def _inspect_local_arguments(
     local_args: list[str]
 ) -> tuple[list[str], CandidateTypesToProcess]:
-    """Derive desired task(s) and options from the local arguments."""
+    """Derive desired task(s) and options from the local arguments.
+
+    Args:
+        local_args: A list with local argument strings like '-park'.
+
+    Returns:
+        A tuple, containing:
+        [0] list[str]: The task arguments in the original order specified
+            by the user.
+        [1] A CandidateTypesToProcess object specifying which types
+            of nominations we want to process.
+    """
     global _g_auto
     global _g_dry
     global _g_threads
@@ -3747,7 +3872,14 @@ def _inspect_local_arguments(
 
 
 def _handle_task(task: str, which_types: CandidateTypesToProcess) -> None:
-    """Perform the desired task for all concerned nominations."""
+    """Perform the desired task for all concerned nominations.
+
+    Args:
+        task: String describing the task we want to execute; see the code
+            of this function for the allowed values.
+        which_types: A CandidateTypesToProcess object specifying which types
+            of nominations we want to process.
+    """
     match task:
         case "-test":
             out("Recounting votes for testing...", heading=True)
@@ -3776,7 +3908,18 @@ def _handle_task(task: str, which_types: CandidateTypesToProcess) -> None:
 
 
 def signal_handler(signal_number: int, frame: FrameType | None) -> None:
-    """Handle a SIGINT (keyboard, Ctrl-C) interrupt."""
+    """Handle a SIGINT (keyboard, Ctrl-C) interrupt.
+
+    The parameters of this function must follow the scheme demanded
+    by signal.signal() for a custom signal handler.  Therefore we must
+    specify parameters even if we do not need them.
+
+    Args:
+        signal_number: The number of the signal, one of the constants
+            defined in Python's 'signal' module.  Because we use this handler
+            only for keyboard interrupts, that value must be signal.SIGINT.
+        frame: the current stack frame -- a frame object or None.
+    """
     global _g_abort
     print("\n\nReceived SIGINT, will abort...\n")
     _g_abort = True
