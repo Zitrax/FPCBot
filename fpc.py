@@ -456,14 +456,14 @@ class CandidateTypesToProcess(NamedTuple):
     delist: bool
 
     def candidate_class(self, subpage_name: str) -> Type[Candidate] | None:
-        """
-        Should we process that nomination, and with which class?
+        """Find out if should we process a nomination, and with which class.
 
-        @param subpage_name: Full name of a nomination subpage.
+        Args:
+            subpage_name: Full name of a nomination subpage.
 
         Returns:
-        The correct Candidate subclass to be used for that nomination,
-        or None if we should not process that type of nomination.
+            The correct Candidate subclass to be used for that nomination,
+            or None if we should not process that type of nomination.
         """
         if re.search(r"/ *[Rr]emoval */", subpage_name):
             return DelistCandidate if self.delist else None
@@ -471,7 +471,7 @@ class CandidateTypesToProcess(NamedTuple):
             return FPCandidate if self.fp else None
 
     def describe(self) -> str:
-        """Summarize the types of candidates up to processing."""
+        """Summarize the types of candidates we want to process."""
         types = [
             entry[1] for entry in zip(self, self._fields)  # pylint: disable=no-member
             if entry[0]
@@ -491,9 +491,11 @@ class ThreadCheckCandidate(threading.Thread):
         candidate: Candidate,
         check: Callable[[Candidate], None],
     ) -> None:
-        """
-        The initializer initializes the thread and saves references
-        to the Candidate instance and to the method which should be called.
+        """Initialize the thread.
+
+        Args:
+            candidate: The Candidate subclass object to process.
+            check: The Candidate class method which should be called.
         """
         super().__init__()
         self._candidate = candidate
@@ -556,13 +558,14 @@ class Candidate(abc.ABC):
     _neu: int  # Count of neutral votes
 
     def __init__(self, page: pywikibot.Page, list_name: str) -> None:
-        """
-        Although this is an abstract base class, the initializer is used
-        by the concrete subclasses.  It sets all instance variables
-        to passed values and to default values resp.
+        """Initialize the candidate object.
 
-        @param page      A pywikibot.Page object for the nomination subpage.
-        @param list_name A string with the name of the candidate list page.
+        Although this is an abstract base class, the initializer is called
+        by the concrete subclasses.
+
+        Args:
+            page: A pywikibot.Page object for the nomination subpage.
+            list_name: A string with the name of the candidate list page.
         """
         # Save passed values
         self._list_page_name = list_name
@@ -585,13 +588,14 @@ class Candidate(abc.ABC):
 
     @property
     def page(self) -> pywikibot.Page:
-        """Simple property getter for the nomination subpage."""
+        """Return the nomination subpage for this candidate."""
         return self._page
 
     def print_all_info(self) -> None:
-        """
-        Print the name, status, vote counts and other information
-        for this candidate, as part of an overview of all open candiates.
+        """Print a line with current status information about this candidate.
+
+        This method is used to generate the '-info' overview of all
+        open nominations.
         """
         try:
             self.count_votes()
@@ -613,10 +617,12 @@ class Candidate(abc.ABC):
             error(f"{self.cut_title()}: -- No such page --")
 
     def filtered_content(self) -> str:
-        """
-        Return a filtered version of the wikitext of the nomination subpage,
-        i.e. without comments, stricken text, code examples, etc.
-        The filtered version is cached because we need it very often.
+        """Return a filtered version of the wikitext of the nomination subpage.
+
+        The filtered version omits all comments, stricken text, code examples,
+        etc.; it is used for counting the votes etc., and cached because
+        we need it often.  If you change the text of the nomination subpage,
+        call reset_filtered_content() to flag the cached version as outdated.
         """
         if self._filtered_content is None:
             self._filtered_content = filter_content(self._page.get(get_redirect=False))
@@ -627,20 +633,26 @@ class Candidate(abc.ABC):
         self._filtered_content = None
 
     def clear_cache(self) -> None:
-        """Clear cached page contents."""
+        """Clear all cached page contents."""
         self._page.clear_cache()
         self._filtered_content = None
 
     def creator(self, link: bool) -> str:
-        """
-        Returns the name of the user who has originally created the image(s).
+        """Return the name of the user who has originally created the image(s).
+
         There is no generally applicable way to determine the creator.
         Therefore nominators should use the phrase
             '{{Info}} ... created by [[User:...]]'
-        on the nomination subpage in order to identify the original creator.
-        We also allow the common variant 'created and <adverb?> uploaded by'.
-        If this phrase is present, the method returns the username
-        (if 'link' is True, a link to the user page), else just ''.
+        on the nomination subpage in order to identify the original creator
+        (we also support some common variants, see the regex constant).
+
+        Args:
+            link: Pass True to get a link to the user page, False to get
+                just the plain username.
+
+        Returns:
+            If the expected phrase is found, the function returns the username
+            resp. a link to the user page, else just ''.
         """
         if self._creator is None:
             if match := CREATOR_NAME_REGEX.search(self.filtered_content()):
@@ -652,11 +664,19 @@ class Candidate(abc.ABC):
         return self._creator
 
     def uploader(self, filename: str, link: bool) -> str:
-        """
-        Returns the name of the user who has uploaded the original version
-        of the image; if link is True, returns a link to the user page.
-        (This method works differently than nominator() because all files of
-        a set must have the same nominator, but can have different uploaders.)
+        """Return the name of the user who has originally uploaded the image.
+
+        This method works differently than nominator() because all files of
+        a set must have the same nominator, but can have different uploaders,
+        therefore we need to specify the individual filename.
+
+        Args:
+            filename: The name of the image on Commons.
+            link: Pass True to get a link to the user page, False to get
+                just the plain username.
+
+        Returns:
+            The username resp. a link to the user page; on errors 'Unknown'.
         """
         try:
             username = self._uploader[filename]
@@ -668,9 +688,14 @@ class Candidate(abc.ABC):
         return "Unknown"
 
     def nominator(self, link: bool) -> str:
-        """
-        Returns the name of the user who has created the nomination;
-        if link is True, returns a link to the nominator's user page.
+        """Return the name of the user who has created the nomination subpage.
+
+        Args:
+            link: Pass True to get a link to the user page, False to get
+                just the plain username.
+
+        Returns:
+            The username resp. a link to the user page; on errors 'Unknown'.
         """
         if self._nominator is None:
             self._nominator = oldest_revision_user(self._page)
@@ -679,18 +704,21 @@ class Candidate(abc.ABC):
         return "Unknown"
 
     def is_set(self) -> bool:
-        """
-        Check whether this candidate is a set nomination or not;
-        the name of the nomination subpage for a set must contain "/[Ss]et/".
-        """
+        """Find out if this candidate is a set nomination."""
         return re.search(r"/ *[Ss]et */", self._page.title()) is not None
 
     def set_files(self) -> list[str]:
-        """
-        Try to return a list of all nominated files in a set nomination.
-        We just search for all filenames in the first <gallery>...</gallery>
-        on the nomination subpage.
-        If we can't identify any files the result is an empty list.
+        """Return the names of all nominated images from a set nomination.
+
+        The method tries to retrieve the filenames from a <gallery> element
+        in the nomination subpage, checks if the individual files exist
+        and resolves any redirects.
+        Problems are reported on the FPC talk page.
+        For single-file nominations, use filename() instead.
+
+        Returns:
+            A list with the names of all nominated image files;
+            on errors the result is an empty list.
         """
         # Use cached result if possible
         if self._set_files is not None:
@@ -793,10 +821,7 @@ class Candidate(abc.ABC):
         return files_list
 
     def find_gallery_of_file(self) -> str:
-        """
-        Try to find the gallery link in the nomination subpage;
-        this is used to copy the link to the results template.
-        """
+        """Find and polish the gallery link in the nomination subpage."""
         match = re.search(
             r"Gallery[^\n]+?\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
             self.filtered_content(),
@@ -807,7 +832,7 @@ class Candidate(abc.ABC):
             return ""
 
     def count_votes(self) -> None:
-        """Count all the votes for this nomination."""
+        """Count all votes in this nomination."""
         if self._pro > -1:
             return  # Votes are already counted.
         if text := self.filtered_content():
@@ -818,39 +843,52 @@ class Candidate(abc.ABC):
             error(f"Error - '{self._page.title()}' has no real content")
 
     def is_withdrawn(self) -> bool:
-        """Has the nomination been marked as withdrawn?"""
+        """Find out if the nomination been marked as withdrawn.
+
+        Nominators can withdraw any of their nominations by adding
+        the template {{Withdraw}} to it.
+        """
         return WITHDRAWN_REGEX.search(self.filtered_content()) is not None
 
     def is_fpx(self) -> bool:
-        """Is the nomination marked with a {{FPX}} or {{FPD}} template?"""
+        """Find out if the nomination is marked with {{FPX}} or {{FPD}}.
+
+        Users can mark a nomination as hopeless with the {{FPX}} template
+        or deny a nomination (because the nominator has exceeded the limit
+        for simultaneous nominations) with the {{FPD}} template.
+        """
         return FPX_FPD_REGEX.search(self.filtered_content()) is not None
 
     def rules_of_fifth_day(self) -> bool:
-        """Check if any of the rules of the fifth day can be applied."""
+        """Find out if the rules of the 5th day apply to this nomination.
+
+        The rules of the 5th day allow to close a nomination already
+        at the 5th day after its creation if it is hopeless (less than two
+        support votes) or a clear winner (10 or more support votes,
+        no oppose votes).  They do not apply to nominations with alternatives
+        because with them the voters' favour can change at any time.
+        """
         if self.days_old() < 5:
             return False
-
         # Rules of the fifth day don't apply to nominations with alternatives
         if self.image_count() > 1:
             return False
-
         self.count_votes()
-
         # First rule of the fifth day
         if self._pro <= 1:
             return True
-
         # Second rule of the fifth day
         if self._pro >= 10 and self._con == 0:
             return True
-
         # If we arrive here, no rule applies
         return False
 
     def close(self) -> None:
-        """
-        Check whether the nomination is finished and can be closed or not.
-        If yes, add the provisional result to the nomination subpage.
+        """Close the nomination if it is finished.
+
+        If the nomination is finished, the function adds a provisional result
+        to the nomination subpage.
+        Withdrawn, FPXed and FPDed nominations are just moved to the FPC log.
         """
         subpage_name = self._page.title()
         cut_title = self.cut_title()
@@ -923,16 +961,21 @@ class Candidate(abc.ABC):
         self.reset_filtered_content()
 
     def fix_heading(self, text: str, value: str | None = None) -> str:
-        """
-        Appends a keyword -- '(not) featured', '(not) delisted' --
-        for the result to the heading of the nomination subpage.
-        Reports if the nomination does not start correctly with a heading.
-        Returns the modified wikitext of the nomination subpage.
+        """Append a result keyword to the heading of the nomination subpage.
 
-        @param text  The complete wikitext of the nomination subpage.
-        @param value If specified as 'yes' or 'no' (the value of the 'featured'
-            or 'delisted' parameter from the reviewed results template),
-            the keyword is based on this value, otherwise we call is_passed().
+        The function appends the keyword '(not) featured' or '(not) delisted'
+        to the heading of the nomination subpage, depending on the result.
+        It reports if the nomination does not start correctly with a heading.
+
+        Args:
+            text: The complete wikitext of the nomination subpage.
+            value: If specified as 'yes' or 'no' (the value of the 'featured'
+                or 'delisted' parameter from the reviewed results template),
+                the keyword is based on that value, otherwise it is based
+                on the result of the method is_passed().
+
+        Returns:
+            The modified wikitext of the nomination subpage.
         """
         # Determine the keyword
         match value:
@@ -968,30 +1011,31 @@ class Candidate(abc.ABC):
 
     @abc.abstractmethod
     def get_result_string(self) -> str:
-        """
-        Returns the results template to be added when closing a nomination.
-        Must be implemented by the subclasses.
+        """Return the results template to be added when closing the nomination.
+
+        Abstract method, must be implemented by the subclasses.
         """
         pass
 
     @abc.abstractmethod
     def get_close_edit_summary(self, fifth_day: bool) -> str:
-        """
-        Returns the edit summary to be used when closing a nomination.
-        Must be implemented by the subclasses.
+        """Return the edit summary to be used when closing the nomination.
 
-        @param fifth_day Is the nomination closed early because the Rules
-        of the 5th day apply to it?
+        Abstract method, must be implemented by the subclasses.
+
+        Args:
+            fifth_day: Is the nomination closed early because one of the
+                rules of the 5th day applies to it?
         """
         pass
 
     def creation_time(self) -> datetime.datetime:
-        """
-        Returns the time at which this nomination was created.
-        If we can't determine the creation time, for example because
-        the page has been moved without leaving a redirect etc.,
-        we return the current time so that we ignore this nomination
-        as too young.
+        """Return the time at which the nomination subpage was created.
+
+        Returns:
+            A datetime.datetime object with the creation time of the subpage.
+            On errors the function returns the current time; therefore
+            the nomination will not be closed because it appears as too young.
         """
         if self._creation_time:
             return self._creation_time
@@ -1016,7 +1060,7 @@ class Candidate(abc.ABC):
         return self._creation_time
 
     def status_string(self) -> str:
-        """Returns a short string describing the status of the candidate."""
+        """Return a short string describing the status of the candidate."""
         if reviewed := self.is_reviewed():
             return reviewed
         if self.is_withdrawn():
@@ -1031,7 +1075,7 @@ class Candidate(abc.ABC):
         return "Active"
 
     def days_old(self) -> int:
-        """Find the number of days this nomination has existed."""
+        """Return the number of days since this nomination was created."""
         if self._days_old != -1:
             return self._days_old
 
@@ -1040,10 +1084,11 @@ class Candidate(abc.ABC):
         return self._days_old
 
     def days_since_last_edit(self) -> int:
-        """
-        Number of whole days since last edit
+        """Return the number of days since this nomination was last edited.
 
-        If the value can not be found -1 is returned
+        Returns:
+            The number of whole days since the nomination was last edited;
+            if the value cannot be found, the function returns -1.
         """
         if self._days_since_last_edit != -1:
             return self._days_since_last_edit
@@ -1064,18 +1109,18 @@ class Candidate(abc.ABC):
         return self._days_since_last_edit
 
     def is_done(self) -> bool:
-        """
-        Check whether the voting period for the nomination is over.
-        NB: This method doesn't consider the rules of the fifth day,
+        """Find out if the voting period for the nomination is over.
+
+        NB: This method does not consider the rules of the fifth day,
         please use rules_of_fifth_day() for that purpose.
         """
         return self.days_old() >= 9
 
     def is_passed(self) -> bool:
-        """
-        Check whether the nomination is successful acc. to the current votes.
-        NB: This method doesn't consider the age of the nomination,
-        please check that with is_done() and rules_of_fifth_day().
+        """Find out if the nomination is successful acc. to the current votes.
+
+        NB: This method does not consider the age of the nomination,
+        please test that with is_done() and rules_of_fifth_day().
         NB: This method cannot properly handle nominations with alternatives.
         """
         if self.is_withdrawn():
@@ -1084,11 +1129,13 @@ class Candidate(abc.ABC):
         return self._pro >= 7 and (self._pro >= 2 * self._con)
 
     def is_reviewed(self) -> str | Literal[False]:
-        """
-        Returns a short string for use with status_string(),
-        indicating whether the nomination has already been closed and reviewed
-        or has been closed and counted, but is still waiting for the review;
-        if neither the one nor the other applies, returns False.
+        """Return a keyword for the review status of this candidate.
+
+        Returns:
+            A keyword for use with status_string(), indicating whether
+            the nomination has already been closed and reviewed,
+            or has been counted, but is still waiting for the review.
+            If neither the one nor the other applies, it returns False.
         """
         text = self.filtered_content()
         if self._REVIEWED_RES_REGEX.search(text):
@@ -1098,18 +1145,23 @@ class Candidate(abc.ABC):
         return False
 
     def is_ignored(self) -> bool:
-        """Nominations with alternative images require manual counting."""
+        """Find out if the nomination needs manual vote counting.
+
+        Nominations with alternative images require manual counting,
+        therefore this method returns True for any nomination with more
+        than one full-size image.
+        """
         return self.image_count() > 1
 
     def section_count(self) -> int:
-        """Counts the number of sections in this nomination."""
+        """Count the number of sections in this nomination."""
         return len(SECTION_REGEX.findall(self.filtered_content()))
 
     def image_count(self) -> int:
-        """
-        Counts the number of images in this nomination.
-        Ignores small images which are below a certain threshold
-        as they probably are just inline icons and not alternatives.
+        """Count the number of images in this nomination.
+
+        Small images and thumbnails are not counted because they are
+        probably just inline icons and not alternative images.
         """
         if self._image_count is not None:
             return self._image_count
@@ -1125,19 +1177,24 @@ class Candidate(abc.ABC):
         return count
 
     def existing_results(self) -> list[tuple[str, ...]]:
-        """
-        Scan the nomination subpage of this candidate and try to find
-        and parse the verified (reviewed) results of the nomination.
-        Returns either an empty list (if the nomination was not closed,
-        if the results were not verified yet, or if the results do not use
-        one of the usual formats) or a list of tuples; if the nomination
-        has been verified correctly it should contain just a single tuple.
-        The length of the tuple varies, depending on the results format,
-        but only the first four values are important for a comparison:
-        [0] count of support votes,
-        [1] count of oppose votes,
-        [2] count of neutral votes,
-        [3] ('yes'|'no'|'(not )?featured'|'(not )?delisted').
+        """Search and parse verified (reviewed) results template(s).
+
+        The method scans the text of the nomination subpage for this candidate
+        for any verified (reviewed) results template(s) and parses them.
+
+        Returns:
+            A list of tuples of strings.
+            That list is empty if the nomination was not closed,
+            if the results were not verified (reviewed) yet,
+            or if the results do not use one of the usual formats.
+            The list contains one or more (normally: exactly one) tuple
+            if the nomination has been verified correctly.
+            The length of the tuple(s) varies, depending on the results format,
+            but only the first four values are important for a comparison:
+            [0] count of support votes,
+            [1] count of oppose votes,
+            [2] count of neutral votes,
+            [3] ('yes'|'no'|'(not )?featured'|'(not )?delisted').
         """
         text = self.filtered_content()
         # Search first for result(s) using the new template-base format,
@@ -1148,9 +1205,10 @@ class Candidate(abc.ABC):
         return results
 
     def compare_result_to_count(self) -> None:
-        """
-        If there is an existing result we compare it to a new vote count
-        made by this bot and check whether they match or not.
+        """Compare an existing verified result with a fresh vote counting.
+
+        If there is an existing result the method compares it with a fresh
+        counting of the votes and checks whether the results match or not.
         This is useful to test the vote counting code of the bot
         and to find possibly incorrect old results.
         """
@@ -1200,7 +1258,7 @@ class Candidate(abc.ABC):
         )
 
     def cut_title(self) -> str:
-        """Returns a fixed width title for the nomination."""
+        """Return a fixed width title for the nomination."""
         title = self.subpage_name(keep_prefix=False, keep_number=True)
         # We skip 'removal/', 'File:' etc., but 'Set/' is informative
         if self.is_set():
@@ -1208,10 +1266,15 @@ class Candidate(abc.ABC):
         return title[0:50].ljust(50)
 
     def filename(self) -> str:
-        """
-        Return the filename of this candidate or, if we cannot identify
-        the nominated image, an empty string.
+        """Return the name of the image nominated in this candidate.
+
+        The method tries to retrieve the filename, checks if the file exists
+        and resolves any redirects.
+        Problems are reported on the FPC talk page.
         For set nominations, use set_files() instead.
+
+        Returns:
+            The filename of the nominated image; on errors an empty string.
         """
         # Try the selected alternative or a cached result first
         if self._alternative is not None:
@@ -1287,11 +1350,13 @@ class Candidate(abc.ABC):
         return self._filename
 
     def _first_real_image_in_nomination(self) -> pywikibot.Page | None:
-        """
-        Return a pywikibot.Page object for the first image file
-        which is linked in reasonable size (not as a mere thumbnail)
-        in the text of the nomination subpage and actually exists.
-        If no such image file is found, return None.
+        """Return the page of the first image in the nomination.
+
+        Returns:
+            A pywikibot.Page object for the first image file
+            which is linked in reasonable size (not as a mere thumbnail)
+            in the text of the nomination subpage and actually exists.
+            If no such image file is found, returns None.
         """
         images = IMAGES_REGEX.findall(self.filtered_content())
         for image_link, image_name in images:
@@ -1306,10 +1371,16 @@ class Candidate(abc.ABC):
         keep_prefix: bool = True,
         keep_number: bool = True,
     ) -> str:
-        """
-        Returns the name of the nomination subpage for this candidate
-        without the leading 'Commons:Featured picture candidates/'
+        """Return the name of the nomination subpage.
+
+        The method returns the name of the nomination subpage for this
+        candidate without the leading 'Commons:Featured picture candidates/'
         (if you want to include it, just call 'self._page.title()' instead).
+
+        Args:
+            keep_prefix: Keep the 'removal/' and/or 'Set' prefixes
+                and/or the 'File:' namespace prefix, if present.
+            keep_number: Keep the trailing '/2', '/3', etc.
 
         Use 'keep_number=True' and adjust the 'keep_prefix' parameter
         to get tailor-made values for the 'com-nom' and 'subpage' parameters
@@ -1337,8 +1408,7 @@ class Candidate(abc.ABC):
         month: str,  # Full English month name
         subpage_name: str,
     ) -> tuple[pywikibot.Page, int, str]:
-        """
-        Find and read the current FPC log page, creating it if necessary.
+        """Find and read the current FPC log page, creating it if necessary.
 
         Until November 2005, we just used one FPC log page per month.
         But long log pages were not rendered correctly because they contain
@@ -1349,19 +1419,25 @@ class Candidate(abc.ABC):
         has reached the threshold.  We save the current part number of the log
         in a global variable to speed up the handling of the next nomination.
 
+        Args:
+            year: The current year as an integer, e.g. 2025.
+            month: The English name of the current month, e.g. 'January'.
+            subpage_name: The full name of the nomination subpage.
+
         Returns:
-        A tuple with
-        [0] a Pyikibot page object for the current part of the log;
-        [1] an integer with the number of the current part of the log;
-        [2] a string with the current text of the current part of the log,
-            empty if we have just started a new part of the log.
+            A tuple, containing:
+            [0] a Pyikibot page object for the current part of the log;
+            [1] an integer with the number of the current part of the log;
+            [2] a string with the current text of the current part of the log,
+                empty if we have just started a new part of the log.
 
         Raises:
-        DataAlreadyPresentError: the nomination is already listed in the log;
-            that's fine, we can remove it from the candidate list.
-        CouldNotAddDataError: Due to an error the nomimation cannot be added
-            to the log; an error description is passed in the exception,
-            we have to report it and must not remove the nomination.
+            DataAlreadyPresentError: The nomination is already in the log;
+                that can happen if the previous run of the bot was interrupted.
+                We still need to remove the nomination from the candidate list.
+            CouldNotAddDataError: Due to an error the nomimation can't be added
+                to the log; an error description is passed in the exception,
+                we have to report it and must not remove the nomination.
         """
         global _g_log_part_no
 
@@ -1452,13 +1528,16 @@ class Candidate(abc.ABC):
         return (log_page, part_no, log_text)
 
     def move_to_log(self, reason: str | None = None) -> None:
-        """
-        Remove this candidate from the list of current candidates
-        and add it to the log for the current month.
-        Should only be called on closed and verified candidates.
+        """Move the nomination from the candidate list to the log.
 
         This is the last step of the parking procedure for FP candidates
         as well as for delisting candidates.
+        Call this method only for closed and verified candidates.
+        It removes the nomination from the list of current candidates
+        and adds it to the log for the current month.
+
+        Args:
+            reason: A keyword for the reason (optional).
         """
         subpage_name = self._page.title()
 
@@ -1513,12 +1592,15 @@ class Candidate(abc.ABC):
             commit(old_cand_text, new_cand_text, candidates_list_page, summary)
 
     def park(self) -> None:
-        """
-        Check that the candidate has exactly one valid verified result,
-        that the image file(s) exist and that there are no other obstacles.
-        If yes, park the candidate -- i.e., if the nomination was successful,
-        promote the new FP(s) or delist the former FP respectively;
-        else, if it has failed, just archive the nomination.
+        """Park the nomination, if possible.
+
+        The method checks that the candidate has exactly one valid verified
+        result, that the image file(s) exist(s) and that there are no other
+        serious obstacles.
+        If yes, it executes the parking procedure for the candidate --
+        if the nomination was successful, it promotes the new FP(s) or
+        delists the former FP respectively;
+        if it has failed, it just archives the nomination.
         """
         subpage_name = self._page.title()
         cut_title = self.cut_title()
@@ -1591,9 +1673,14 @@ class Candidate(abc.ABC):
 
     @abc.abstractmethod
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
-        """
-        Handle the parking procedure for a passed candidate.
-        Must be implemented by the subclasses.
+        """Handle the parking procedure for a passed candidate.
+
+        Abstract method, must be implemented by the subclasses.
+
+        Args:
+            results: A tuple with strings representing the values which
+                have been assigned to the individual parameters of the
+                reviewed results template in the nomination.
         """
         pass
 
@@ -1615,9 +1702,10 @@ class FPCandidate(Candidate):
     # the class just uses the initializer of the superclass.
 
     def get_result_string(self) -> str:
-        """
-        Returns the results template to be added when closing a nomination.
-        Implementation for FP candidates.
+        """Return the results template to be added when closing a nomination.
+
+        Overrides the abstract method from the superclass, implementing it
+        for FP candidates.
         """
         gallery = self.find_gallery_of_file()
         if self.image_count() > 1:
@@ -1642,7 +1730,11 @@ class FPCandidate(Candidate):
         )
 
     def get_close_edit_summary(self, fifth_day: bool) -> str:
-        """Implementation for FP candidates."""
+        """Return the edit summary to be used when closing a nomination.
+
+        Overrides the abstract method from the superclass, implementing it
+        for FP candidates.
+        """
         if self.image_count() > 1:
             return "Closing for review - contains alternatives, needs manual counting"
         # A simple FP nomination
@@ -1655,12 +1747,14 @@ class FPCandidate(Candidate):
         )
 
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
-        """
-        Promotes a new featured picture (or set of featured pictures):
-        adds it to the appropriate gallery page, to the monthly overview
-        and to the landing-page list of recent FPs,
+        """Promote a new featured picture (or set of featured pictures).
+
+        The method overrides the abstract method from the superclass,
+        implementing it for FP candidates.  It adds the new FP(s) to
+        the list of recently promoted FPs and to the specified gallery page,
         inserts the {{Assessments}} template into the description page(s),
-        notifies nominator and uploader, etc.
+        creates an entry in the chronological archives, notifies nominator,
+        uploader and creator, etc.
         """
         subpage_name = self._page.title()
         cut_title = self.cut_title()
@@ -1727,16 +1821,18 @@ class FPCandidate(Candidate):
         self.move_to_log(self._SUCCESS_KEYWORD)
 
     def add_to_featured_list(self, section_name: str, files: list[str]) -> None:
-        """
-        Adds the new featured picture to the list with recently
-        featured images that is used on the FP landing page.
-        Should only be called on closed and verified candidates.
+        """Add the new featured picture to the list of recent FPs.
 
-        This is ==STEP 1== of the parking procedure.
+        This is STEP 1 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        The list of recent FPs is also used on the FP landing page;
+        set nominations are represented by the first image from the set.
 
-        @param section_name The section name, like 'Animals' or 'Places'.
-        (The list uses the basic part of the gallery links as section names.)
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            section_name: The section name, like 'Animals' or 'Places'.
+                (The list of recently featured images uses the basic part
+                of the gallery links as section names.)
+            files: List with filename(s) of the featured picture or set.
         """
         filename = files[0]  # For set nominations just use the first file.
 
@@ -1801,17 +1897,18 @@ class FPCandidate(Candidate):
         commit(old_text, new_text, page, summary)
 
     def add_to_gallery_page(self, gallery_link: str, files: list[str]) -> None:
-        """
-        Adds the new featured picture (resp. all files from a set nomination)
-        to the appropriate featured picture gallery page.
-        Should only be called on closed and verified candidates.
+        """Add the new featured picture(s) to the FP gallery page.
 
-        This is ==STEP 2== of the parking procedure.
+        This is STEP 2 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        For set nominations all files from the set are added at once
+        to the same place on the same FP gallery page.
 
-        @param gallery_link The gallery link with the name of the gallery page
-        and (optionally) a section anchor which denotes the target section
-        on that page.
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            gallery_link: The gallery link with the name of the gallery page
+                and (optionally) a section anchor which denotes the target
+                section on that page.
+            files: List with filename(s) of the featured picture or set.
         """
         subpage_name = self._page.title()
 
@@ -1891,17 +1988,24 @@ class FPCandidate(Candidate):
         section: str,
         old_text: str,
     ) -> tuple[str, slice] | None:
-        """
-        Search for the start of the <gallery>...</gallery> element
+        """Search for the start of the <gallery>...</gallery> element
         of the section to which we have to add the new featured picture(s).
 
+        Args:
+            gallery_link: The gallery link with the name of the gallery page
+                and (optionally) a section anchor which denotes the target
+                section on that page.
+            full_page_name: The full name of the gallery page.
+            section: The section anchor from the gallery link.
+            old_text: The complete old text of the gallery page.
+
         Returns:
-        If successful, a tuple containing
-        [0] the official subheading of the target section and
-        [1] a slice object describing the index values of the characters
-        which should be replaced by the new entries;
-        or None if we did not find a valid target section and have to use
-        the 'Unsorted' section instead.
+            If successful, a tuple containing
+            [0] the official subheading of the target section and
+            [1] a slice object describing the index values of the characters
+            which should be replaced by the new entries;
+            or None if we did not find a valid target section and have to use
+            the 'Unsorted' section instead.
         """
         subpage_name = self._page.title()
         unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(page=full_page_name)
@@ -1988,10 +2092,14 @@ class FPCandidate(Candidate):
         of the 'Unsorted' section in order to insert the new FP(s);
         it should be just the last <gallery> element on the gallery page.
 
+        Args:
+            full_page_name: The full name of the gallery page.
+            old_text: The complete old text of the gallery page.
+
         Returns:
-        If successful, a slice object describing the index values
-        of the characters which should be replaced by the new entries;
-        or None if we did not even find a usabale 'Unsorted' section.
+            If successful, a slice object describing the index values
+            of the characters which should be replaced by the new entries;
+            or None if we did not even find a usabale 'Unsorted' section.
         """
         if (start := old_text.rfind("<gallery")) >= 0:
             if match := GALLERY_ENTRY_START_REGEX.search(old_text, pos=start):
@@ -2013,14 +2121,15 @@ class FPCandidate(Candidate):
         return None
 
     def add_assessments(self, files: list[str]) -> None:
-        """
-        Adds the {{Assessments}} template to the description page
-        of a featured picture, resp. to all files in a set.
-        Should only be called on closed and verified candidates.
+        """Add the {{Assessments}} template to the image description page(s).
 
-        This is ==STEP 3== of the parking procedure.
+        This is STEP 3 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        For set nominations the template is added to the description page
+        of every single image from the set.
 
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            files: List with filename(s) of the featured picture or set.
         """
         subpage_name = self.subpage_name(keep_prefix=False, keep_number=True)
         for filename in files:
@@ -2093,15 +2202,17 @@ class FPCandidate(Candidate):
                 )
 
     def add_assessment_to_media_info(self, files: list[str]) -> None:
-        """
-        Adds the 'Commons quality assessment' (P6731) claim
-        'Wikimedia Commons featured picture' (Q63348049)
-        to the Media Info (structured data) of the new featured picture,
-        resp. of all files in a successful set nomination.
+        """Add a FP assessment claim to the structured data of the new FP(s).
 
-        This is ==STEP 4== of the parking procedure.
+        This is STEP 4 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        It adds the 'Commons quality assessment' (P6731) claim
+        'Wikimedia Commons featured picture' (Q63348049) to the Media Info
+        (structured data) of the new featured picture, resp. of all files
+        from a successful set nomination.
 
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            files: List with filename(s) of the featured picture or set.
         """
         # As effective date for the FP status we use the last modification
         # of the nomination subpage, normally made by the closing user.
@@ -2225,16 +2336,16 @@ class FPCandidate(Candidate):
                     error(f"Error - '{filename}' is locked.")
 
     def add_to_current_month(self, files: list[str]) -> None:
-        """
-        Adds the candidate to the monthly overview of new featured pictures.
-        Should only be called on closed and verified candidates.
+        """Add the candidate to the chronological archive of featured pictures.
 
-        This is ==STEP 5== of the parking procedure.
+        This is STEP 5 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        Set nominations are represented by the first image from the set.
 
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            files: List with filename(s) of the featured picture or set.
         """
-        # For set nominations just use the first file
-        filename = files[0]
+        filename = files[0]  # For set nominations just use the first file.
 
         # Extract voting results
         if match := VERIFIED_RESULT_REGEX.search(self.filtered_content()):
@@ -2250,7 +2361,7 @@ class FPCandidate(Candidate):
             )
             return
 
-        # Get the current monthly overview page
+        # Get the chronological archive page for the current month
         now = datetime.datetime.now(datetime.UTC)
         year = now.year
         month = now.strftime("%B")  # Full local month name, here: English
@@ -2282,8 +2393,8 @@ class FPCandidate(Candidate):
             else:
                 error(f"Error - no valid <gallery> element in '{monthpage}'.")
                 ask_for_help(
-                    f"The monthly overview page [[{monthpage}]] is missing "
-                    "a <code><nowiki><gallery></nowiki></code> element. "
+                    f"The chronological archive page [[{monthpage}]] contains "
+                    "no <code><nowiki><gallery></nowiki></code> element. "
                     "Please check the page."
                 )
                 return
@@ -2298,7 +2409,7 @@ class FPCandidate(Candidate):
                 "<gallery>\n</gallery>"
             )
             count = 1
-            job = "Started new archival page, added"
+            job = "Started new chronological archive page, added"
 
         # Assemble the new entry and append it to the end of the gallery
         if self.is_set():
@@ -2327,13 +2438,14 @@ class FPCandidate(Candidate):
         commit(old_text, new_text, page, summary)
 
     def notify_nominator(self, files: list[str]) -> None:
-        """
-        Add a FP promotion template to the nominator's talk page.
-        Should only be called on closed and verified candidates.
+        """Notify the nominator of the new FP(s).
 
-        This is ==STEP 6== of the parking procedure.
+        This is STEP 6 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        It adds a FP promotion template to the nominator's talk page.
 
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            files: List with filename(s) of the featured picture or set.
         """
         # Get and read nominator talk page
         talk_link = f"{USER_TALK_NAMESPACE}{self.nominator(link=False)}"
@@ -2419,27 +2531,28 @@ class FPCandidate(Candidate):
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
 
     def notify_uploader_and_creator(self, files: list[str]) -> None:
-        """
-        Add a FP promotion template to the talk page of the uploader and
-        (optionally) of the original creator.  (Sometimes the creator
-        is different from the uploader, e.g. when we promote a variant
-        of an image which has been retouched by another user.
-        In this case we notify also the original creator, if possible.)
-        Should only be called on closed and verified candidates.
+        """Notify the uploader and (optionally) the creator of the new FP(s).
 
-        This is ==STEP 7== of the parking procedure.
+        This is STEP 7 of the parking procedure for new featured pictures.
+        Call this method only for closed and verified candidates.
+        It adds a FP promotion template to the talk page(s) of the uploader(s)
+        and (optionally) of the original creator of the promoted image(s).
+        (Sometimes the creator is different from the uploader, e.g. if we
+        promote a variant of an image which has been retouched by another user.
+        In this case we notify also the original creator, if possible.)
 
         To understand this method and how it differs from notify_nominator(),
-        please keep in mind that all files in a set nomination have the same
-        nominator, but they may have been uploaded by different users.
-        That's very unusual and discouraged by the current FPC rules,
+        consider that all files in a set nomination have the same nominator,
+        but they may have been uploaded by different users.  Of course
+        this is very unusual and discouraged by the current FPC rules,
         but the bot stills supports that special case.  Therefore this method
         handles the files one by one, unlike notify_nominator().
         (Theoretically we would also need to support different creators,
         but at least for now we extract the creator name from the nomination,
         therefore we can handle just a single creator per nomination.)
 
-        @param files List with filename(s) of the featured picture or set.
+        Args:
+            files: List with filename(s) of the featured picture or set.
         """
         ignored_pages: set[str] = set()
         redirects: dict[str, str] = {}  # Mapping: old page name -> new name
@@ -2484,7 +2597,20 @@ class FPCandidate(Candidate):
         ignored_pages: set[str],
         redirects: dict[str, str],
     ) -> None:
-        """Subroutine which implements the uploader/creator notification."""
+        """Notify the uploader or creator of a new featured picture.
+
+        Subroutine which implements the uploader/creator notification.
+
+        Args:
+            filename: The complete filename of the new featured picture.
+            is_uploader: True if we want to notify the uploader,
+                False if we want to notify the creator of the picture.
+            username: The username of the uploader/creator.
+            ignored_pages: A set with problematic user talk pages which
+                must be ignored.
+            redirects: A dictionary with resolved user talk page redirects,
+                used to avoid repeated page redirect resolutions.
+        """
         if is_uploader:
             role = "uploader"
             tmpl_name = "FPpromotedUploader"
@@ -2583,9 +2709,10 @@ class DelistCandidate(Candidate):
     # the class just uses the initializer of the superclass.
 
     def get_result_string(self) -> str:
-        """
-        Returns the results template to be added when closing a nomination.
-        Implementation for delisting candidates.
+        """Return the results template to be added when closing a nomination.
+
+        Overrides the abstract method from the superclass, implementing it
+        for delisting candidates.
         """
         if self.image_count() != 1 or self.is_set():
             # A delist-and-replace or a set delisting nomination
@@ -2607,7 +2734,11 @@ class DelistCandidate(Candidate):
         )
 
     def get_close_edit_summary(self, fifth_day: bool) -> str:
-        """Implementation for delisting candidates."""
+        """Return the edit summary to be used when closing a nomination.
+
+        Overrides the abstract method from the superclass, implementing it
+        for delisting candidates.
+        """
         if self.image_count() != 1 or self.is_set():
             # A delist-and-replace or a set delisting nomination
             return (
@@ -2624,11 +2755,13 @@ class DelistCandidate(Candidate):
         )
 
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
-        """
-        Handle the parking procedure for a passed delisting candidate:
-        remove the image from FP gallery pages, mark it as delisted
-        in the chronological archives, update the {{Assessents}} template
-        and remove FP categories from the image description page, etc.
+        """Handle the parking procedure for a passed delisting candidate.
+
+        The method overrides the abstract method from the superclass,
+        implementing it for delisting candidates.  It removes the image
+        from FP gallery pages, updates the {{Assessents}} template
+        and removes FP categories from the image description page,
+        marks the entry in the chronological archives as delisted, etc.
         """
         if self.image_count() != 1 or self.is_set():
             # Support for delist-and-replace nominations and set delisting
@@ -2652,18 +2785,24 @@ class DelistCandidate(Candidate):
         self.move_to_log(self._SUCCESS_KEYWORD)
 
     def remove_from_featured_list(self, filename: str) -> None:
-        """
-        Remove a delisted FP from the list with recently featured images
-        that is used on the FP landing page.
+        """Remove the delisted featured picture from the list of recent FPs.
 
-        Usually this is not necessary.  Until August 2025, a comment said:
-        'We skip checking the FP landing page with the newest FPs;
-        the chance that the image is still there is very small,
-        and even then that page will soon be updated anyway.'
-        That's correct.  But some sections of the list are updated
+        This is STEP 1 of the parking procedure for delisting candidates.
+        It removes the delisted featured picture from the list of new FPs
+        which is also used (transcluded) on the FP landing page.
+
+        Usually this step is not required.  Until August 2025, a comment
+        in the code said:
+            'We skip checking the FP landing page with the newest FPs;
+            the chance that the image is still there is very small,
+            and even then that page will soon be updated anyway.'
+        This is correct.  But some sections of the list are updated
         only very rarely (e.g. the 'Other lifeforms' section),
         so a delisted FP could stay there for years.  That would be bad,
-        and removing a FP from the list is easy, so let's just do it.
+        and removing a FP from the list is easy, so we just do it.
+
+        Args:
+            filename: The filename of the delisted featured pictured.
         """
         # Read the list
         page = pywikibot.Page(_g_site, GALLERY_LIST_PAGE_NAME)
@@ -2699,9 +2838,17 @@ class DelistCandidate(Candidate):
         filename: str,
         results: tuple[str, ...],
     ) -> None:
-        """
-        Remove a delisted FP from the FP gallery pages and mark its entry
-        in the chronological archive as delisted.
+        """Remove a delisted FP from gallery pages and chronological archives.
+
+        This is STEP 2 of the parking procedure for delisting candidates.
+        It removes the delisted FP from all FP gallery pages and marks its
+        entry in the chronological archive pages as delisted.
+
+        Args:
+            filename: The filename of the delisted featured pictured.
+            results: A tuple with strings representing the values which
+                have been assigned to the individual parameters of the
+                reviewed results template in the nomination.
         """
         nomination_link = self._page.title()
         fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
@@ -2773,7 +2920,16 @@ class DelistCandidate(Candidate):
                 )
 
     def remove_assessments(self, filename: str) -> None:
-        """Remove FP status from the image description page."""
+        """Remove the FP status from the image description page.
+
+        This is STEP 3 of the parking procedure for delisting candidates.
+        It searches the image description page of the delisted FP for the
+        {{Assessments}} template and changes the template's parameters
+        in order to mark the FP as delisted.
+
+        Args:
+            filename: The filename of the delisted featured pictured.
+        """
         # Get and read image description page
         image_page = pywikibot.Page(_g_site, filename)
         try:
@@ -2809,10 +2965,15 @@ class DelistCandidate(Candidate):
             error(f"Error - '{filename}' is locked, can't update {{Assessments}}.")
 
     def remove_assessment_from_media_info(self, filename: str) -> None:
-        """
-        Remove the 'Commons quality assessment' (P6731) claim
+        """Remove the FP assessment claim from the structured data.
+
+        This is STEP 4 of the parking procedure for delisting candidates.
+        It removes the 'Commons quality assessment' (P6731) claim
         'Wikimedia Commons featured picture' (Q63348049)
-        from the Media Info (structured data) for the image.
+        from the Media Info (structured data) for the former FP.
+
+        Args:
+            filename: The filename of the delisted featured pictured.
         """
         # Get the Media Info for the image
         file_page = pywikibot.FilePage(_g_site, title=filename)
