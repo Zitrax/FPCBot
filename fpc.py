@@ -3389,6 +3389,8 @@ def check_candidates(
         # These exceptions just stop the candidate, continue with the next one.
         if _g_abort:
             break
+        # Take the load off the server and avoid 429 'Too many requests' errors
+        time.sleep(1)
 
 
 def filter_content(text: str) -> str:
