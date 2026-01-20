@@ -3513,6 +3513,7 @@ def bare_filename(filename: str) -> str:
         count=1,
     ).strip()
 
+
 def is_just_thumbnail(image_link: str) -> bool:
     """Find out if a wikitext image link is just a thumbnail or icon.
 
