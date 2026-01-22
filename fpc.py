@@ -4062,7 +4062,7 @@ def _handle_task(task: str, which_types: CandidateTypesToProcess) -> None:
         case "-park":
             if _g_threads and _g_auto:
                 warn("Auto-parking using threads is disabled for now...")
-                sys.exit()
+                return
             out("Parking finished candidates...", heading=True)
             check_candidates(Candidate.park, CAND_LIST_PAGE_NAME, which_types)
         case _:
