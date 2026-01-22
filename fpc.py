@@ -24,6 +24,7 @@ Tasks:
 -close          Close, count votes and add results to finished nominations.
 -park           Park closed and verified nominations.
 -test           Test vote counting against an old log.
+-checkgallery   Test the gallery links in current nominations.
 
 Options:
 
@@ -1591,6 +1592,28 @@ class Candidate(abc.ABC):
             summary = f"Removed [[{subpage_name}]]{why}"
             commit(old_cand_text, new_cand_text, candidates_list_page, summary)
 
+    def check_gallery(self) -> None:
+        """Check if the gallery link is valid and report any problems.
+
+        Like the '-info' task, '-checkgallery' is not used by the bot.
+        It allows users to check the gallery links in all open FP nominations
+        in order to find and fix gallery link problems before the bot program
+        parks each nomination and has to complain if a link does not work.
+        """
+        self._check_gallery_link()
+
+    @abc.abstractmethod
+    def _check_gallery_link(self) -> None:
+        """Check if the gallery link is valid and report any problems.
+
+        We have to define check_gallery() in the base class in order to link
+        and call it like all other task methods from _handle_task().
+        However the real work must be done in this subroutine which is
+        implemented by the individual subclasses because its code needs
+        to call subclass-specific methods.
+        """
+        pass
+
     def park(self) -> None:
         """Park the nomination, if possible.
 
@@ -1745,6 +1768,44 @@ class FPCandidate(Candidate):
             f"featured: {yes_no(self.is_passed())}, "
             f"5th day: {yes_no(fifth_day)})"
         )
+
+    def _check_gallery_link(self) -> None:
+        """Check if the gallery link is valid and report any problems.
+
+        The method overrides the abstract method from the superclass,
+        implementing it for FP candidates.
+        """
+        cut_title = self.cut_title()
+        # Find the gallery link
+        gallery_link = self.find_gallery_of_file()
+        if not gallery_link:
+            warn(f"{cut_title}: Found no gallery link.")
+            return
+        # Split the gallery link into gallery page name and section anchor
+        # (the latter can be empty)
+        link_parts = gallery_link.split("#", maxsplit=1)
+        gallery_page_name = link_parts[0].strip()
+        section = link_parts[1].strip() if len(link_parts) > 1 else ""
+        # Read the gallery page
+        full_page_name = f"{FP_PREFIX}{gallery_page_name}"
+        page = pywikibot.Page(_g_site, full_page_name)
+        try:
+            old_text = page.get(get_redirect=False)
+        except pywikibot.exceptions.NoPageError:
+            warn(f"{cut_title}: Gallery page '{full_page_name}' does not exist.")
+            return
+        except pywikibot.exceptions.PageRelatedError as exc:
+            warn(f"{cut_title}: Can't read gallery page '{full_page_name}': {exc}")
+            return
+        # Search for the section to which we have to add the new FP(s)
+        result = self._find_gallery_insertion_place(
+            gallery_link, full_page_name, section, old_text, False
+        )
+        if isinstance(result, tuple):
+            section_name, _ = result
+            out(f"{cut_title}: OK - '{gallery_page_name}', section '{section_name}'")
+        else:  # The result is a warning.
+            warn(f"{cut_title}: {result}")
 
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
         """Promote a new featured picture (or set of featured pictures).
@@ -1963,9 +2024,10 @@ class FPCandidate(Candidate):
 
         # Search for the section to which we have to add the new FPs
         insert_at: slice | None  # Help typecheckers.
-        if result := self._find_gallery_insertion_place(
-            gallery_link, full_page_name, section, old_text
-        ):
+        result = self._find_gallery_insertion_place(
+            gallery_link, full_page_name, section, old_text, True
+        )
+        if isinstance(result, tuple):
             real_section_name, insert_at = result
             summary = f"Added {files_for_summary} to section '{real_section_name}'"
         elif insert_at := self._find_unsorted_insertion_place(full_page_name, old_text):
@@ -1987,7 +2049,8 @@ class FPCandidate(Candidate):
         full_page_name: str,
         section: str,
         old_text: str,
-    ) -> tuple[str, slice] | None:
+        report_errors: bool,
+    ) -> tuple[str, slice] | str:
         """Search for the start of the <gallery>...</gallery> element
         of the section to which we have to add the new featured picture(s).
 
@@ -1998,14 +2061,18 @@ class FPCandidate(Candidate):
             full_page_name: The full name of the gallery page.
             section: The section anchor from the gallery link.
             old_text: The complete old text of the gallery page.
+            report_errors: If True, warnings are printed to the CLI and
+                a request for help is posted on the FPC talk page;
+                if False, warnings are just returned.
 
         Returns:
             If successful, a tuple containing
             [0] the official subheading of the target section and
             [1] a slice object describing the index values of the characters
-            which should be replaced by the new entries;
-            or None if we did not find a valid target section and have to use
-            the 'Unsorted' section instead.
+            which should be replaced by the new entries.
+            If not successful, a string with a short warning;
+            this means we did not find a valid target section and have
+            to use the 'Unsorted' section instead.
         """
         subpage_name = self._page.title()
         unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(page=full_page_name)
@@ -2013,13 +2080,15 @@ class FPCandidate(Candidate):
         # Have we got a section anchor?
         if not section:
             # There was no section anchor
-            warn("No section anchor, adding FP(s) to 'Unsorted' section.")
-            ask_for_help(
-                f"The gallery link ''{gallery_link}'' in the nomination "
-                f"[[{subpage_name}]] does not specify a gallery section. "
-                f"{unsorted_hint}"
-            )
-            return None
+            warning = "No section anchor, adding FP(s) to 'Unsorted' section."
+            if report_errors:
+                warn(warning)
+                ask_for_help(
+                    f"The gallery link ''{gallery_link}'' in the nomination "
+                    f"[[{subpage_name}]] does not specify a gallery section. "
+                    f"{unsorted_hint}"
+                )
+            return warning
 
         # Search for the subheading matching the section anchor
         # We handle spaces before colons as optional (these spaces are common
@@ -2032,14 +2101,19 @@ class FPCandidate(Candidate):
             flags=re.IGNORECASE,
         )
         if not match:
-            warn("Found no matching subheading, adding FP(s) to 'Unsorted' section.")
-            ask_for_help(
-                f"The section anchor ''{section}'' in the gallery link "
-                f"of the nomination [[{subpage_name}]] does not match "
-                f"any subheading on the gallery page [[{full_page_name}]] "
-                f"letter for letter. {unsorted_hint}"
+            warning = (
+                "Found no matching subheading, adding FP(s) "
+                "to 'Unsorted' section."
             )
-            return None
+            if report_errors:
+                warn(warning)
+                ask_for_help(
+                    f"The section anchor ''{section}'' in the gallery link "
+                    f"of the nomination [[{subpage_name}]] does not match "
+                    f"any subheading on the gallery page [[{full_page_name}]] "
+                    f"letter for letter. {unsorted_hint}"
+                )
+            return warning
         real_section_name = match.group(1)
 
         # Check if that subheading opens a valid target section,
@@ -2047,40 +2121,47 @@ class FPCandidate(Candidate):
         # <gallery>...</gallery> element or not
         match = ASSOC_GALLERY_ELEMENT_REGEX.match(old_text, pos=match.end(0))
         if not match:
-            warn(
+            warning = (
                 "Target subheading not followed immediately by <gallery>, "
                 "adding FP(s) to 'Unsorted' section."
             )
-            ask_for_help(
-                f"The gallery link ''{gallery_link}'' "
-                f"in the nomination [[{subpage_name}]] "
-                f"points to a heading on [[{full_page_name}]], "
-                f"but [[{full_page_name}#{real_section_name}|that heading]] "
-                "is not a valid target because it is not followed "
-                "immediately by an associated "
-                "<code><nowiki><gallery></nowiki></code> element. "
-                "Perhaps this is a superordinate heading and the "
-                "image should be added to one of its subsections; "
-                f"but to which one? {unsorted_hint}"
-            )
-            return None
+            if report_errors:
+                warn(warning)
+                ask_for_help(
+                    f"The gallery link ''{gallery_link}'' "
+                    f"in the nomination [[{subpage_name}]] "
+                    f"points to a heading on [[{full_page_name}]], "
+                    f"but [[{full_page_name}#{real_section_name}|that heading]] "
+                    "is not a valid target because it is not followed "
+                    "immediately by an associated "
+                    "<code><nowiki><gallery></nowiki></code> element. "
+                    "Perhaps this is a superordinate heading and the "
+                    "image should be added to one of its subsections; "
+                    f"but to which one? {unsorted_hint}"
+                )
+            return warning
 
         # If we arrive here, we have found a valid target section.
         # Check if that section is just the 'Unsorted' section
         # (this actually happens; it's valid, but not helpful,
         # so we handle the request, but also ask for help).
         if real_section_name == UNSORTED_HEADING:
-            warn("Gallery link points to 'Unsorted' section.")
-            ask_for_help(
-                f"The gallery link ''{gallery_link}'' in the nomination "
-                f"[[{subpage_name}]] instructs the bot to put the new "
-                "featured picture(s) into the ''Unsorted'' section "
-                f"of [[{full_page_name}]]. That is not exactly helpful "
-                "because this section is used only for images "
-                "which need to be sorted into a more specific section. "
-                "So please move the new featured picture(s) "
-                "to a more appropriate place."
-            )
+            warning = "Gallery link points to 'Unsorted' section."
+            if report_errors:
+                warn(warning)
+                ask_for_help(
+                    f"The gallery link ''{gallery_link}'' in the nomination "
+                    f"[[{subpage_name}]] instructs the bot to put the new "
+                    "featured picture(s) into the ''Unsorted'' section "
+                    f"of [[{full_page_name}]]. That is not exactly helpful "
+                    "because this section is used only for images "
+                    "which need to be sorted into a more specific section. "
+                    "So please move the new featured picture(s) "
+                    "to a more appropriate place."
+                )
+            return warning
+
+        # Success
         return (real_section_name, slice(match.end(1), match.end(0)))
 
     def _find_unsorted_insertion_place(
@@ -2753,6 +2834,14 @@ class DelistCandidate(Candidate):
             f"delisted: {yes_no(self.is_passed())}, "
             f"5th day: {yes_no(fifth_day)})"
         )
+
+    def _check_gallery_link(self) -> None:
+        """Check if the gallery link is valid and report any problems.
+
+        The method overrides the abstract method from the superclass,
+        implementing it for Delist candidates.
+        """
+        out(f"{self.cut_title()}: OK - delist candidate, doesn't need a gallery link")
 
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
         """Handle the parking procedure for a passed delisting candidate.
@@ -4025,7 +4114,9 @@ def _inspect_local_arguments(
             "like '-info', '-close', '-park', etc.; see '-help'."
         )
         sys.exit()
-    if invalid_args := set(task_args) - {"-test", "-info", "-close", "-park"}:
+    if invalid_args := set(task_args) - {
+        "-test", "-info", "-checkgallery", "-close", "-park"
+    }:
         # To provide a helpful error message, abort before handling even
         # the first argument and report all invalid arguments at once.
         formatted = ", ".join(f"'{arg}'" for arg in sorted(invalid_args))
@@ -4056,6 +4147,12 @@ def _handle_task(task: str, which_types: CandidateTypesToProcess) -> None:
         case "-info":
             out("Gathering information about candidates...", heading=True)
             check_candidates(Candidate.print_all_info, CAND_LIST_PAGE_NAME, which_types)
+        case "-checkgallery":
+            if not which_types.fp:
+                warn("Checking gallery links makes sense only with FP candidates.")
+                return
+            out("Checking gallery links...", heading=True)
+            check_candidates(Candidate.check_gallery, CAND_LIST_PAGE_NAME, which_types)
         case "-close":
             out("Closing finished candidates...", heading=True)
             check_candidates(Candidate.close, CAND_LIST_PAGE_NAME, which_types)
