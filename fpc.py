@@ -1776,16 +1776,12 @@ class FPCandidate(Candidate):
         implementing it for FP candidates.
         """
         cut_title = self.cut_title()
-        # Find the gallery link
+        # Find and split the gallery link
         gallery_link = self.find_gallery_of_file()
         if not gallery_link:
             warn(f"{cut_title}: Found no gallery link.")
             return
-        # Split the gallery link into gallery page name and section anchor
-        # (the latter can be empty)
-        link_parts = gallery_link.split("#", maxsplit=1)
-        gallery_page_name = link_parts[0].strip()
-        section = link_parts[1].strip() if len(link_parts) > 1 else ""
+        gallery_page_name, section = split_gallery_link(gallery_link)
         # Read the gallery page
         full_page_name = f"{FP_PREFIX}{gallery_page_name}"
         page = pywikibot.Page(_g_site, full_page_name)
@@ -1799,7 +1795,7 @@ class FPCandidate(Candidate):
             return
         # Search for the section to which we have to add the new FP(s)
         result = self._find_gallery_insertion_place(
-            gallery_link, full_page_name, section, old_text, False
+            gallery_page_name, section, old_text, False
         )
         if isinstance(result, tuple):
             section_name, _ = result
@@ -1823,7 +1819,7 @@ class FPCandidate(Candidate):
         # Some methods need the full gallery link with section anchor,
         # others only the gallery page name or even just the basic gallery.
         full_gallery_link = clean_gallery_link(results[4])
-        gallery_page = re.sub(r"#.*$", "", full_gallery_link, count=1).rstrip()
+        gallery_page, section = split_gallery_link(full_gallery_link)
         if not gallery_page:
             error(f"{cut_title}: (ignoring, gallery not defined)")
             ask_for_help(
@@ -1873,7 +1869,7 @@ class FPCandidate(Candidate):
 
         # Promote the new featured picture(s)
         self.add_to_featured_list(basic_gallery, files)
-        self.add_to_gallery_page(full_gallery_link, files)
+        self.add_to_gallery_page(gallery_page, section, files)
         self.add_assessments(files)
         self.add_assessment_to_media_info(files)
         self.add_to_current_month(files)
@@ -1957,7 +1953,12 @@ class FPCandidate(Candidate):
         summary = f"Added [[{filename}]] to section '{real_section_name}'"
         commit(old_text, new_text, page, summary)
 
-    def add_to_gallery_page(self, gallery_link: str, files: list[str]) -> None:
+    def add_to_gallery_page(
+        self,
+        gallery_page_name: str,
+        section: str,
+        files: list[str],
+    ) -> None:
         """Add the new featured picture(s) to the FP gallery page.
 
         This is STEP 2 of the parking procedure for new featured pictures.
@@ -1966,18 +1967,13 @@ class FPCandidate(Candidate):
         to the same place on the same FP gallery page.
 
         Args:
-            gallery_link: The gallery link with the name of the gallery page
-                and (optionally) a section anchor which denotes the target
-                section on that page.
+            gallery_page_name: The name of the gallery page, without the
+                leading 'Commons:Featured pictures/'.
+            section: The section anchor which denotes the target section
+                on that page (can be empty).
             files: List with filename(s) of the featured picture or set.
         """
         subpage_name = self._page.title()
-
-        # Split the gallery link into gallery page name and section anchor
-        # (the latter can be empty)
-        link_parts = gallery_link.split("#", maxsplit=1)
-        gallery_page_name = link_parts[0].strip()
-        section = link_parts[1].strip() if len(link_parts) > 1 else ""
 
         # Read the gallery page
         full_page_name = f"{FP_PREFIX}{gallery_page_name}"
@@ -2025,7 +2021,7 @@ class FPCandidate(Candidate):
         # Search for the section to which we have to add the new FPs
         insert_at: slice | None  # Help typecheckers.
         result = self._find_gallery_insertion_place(
-            gallery_link, full_page_name, section, old_text, True
+            gallery_page_name, section, old_text, True
         )
         if isinstance(result, tuple):
             real_section_name, insert_at = result
@@ -2045,8 +2041,7 @@ class FPCandidate(Candidate):
 
     def _find_gallery_insertion_place(
         self,
-        gallery_link: str,
-        full_page_name: str,
+        gallery_page_name: str,
         section: str,
         old_text: str,
         report_errors: bool,
@@ -2055,10 +2050,8 @@ class FPCandidate(Candidate):
         of the section to which we have to add the new featured picture(s).
 
         Args:
-            gallery_link: The gallery link with the name of the gallery page
-                and (optionally) a section anchor which denotes the target
-                section on that page.
-            full_page_name: The full name of the gallery page.
+            gallery_page_name: The name of the gallery page, without the
+                leading 'Commons:Featured pictures/'.
             section: The section anchor from the gallery link.
             old_text: The complete old text of the gallery page.
             report_errors: If True, warnings are printed to the CLI and
@@ -2075,6 +2068,7 @@ class FPCandidate(Candidate):
             to use the 'Unsorted' section instead.
         """
         subpage_name = self._page.title()
+        full_page_name = f"{FP_PREFIX}{gallery_page_name}"
         unsorted_hint = ADDING_FPS_TO_UNSORTED_SECTION.format(page=full_page_name)
 
         # Have we got a section anchor?
@@ -2084,8 +2078,9 @@ class FPCandidate(Candidate):
             if report_errors:
                 warn(warning)
                 ask_for_help(
-                    f"The gallery link ''{gallery_link}'' in the nomination "
-                    f"[[{subpage_name}]] does not specify a gallery section. "
+                    f"The gallery link in the nomination [[{subpage_name}]] "
+                    f"points to the gallery page [[{full_page_name}]], "
+                    "but does not specify the desired section on that page. "
                     f"{unsorted_hint}"
                 )
             return warning
@@ -2128,8 +2123,7 @@ class FPCandidate(Candidate):
             if report_errors:
                 warn(warning)
                 ask_for_help(
-                    f"The gallery link ''{gallery_link}'' "
-                    f"in the nomination [[{subpage_name}]] "
+                    f"The gallery link in the nomination [[{subpage_name}]] "
                     f"points to a heading on [[{full_page_name}]], "
                     f"but [[{full_page_name}#{real_section_name}|that heading]] "
                     "is not a valid target because it is not followed "
@@ -2150,12 +2144,12 @@ class FPCandidate(Candidate):
             if report_errors:
                 warn(warning)
                 ask_for_help(
-                    f"The gallery link ''{gallery_link}'' in the nomination "
-                    f"[[{subpage_name}]] instructs the bot to put the new "
-                    "featured picture(s) into the ''Unsorted'' section "
-                    f"of [[{full_page_name}]]. That is not exactly helpful "
-                    "because this section is used only for images "
-                    "which need to be sorted into a more specific section. "
+                    f"The gallery link in the nomination [[{subpage_name}]] "
+                    "instructs the bot to put the new featured picture(s) "
+                    f"into the ''Unsorted'' section of [[{full_page_name}]]. "
+                    "This is not exactly helpful because that section "
+                    "is used only for images which need to be sorted "
+                    "into a more specific section. "
                     "So please move the new featured picture(s) "
                     "to a more appropriate place."
                 )
@@ -3582,6 +3576,24 @@ def clean_gallery_link(gallery_link: str) -> str:
             # Keep the encoded value of the link, just log the error
             error("Error - invalid %xx escape in gallery link.")
     return link
+
+
+def split_gallery_link(gallery_link: str) -> tuple[str, str]:
+    """Split the gallery link into gallery page name and section anchor.
+
+    Args:
+        gallery_link: The gallery link from the nomination.
+
+    Returns:
+        A tuple, containing:
+        [0] str: The name of the gallery page, without the leading
+            'Commons:Featured pictures/'.
+        [1] str: The section anchor (can be empty).
+    """
+    link_parts = gallery_link.split("#", maxsplit=1)
+    page_name = link_parts[0].strip()
+    section = link_parts[1].strip() if len(link_parts) > 1 else ""
+    return (page_name, section)
 
 
 def bare_filename(filename: str) -> str:
