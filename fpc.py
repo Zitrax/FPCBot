@@ -824,7 +824,7 @@ class Candidate(abc.ABC):
     def find_gallery_of_file(self) -> str:
         """Find and polish the gallery link in the nomination subpage."""
         match = re.search(
-            r"Gallery[^\n]+?\[\[Commons:Featured[_ ]pictures\/([^\n\]]+)",
+            r"Gallery[^\n]+?\[\[[Cc]ommons: ?[Ff]eatured[_ ]pictures ?\/([^\n\]]+)",
             self.filtered_content(),
         )
         if match is not None:
