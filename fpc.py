@@ -2477,12 +2477,7 @@ class FPCandidate(Candidate):
         else:
             # The page does not exist yet (new month) or is empty,
             # so create its contents from scratch.
-            old_text = (
-                "{{FPArchiveChrono}}\n"
-                "\n"
-                f"== {month} {year} ==\n"
-                "<gallery>\n</gallery>"
-            )
+            old_text = f"== {month} {year} ==\n<gallery>\n</gallery>"
             count = 1
             job = "Started new chronological archive page, added"
 
