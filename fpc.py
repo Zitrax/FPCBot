@@ -1161,7 +1161,10 @@ class Candidate(abc.ABC):
     def image_count(self) -> int:
         """Count the number of images in this nomination.
 
-        Small images and thumbnails are not counted because they are
+        This method is used to detect nominations with alternative images.
+        Therefore it ignores the images from set nominations (which are
+        formatted with a <gallery> element) and reports 0 for them.
+        Small images and thumbnails are not counted, too, because they are
         probably just inline icons and not alternative images.
         """
         if self._image_count is not None:
