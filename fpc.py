@@ -1269,6 +1269,22 @@ class Candidate(abc.ABC):
             title = f"Set/{title}"
         return title[0:50].ljust(50)
 
+    def all_filenames(self) -> list[str]:
+        """List all nominated image files.
+
+        Returns:
+            A list with the cleaned names of all nominated image files.
+            If this is a single-file nomination, it has just one entry.
+            If there were errors in determining the file names,
+            the list is empty.
+        """
+        if self.is_set():
+            files = self.set_files()
+        else:
+            filename = self.filename()
+            files = [filename] if filename else []
+        return files
+
     def filename(self) -> str:
         """Return the name of the image nominated in this candidate.
 
@@ -1666,12 +1682,8 @@ class Candidate(abc.ABC):
             return
 
         # Are the nominated images readily available?
-        if self.is_set():
-            if not self.set_files():
-                # Could not find set images, error was already reported
-                return
-        elif not self.filename():
-            # Could not identify nominated image, error already reported
+        if not self.all_filenames():
+            # Could not find nominated image(s), error was already reported.
             return
 
         # We should now have a candidate with verified result that we can park
@@ -1860,17 +1872,11 @@ class FPCandidate(Candidate):
                 )
                 return
 
-        # Retrieve the image filename(s)
-        if self.is_set():
-            files = self.set_files()
-        else:
-            filename = self.filename()
-            files = [filename] if filename else []
+        # Promote the new featured picture(s)
+        files = self.all_filenames()
         if not files:
             # Could not identify the nominated image(s), error already reported
             return
-
-        # Promote the new featured picture(s)
         self.add_to_featured_list(basic_gallery, files)
         self.add_to_gallery_page(gallery_page, section, files)
         self.add_assessments(files)
