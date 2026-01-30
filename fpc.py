@@ -255,6 +255,13 @@ ADDING_FPS_TO_UNSORTED_SECTION: Final[str] = (
     "to the ''Unsorted'' section at the bottom of [[{page}]]. "
     "Please sort these images into the correct section."
 )
+CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS: Final[str] = (
+    "Please check that page and update the parameters "
+    "of the {{{{tl|Assessments}}}} template: "
+    "replace <code>featured=1</code> by <code>featured=2</code> "
+    "and add or update the <code>com-nom</code> parameter "
+    "with the value <code>{subpage}</code>."
+)
 
 
 # Regular expressions
@@ -2954,6 +2961,13 @@ class DelistCandidate(Candidate):
             file_page = pywikibot.FilePage(_g_site, title=filename)
             if not file_page.exists():
                 error(f"Error - image '{filename}' not found.")
+                ask_for_help(
+                    "The bot tried to remove the delisted featured picture "
+                    f"[[:{filename}]] from the gallery pages, but it seems "
+                    f"the file page does not exist. Please check "
+                    "whether it has been renamed or deleted, and remove it "
+                    "from all featured picture gallery pages."
+                )
                 continue
             using_pages = file_page.using_pages(
                 namespaces=["Commons"], filterredir=False
@@ -2990,6 +3004,13 @@ class DelistCandidate(Candidate):
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - could not read '{page_name}': {exc}")
+            formatted = "\n".join(f"* [[:{filename}]]" for filename in files)
+            ask_for_help(
+                f"The bot could not read the gallery page [[{page_name}]]: "
+                f"{format_exception(exc)}. Please check that page "
+                f"and remove the following delisted featured picture(s):\n"
+                f"{formatted}\n"
+            )
             return
         removed_files = []
         remaining_files = []
@@ -3006,6 +3027,12 @@ class DelistCandidate(Candidate):
         if remaining_files:
             for filename in remaining_files:
                 error(f"Error - could not remove '{filename}' from '{page_name}'.")
+            formatted = "\n".join(f"* [[:{filename}]]" for filename in remaining_files)
+            ask_for_help(
+                "The bot could not remove the following delisted featured "
+                f"picture(s) from the gallery page [[{page_name}]]:\n"
+                f"{formatted}\nPlease remove them manually."
+            )
         if removed_files:
             summary = f"Removed [[{removed_files[0]}]] "
             if (n := len(removed_files)) > 1:
@@ -3026,6 +3053,12 @@ class DelistCandidate(Candidate):
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - could not read '{page_name}': {exc}")
+            ask_for_help(
+                f"The bot could not read the archive page [[{page_name}]]: "
+                f"{format_exception(exc)}. Please check that page "
+                f"and mark the former featured picture [[:{filename}]] "
+                "as delisted."
+            )
             return
         fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
         if match := re.search(
@@ -3075,6 +3108,13 @@ class DelistCandidate(Candidate):
                 old_text = image_page.get(get_redirect=False)
             except pywikibot.exceptions.PageRelatedError as exc:
                 error(f"Error - can't read '{filename}': {exc}")
+                ask_for_help(
+                    f"The bot could not read the delisted featured picture "
+                    f"[[:{filename}]]: {format_exception(exc)}. "
+                    + CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS.format(
+                        subpage=subpage_name
+                    )
+                )
                 continue
 
             # Search and (if found) update the {{Assessments}} template
@@ -3083,6 +3123,14 @@ class DelistCandidate(Candidate):
             )
             if not found:
                 error(f"Error - no {{{{Assessments}}}} found on '{filename}'.")
+                ask_for_help(
+                    "The bot tried to update the {{tl|Assessments}} template "
+                    f"for the delisted featured picture [[:{filename}]], "
+                    "but did not find the template on that page. "
+                    + CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS.format(
+                        subpage=subpage_name
+                    )
+                )
                 continue
             if up_to_date:
                 # This can happen if the process has previously been interrupted.
@@ -3104,6 +3152,14 @@ class DelistCandidate(Candidate):
                     f"Error - '{filename}' is locked, can't update "
                     "{{Assessments}} template."
                 )
+                ask_for_help(
+                    "The bot cannot update the {{tl|Assessments}} template "
+                    f"for the delisted featured picture [[:{filename}]] "
+                    "because that page is locked. "
+                    + CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS.format(
+                        subpage=subpage_name
+                    )
+                )
 
     def remove_assessment_from_media_info(self, files: list[str]) -> None:
         """Remove the FP assessment claim from the structured data.
@@ -3121,6 +3177,13 @@ class DelistCandidate(Candidate):
             file_page = pywikibot.FilePage(_g_site, title=filename)
             if not file_page.exists():
                 error(f"Error - image '{filename}' not found.")
+                ask_for_help(
+                    "The bot tried to remove the featured picture "
+                    "assessment claim from the delisted featured picture "
+                    f"[[:{filename}]], but it seems the file page "
+                    "does not exist. Please check whether it has been "
+                    "renamed or deleted, and remove the assessment claim."
+                )
                 return
             media_info = file_page.data_item()
             structured_data = media_info.get(force=True)
@@ -3147,6 +3210,12 @@ class DelistCandidate(Candidate):
                     )
                 except pywikibot.exceptions.LockedPageError:
                     error(f"Error - '{filename}' is locked, can't remove FP claim.")
+                    ask_for_help(
+                        "The bot tried to remove the featured picture "
+                        "assessment claim from the delisted featured picture "
+                        f"[[:{filename}]], but the file page is locked. "
+                        "Please remove the assessment claim manually."
+                    )
             else:
                 warn(
                     "Found no 'Wikimedia Commons featured picture' assessment "
