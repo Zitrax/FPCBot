@@ -2793,17 +2793,17 @@ class DelistCandidate(Candidate):
         Overrides the abstract method from the superclass, implementing it
         for delisting candidates.
         """
-        if self.image_count() != 1 or self.is_set():
-            # A delist-and-replace or a set delisting nomination
+        if self.image_count() > 1:
+            # A delist-and-replace or other special nomination
             return (
                 "{{FPC-delist-results-unreviewed"
                 "|delist=X|keep=X|neutral=X|delisted=X"
-                "|sig=<small>'''Note: This appears to be a delist-and-replace "
-                "or set delisting nomination (or something else special). "
-                "It must therefore be counted and processed manually.'''"
+                "|sig=<small>'''Note: This looks like a delist-and-replace "
+                "nomination (or something else special). "
+                "Therefore it must be counted and processed manually.'''"
                 "</small> ~~~~}}"
             )
-        # A simple delisting nomination
+        # A delisting or set delisting nomination
         self.count_votes()
         return (
             "{{FPC-delist-results-unreviewed"
@@ -2818,13 +2818,13 @@ class DelistCandidate(Candidate):
         Overrides the abstract method from the superclass, implementing it
         for delisting candidates.
         """
-        if self.image_count() != 1 or self.is_set():
-            # A delist-and-replace or a set delisting nomination
+        if self.image_count() > 1:
+            # A delist-and-replace or other special nomination
             return (
                 "Closing for review - looks like a delist-and-replace "
-                "or set delisting nomination, needs manual counting"
+                "nomination, needs manual counting"
             )
-        # A simple delisting nomination
+        # A delisting or set delisting nomination
         self.count_votes()
         return (
             "Closing for review "
@@ -2845,40 +2845,39 @@ class DelistCandidate(Candidate):
         """Handle the parking procedure for a passed delisting candidate.
 
         The method overrides the abstract method from the superclass,
-        implementing it for delisting candidates.  It removes the image
-        from FP gallery pages, updates the {{Assessents}} template
-        and removes FP categories from the image description page,
-        marks the entry in the chronological archives as delisted, etc.
+        implementing it for delisting candidates.  It removes the image(s)
+        from FP gallery pages, updates the {{Assessents}} template(s)
+        and removes FP categories from the image description page(s),
+        marks entries in the chronological archives as delisted, etc.
         """
-        if self.image_count() != 1 or self.is_set():
-            # Support for delist-and-replace nominations and set delisting
-            # is yet to be implemented.  Therefore ask for help and abort.
+        if self.image_count() > 1:
+            # Support for delist-and-replace nominations is not implemented.
             ask_for_help(
-                "The bot is not yet able to handle delist-and-replace "
-                "nominations or set delisting nominations. "
-                "Therefore, please take care of the images "
-                f"from the nomination [[{self._page.title()}]] "
+                f"The nomination [[{self._page.title()}]] looks like "
+                "a delist-and-replace nomination or something else special, "
+                "but the bot cannot handle this (yet). "
+                "Please take care of the images from that nomination "
                 "and remove or replace them manually."
             )
             return
-        filename = self.filename()
-        if not filename:
-            # Could not identify nominated image, error already reported
+        files = self.all_filenames()
+        if not files:
+            # Could not identify the nominated image(s), error already reported
             return
-        self.remove_from_featured_list(filename)
-        self.remove_from_gallery_pages(filename, results)
-        self.remove_assessments(filename)
-        self.remove_assessment_from_media_info(filename)
+        self.remove_from_featured_list(files)
+        self.remove_from_gallery_pages(files, results)
+        self.remove_assessments(files)
+        self.remove_assessment_from_media_info(files)
         self.move_to_log(self._SUCCESS_KEYWORD)
 
-    def remove_from_featured_list(self, filename: str) -> None:
-        """Remove the delisted featured picture from the list of recent FPs.
+    def remove_from_featured_list(self, files: list[str]) -> None:
+        """Remove the delisted FP(s) from the list of recent FPs.
 
         This is STEP 1 of the parking procedure for delisting candidates.
-        It removes the delisted featured picture from the list of new FPs
+        It removes the delisted featured picture(s) from the list of new FPs
         which is also used (transcluded) on the FP landing page.
 
-        Usually this step is not required.  Until August 2025, a comment
+        Usually this step is not necessary.  Until August 2025, a comment
         in the code said:
             'We skip checking the FP landing page with the newest FPs;
             the chance that the image is still there is very small,
@@ -2889,7 +2888,7 @@ class DelistCandidate(Candidate):
         and removing a FP from the list is easy, so we just do it.
 
         Args:
-            filename: The filename of the delisted featured pictured.
+            files: The filename(s) of the delisted featured picture(s).
         """
         # Read the list
         page = pywikibot.Page(_g_site, GALLERY_LIST_PAGE_NAME)
@@ -2898,203 +2897,261 @@ class DelistCandidate(Candidate):
         except pywikibot.exceptions.PageRelatedError as exc:
             error(f"Error - can't read list of recent FPs: {exc}")
             fexc = format_exception(exc)
+            if len(files) == 1:
+                file_desc = f"the delisted featured picture [[:{files[0]}]]"
+            else:
+                file_desc = (
+                    "any of the delisted featured pictures "
+                    + ", ".join(f"[[:{filename}]]" for filename in files)
+                )
             ask_for_help(
                 COULD_NOT_READ_RECENT_FPS_LIST.format(exception=fexc)
-                + f" If the delisted FP [[:{filename}]] "
-                "appears on that page, please remove it."
+                + f" If {file_desc} appears on that page, please remove it."
             )
             return
 
-        # Remove the image, if present, from the list
-        new_text, n = re.subn(
-            r"\n[^\n]*" + wikipattern(filename) + r"[^\n]*",
-            "",
-            old_text,
-        )
-        if n == 0:
+        # Remove the image(s), if present, from the list
+        # (there should be at most one of the images in the list,
+        # but we better search for all of them to be on the save side)
+        removed_files = []
+        new_text = old_text
+        for filename in files:
+            fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
+            new_text, n = re.subn(r"\n[^\n]*" + fn_pattern + r"[^\n]*", "", new_text)
+            if n > 0:
+                removed_files.append(filename)
+        if not removed_files:
             out(
-                f"Skipping remove_from_featured_list() for '{filename}', "
-                "image not found in list."
+                f"Skipping remove_from_featured_list() for '{self._page.title()}', "
+                "image(s) not found in list."
             )
             return
-        summary = f"Removed [[{filename}]] per [[{self._page.title()}]]"
+        summary = f"Removed [[{removed_files[0]}]] "
+        if (n := len(removed_files)) > 1:
+            summary += f"and {n - 1} more set file(s) "
+        summary += f"per [[{self._page.title()}]]"
         commit(old_text, new_text, page, summary)
 
     def remove_from_gallery_pages(
         self,
-        filename: str,
+        files: list[str],
         results: tuple[str, ...],
     ) -> None:
-        """Remove a delisted FP from gallery pages and chronological archives.
+        """Remove delisted FP(s) from gallery pages and chronological archives.
 
         This is STEP 2 of the parking procedure for delisting candidates.
-        It removes the delisted FP from all FP gallery pages and marks its
-        entry in the chronological archive pages as delisted.
+        It removes the delisted FP(s) from all FP gallery pages and marks
+        their entries in the chronological archive pages as delisted.
 
         Args:
-            filename: The filename of the delisted featured pictured.
+            files: The filename(s) of the delisted featured picture(s).
             results: A tuple with strings representing the values which
                 have been assigned to the individual parameters of the
                 reviewed results template in the nomination.
         """
-        nomination_link = self._page.title()
-        fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
-        file_page = pywikibot.FilePage(_g_site, title=filename)
-        if not file_page.exists():
-            error(f"Error - image '{filename}' not found.")
-            return
-        using_pages = file_page.using_pages(namespaces=["Commons"], filterredir=False)
-        for page in using_pages:
-            page_name = page.title()
-            if not page_name.startswith(FP_PREFIX):
-                # Any other page -- don't remove the image here, of course.
+        images_per_page: dict[pywikibot.Page, list[str]] = {}
+        for filename in files:
+            file_page = pywikibot.FilePage(_g_site, title=filename)
+            if not file_page.exists():
+                error(f"Error - image '{filename}' not found.")
                 continue
-            try:
-                old_text = page.get(get_redirect=False)
-            except pywikibot.exceptions.PageRelatedError as exc:
-                error(f"Error - could not read {page_name}: {exc}")
-                continue
-            if page_name.startswith(CHRONO_ARCHIVE_PREFIX):
-                # Chronological archive page: mark the image as delisted
-                out(f"Adding delist note to '{page_name}'...")
-                if match := re.search(
-                    r"((?:[Ff]ile|[Ii]mage):%s.*)\n" % fn_pattern, old_text
-                ):
-                    if re.search(r"[Dd]elisted", match.group(1)):
-                        out(f"Already marked as delisted on '{page_name}'.")
-                        continue
-                    now = datetime.datetime.now(datetime.UTC)
-                    entry = (
-                        # Entries often end with trailing spaces, strip them
-                        f"{match.group(1).rstrip()}<br> "
-                        f"'''[[{nomination_link}|Delisted]] {now:%Y-%m-%d} "
-                        f"({results[1]}\u2013{results[0]})'''"
-                    )
-                    new_text = (
-                        f"{old_text[:match.start(1)]}{entry}{old_text[match.end(1):]}"
-                    )
+            using_pages = file_page.using_pages(
+                namespaces=["Commons"], filterredir=False
+            )
+            for page in using_pages:
+                page_name = page.title()
+                if not page_name.startswith(FP_PREFIX):
+                    # Any other page -- don't remove the image here, of course.
+                    continue
+                if page_name.startswith(CHRONO_ARCHIVE_PREFIX):
+                    # Chronological archive page: mark the image as delisted
+                    self._mark_image_as_delisted(page, filename, results)
                 else:
-                    # Did not find the image.  That's OK e.g. for the overview
-                    # pages which include the archives of each half year,
-                    # therefore don't print an error here.
-                    out(
-                        f"Did not find '{filename}' on '{page_name}'; "
-                        "that's OK if this is just a transclusion page etc."
-                    )
-                    continue
-                summary = f"Delisted [[{filename}]] per [[{nomination_link}]]"
-            else:
-                # FP gallery page: remove the entry (line) with the image
-                out(f"Removing delisted image from '{page_name}'...")
-                new_text, n = re.subn(
-                    r"(\[\[)?([Ff]ile|[Ii]mage):%s.*\n" % fn_pattern,
-                    "",
-                    old_text,
-                )
-                if n == 0:
-                    error(f"Error - could not remove '{filename}' from '{page_name}'.")
-                    continue
-                summary = f"Removed [[{filename}]] per [[{nomination_link}]]"
-            if new_text != old_text:
-                try:
-                    commit(old_text, new_text, page, summary)
-                except pywikibot.exceptions.LockedPageError:
-                    error(f"Error - page '{page_name}' is locked.")
-            else:
-                error(
-                    f"Error - removing/delisting '{filename}' "
-                    f"did not work on '{page_name}'."
-                )
+                    # FP gallery page -- if this is a set delisting, the page
+                    # probably contains several or all images from the set,
+                    # so collect them first and then remove all at once.
+                    if page in images_per_page:
+                        images_per_page[page].append(filename)
+                    else:
+                        images_per_page[page] = [filename]
+        # Now remove the collected images from the gallery page(s)
+        for page, filenames in images_per_page.items():
+            self._remove_images_from_gallery_page(page, filenames)
 
-    def remove_assessments(self, filename: str) -> None:
-        """Remove the FP status from the image description page.
-
-        This is STEP 3 of the parking procedure for delisting candidates.
-        It searches the image description page of the delisted FP for the
-        {{Assessments}} template and changes the template's parameters
-        in order to mark the FP as delisted.
-
-        Args:
-            filename: The filename of the delisted featured pictured.
-        """
-        # Get and read image description page
-        image_page = pywikibot.Page(_g_site, filename)
+    def _remove_images_from_gallery_page(
+        self,
+        page: pywikibot.Page,
+        files: list[str],
+    ) -> None:
+        """Remove all delisted images from the gallery page."""
+        page_name = page.title()
+        out(f"Removing delisted image(s) from '{page_name}'...")
         try:
-            old_text = image_page.get(get_redirect=False)
+            old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
-            error(f"Error - can't read '{filename}': {exc}")
+            error(f"Error - could not read '{page_name}': {exc}")
             return
-        subpage_name = self.subpage_name(keep_prefix=False, keep_number=True)
+        removed_files = []
+        remaining_files = []
+        new_text = old_text
+        for filename in files:
+            fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
+            new_text, n = re.subn(
+                r"(\[\[)?([Ff]ile|[Ii]mage):" + fn_pattern + r".*\n", "", new_text
+            )
+            if n == 0:
+                remaining_files.append(filename)
+            else:
+                removed_files.append(filename)
+        if remaining_files:
+            for filename in remaining_files:
+                error(f"Error - could not remove '{filename}' from '{page_name}'.")
+        if removed_files:
+            summary = f"Removed [[{removed_files[0]}]] "
+            if (n := len(removed_files)) > 1:
+                summary += f"and {n - 1} more set file(s) "
+            summary += f"per [[{self._page.title()}]]"
+            commit(old_text, new_text, page, summary)
 
-        # Search and (if found) update the {{Assessments}} template
-        found, up_to_date, new_text = update_assessments_template(
-            old_text, 2, subpage_name
-        )
-        if not found:
-            error(f"Error - no {{{{Assessments}}}} found on '{filename}'.")
+    def _mark_image_as_delisted(
+        self,
+        page: pywikibot.Page,
+        filename: str,
+        results: tuple[str, ...],
+    ) -> None:
+        """Mark the image on a chronological archive page as delisted."""
+        page_name = page.title()
+        out(f"Adding delist note to '{page_name}'...")
+        try:
+            old_text = page.get(get_redirect=False)
+        except pywikibot.exceptions.PageRelatedError as exc:
+            error(f"Error - could not read '{page_name}': {exc}")
             return
-        if up_to_date:
-            # This can happen if the process has previously been interrupted.
+        fn_pattern = wikipattern(filename.replace(FILE_NAMESPACE, ""))
+        if match := re.search(
+            r"((?:[Ff]ile|[Ii]mage):" + fn_pattern + r"(.*))\n", old_text
+        ):
+            if re.search(r"[Dd]elisted", match.group(2)):
+                out(f"Already marked as delisted on '{page_name}'.")
+                return
+            now = datetime.datetime.now(datetime.UTC)
+            entry = (
+                # Entries often end with trailing spaces, strip them
+                f"{match.group(1).rstrip()}<br> "
+                f"'''[[{self._page.title()}|Delisted]] {now:%Y-%m-%d} "
+                f"({results[1]}\u2013{results[0]})'''"
+            )
+            new_text = (
+                f"{old_text[:match.start(1)]}{entry}{old_text[match.end(1):]}"
+            )
+        else:
+            # Did not find the image.  That's OK e.g. for the overview
+            # pages which include the archives of each half year,
+            # therefore don't print an error here.
             out(
-                f"Skipping add_assessments() for '{filename}', "
-                "image is already delisted."
+                f"Did not find '{filename}' on '{page_name}'; "
+                "that's OK if this is just a transclusion page etc."
             )
             return
+        summary = f"Delisted [[{filename}]] per [[{self._page.title()}]]"
+        commit(old_text, new_text, page, summary)
 
-        # Remove 'Featured pictures of/from/by ...' categories
-        new_text = TOPICAL_FP_CATEGORY_REGEX.sub("", new_text)
+    def remove_assessments(self, files: list[str]) -> None:
+        """Remove the FP status from the image description page(s).
 
-        # Commit the new text
-        summary = f"Delisted per [[{self._page.title()}]]"
-        try:
-            commit(old_text, new_text, image_page, summary)
-        except pywikibot.exceptions.LockedPageError:
-            error(f"Error - '{filename}' is locked, can't update {{Assessments}}.")
+        This is STEP 3 of the parking procedure for delisting candidates.
+        It searches the image description page(s) of the delisted FP(s)
+        for the {{Assessments}} template and changes the template's
+        parameters in order to mark the FP(s) as delisted.
 
-    def remove_assessment_from_media_info(self, filename: str) -> None:
+        Args:
+            files: The filename(s) of the delisted featured picture(s).
+        """
+        subpage_name = self.subpage_name(keep_prefix=False, keep_number=True)
+        for filename in files:
+            # Get and read image description page
+            image_page = pywikibot.Page(_g_site, filename)
+            try:
+                old_text = image_page.get(get_redirect=False)
+            except pywikibot.exceptions.PageRelatedError as exc:
+                error(f"Error - can't read '{filename}': {exc}")
+                continue
+
+            # Search and (if found) update the {{Assessments}} template
+            found, up_to_date, new_text = update_assessments_template(
+                old_text, 2, subpage_name
+            )
+            if not found:
+                error(f"Error - no {{{{Assessments}}}} found on '{filename}'.")
+                continue
+            if up_to_date:
+                # This can happen if the process has previously been interrupted.
+                out(
+                    f"Skipping add_assessments() for '{filename}', "
+                    "image is already delisted."
+                )
+                continue
+
+            # Remove 'Featured pictures of/from/by ...' categories
+            new_text = TOPICAL_FP_CATEGORY_REGEX.sub("", new_text)
+
+            # Commit the new text
+            summary = f"Delisted per [[{self._page.title()}]]"
+            try:
+                commit(old_text, new_text, image_page, summary)
+            except pywikibot.exceptions.LockedPageError:
+                error(
+                    f"Error - '{filename}' is locked, can't update "
+                    "{{Assessments}} template."
+                )
+
+    def remove_assessment_from_media_info(self, files: list[str]) -> None:
         """Remove the FP assessment claim from the structured data.
 
         This is STEP 4 of the parking procedure for delisting candidates.
         It removes the 'Commons quality assessment' (P6731) claim
         'Wikimedia Commons featured picture' (Q63348049)
-        from the Media Info (structured data) for the former FP.
+        from the Media Info (structured data) for the former FP(s).
 
         Args:
-            filename: The filename of the delisted featured pictured.
+            files: The filename(s) of the delisted featured picture(s).
         """
-        # Get the Media Info for the image
-        file_page = pywikibot.FilePage(_g_site, title=filename)
-        if not file_page.exists():
-            error(f"Error - image '{filename}' not found.")
-            return
-        media_info = file_page.data_item()
-        structured_data = media_info.get(force=True)
-        try:
-            quality_assessments = structured_data["statements"]["P6731"]
-        except KeyError:
-            out(
-                "Found no 'Commons quality assessment' (P6731) claims "
-                f"for '{filename}'."
-            )
-            return
-
-        # Search for the claim(s) to be removed
-        # (normally there should be at most one FP claim, but I have seen
-        # weird things, so handle multiple FP claims to be on the save side)
-        claims_to_remove = []
-        for claim in quality_assessments:
-            if is_fp_assessment_claim(claim):
-                claims_to_remove.append(claim)
-        if claims_to_remove:
+        for filename in files:
+            # Get the Media Info for the image
+            file_page = pywikibot.FilePage(_g_site, title=filename)
+            if not file_page.exists():
+                error(f"Error - image '{filename}' not found.")
+                return
+            media_info = file_page.data_item()
+            structured_data = media_info.get(force=True)
             try:
-                commit_media_info_changes(filename, media_info, claims_to_remove, [])
-            except pywikibot.exceptions.LockedPageError:
-                error(f"Error - '{filename}' is locked.")
-        else:
-            out(
-                "Found no 'Wikimedia Commons featured picture' assessment "
-                f"claim (Q63348049) for '{filename}'."
-            )
+                quality_assessments = structured_data["statements"]["P6731"]
+            except KeyError:
+                warn(
+                    "Found no 'Commons quality assessment' (P6731) claims "
+                    f"for '{filename}'."
+                )
+                return
+
+            # Search for the claim(s) to be removed
+            # (normally there should be at most one FP claim, but I have seen
+            # weird things, so handle multiple FP claims to be on the save side)
+            claims_to_remove = []
+            for claim in quality_assessments:
+                if is_fp_assessment_claim(claim):
+                    claims_to_remove.append(claim)
+            if claims_to_remove:
+                try:
+                    commit_media_info_changes(
+                        filename, media_info, claims_to_remove, []
+                    )
+                except pywikibot.exceptions.LockedPageError:
+                    error(f"Error - '{filename}' is locked, can't remove FP claim.")
+            else:
+                warn(
+                    "Found no 'Wikimedia Commons featured picture' assessment "
+                    f"claim (Q63348049) for '{filename}'."
+                )
 
 
 # FUNCTIONS
