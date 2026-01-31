@@ -359,17 +359,9 @@ KEEP_VOTE_REGEX: Final[re.Pattern] = re.compile(
     VOTING_TEMPLATE_MODEL % "|".join(KEEP_TEMPLATES)
 )
 
-# Does the nomination contain a {{Withdraw(n)}}/{{Wdn}} template?
-WITHDRAWN_REGEX: Final[re.Pattern] = re.compile(
-    r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}"
-)
-# Does the nomination contain a {{FPX}} template?
-FPX_REGEX: Final[re.Pattern] = re.compile(
-    r"\{\{\s*[Ff]PX\s*(\|.*?)?\}\}"
-)
-# Does the nomination contain a {{FPD}} template?
-FPD_REGEX: Final[re.Pattern] = re.compile(
-    r"\{\{\s*[Ff]PD\s*(\|.*?)?\}\}"
+# Does the nomination contain a {{Withdraw(n)}}, {{FPX}} or {{FPD}} template?
+WITHDRAWN_FPX_FPD_REGEX: Final[re.Pattern] = re.compile(
+    r"\{\{\s*([Ww](?:ithdrawn?|dn)|[Ff]P[XD])\s*(\|.*?)?\}\}"
 )
 # Does the nomination contain subheadings = subsections?
 SECTION_REGEX: Final[re.Pattern] = re.compile(
@@ -854,31 +846,14 @@ class Candidate(abc.ABC):
         else:
             error(f"Error - '{self._page.title()}' has no real content")
 
-    def is_withdrawn(self) -> bool:
-        """Find out if the nomination been marked as withdrawn.
+    def was_cancelled(self, uppercase: bool = False) -> str | Literal[False]:
+        """Find out if the nomination has been withdrawn, FPXed or FPDed.
 
         Nominators can withdraw any of their nominations by adding
         the template {{Withdraw}} to it.
-        """
-        return WITHDRAWN_REGEX.search(self.filtered_content()) is not None
-
-    def is_fpx(self) -> bool:
-        """Find out if the nomination is marked with {{FPX}}.
-
-        Users can mark a nomination as hopeless with the {{FPX}} template.
-        """
-        return FPX_REGEX.search(self.filtered_content()) is not None
-
-    def is_fpd(self) -> bool:
-        """Find out if the nomination is marked with {{FPD}}.
-
-        Users can deny a nomination (because the nominator has exceeded
-        the limit for simultaneous nominations) with the {{FPD}} template.
-        """
-        return FPD_REGEX.search(self.filtered_content()) is not None
-
-    def was_cancelled(self, uppercase: bool = False) -> str | Literal[False]:
-        """Find out if the nomination has been withdrawn, FPXed or FPDed.
+        Users can mark a nomination as hopeless with the {{FPX}} template
+        or deny a nomination (because the nominator has exceeded the limit
+        for simultaneous nominations) with the {{FPD}} template.
 
         Args:
             uppercase: Should the return value start with an uppercase letter
@@ -888,12 +863,15 @@ class Candidate(abc.ABC):
             A short string which denotes that the nomination has been
             withdrawn, FPXed or FPDed; or False if this is not the case.
         """
-        if self.is_withdrawn():
-            return "Withdrawn" if uppercase else "withdrawn"
-        if self.is_fpx():
-            return "FPXed"
-        if self.is_fpd():
-            return "FPDed"
+        if result := WITHDRAWN_FPX_FPD_REGEX.search(self.filtered_content()):
+            # Distinguish templates on the basis of the name's last letter
+            match result.group(1)[-1]:
+                case "X":
+                    return "FPXed"
+                case "D":
+                    return "FPDed"
+                case _:
+                    return "Withdrawn" if uppercase else "withdrawn"
         return False
 
     def rules_of_fifth_day(self) -> bool:
