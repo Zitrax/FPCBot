@@ -528,6 +528,8 @@ class Candidate(abc.ABC):
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
     # Keyword for the title etc. of a failed nomination:
     _FAIL_KEYWORD: ClassVar[str] = "not featured"
+    # Basic component of the candidate archive category name
+    _CANDIDATE_ARCHIVE_CAT_ROOT: ClassVar[str] = "new featured picture candidates"
     # Compiled regex to find positive votes in the nomination:
     _PRO_VOTE_REGEX: ClassVar[re.Pattern] = SUPPORT_VOTE_REGEX
     # Compiled regex to find negative votes in the nomination:
@@ -1086,6 +1088,29 @@ class Candidate(abc.ABC):
             return text.capitalize()
         return "Active"
 
+    def _candidate_archive_status_category(self, year: int, status: str) -> str:
+        """Return the name of the candidate archive category by status.
+
+        Args:
+            year: The current year.
+            status: A keyword for the final status of this nomination,
+                i.e. '(not) featured', '(not) delisted', 'withdrawn',
+                'FPXed', 'FPDed'.
+
+        Returns:
+            The complete name of the candidate archive category by status
+            for this nomination.
+        """
+        match status:
+            case "featured" | "delisted":
+                status = "successful"
+            case "not featured" | "not delisted":
+                status = "unsuccessful"
+            case _:
+                # Don't change the keyword, just check it to catch bugs
+                assert status in {"withdrawn", "FPXed", "FPDed"}
+        return f"Category:{year} {status} {self._CANDIDATE_ARCHIVE_CAT_ROOT}"
+
     def days_old(self) -> int:
         """Return the number of days since this nomination was created."""
         if self._days_old != -1:
@@ -1562,15 +1587,19 @@ class Candidate(abc.ABC):
         as well as for delisting candidates.
         Call this method only for closed and verified candidates.
         It removes the nomination from the list of current candidates
-        and adds it to the log for the current month.
+        and adds it to the log for the current month; since February 2026,
+        it also adds candidate archive categories to the nomination subpage.
 
         Args:
             status: A keyword for the final status, like 'featured'.
         """
         subpage_name = self._page.title()
+        now = datetime.datetime.now(datetime.UTC)
+
+        # Add candidate archive categories to the nomination subpage
+        self._add_archive_categories(status, now)
 
         # Append nomination to the current log page
-        now = datetime.datetime.now(datetime.UTC)
         try:
             log_page, part_no, old_log_text = self._get_current_log_page(
                 now.year, now.strftime("%B"), subpage_name
@@ -1617,6 +1646,66 @@ class Candidate(abc.ABC):
         else:
             summary = f"Removed [[{subpage_name}]] ({status})"
             commit(old_cand_text, new_cand_text, candidates_list_page, summary)
+
+    def _add_archive_categories(self, status: str, now: datetime.datetime) -> None:
+        """Add candidate archive categories to the nomination subpage.
+
+        Args:
+            status: A keyword for the final status, like 'featured'.
+            now: The current date and time.
+        """
+        # Add archive categories to nomination subpage
+        old_text = self._page.get(get_redirect=False)
+        year = now.year
+        month_cat = f"Category:{now:%B} {year} featured picture candidates"
+        if month_cat in old_text:
+            out(
+                f"Skipping _add_archive_categories() for '{self._page.title()}', "
+                "archive category is already present."
+            )
+            return
+        status_cat = self._candidate_archive_status_category(year, status)
+        key = self.subpage_name(keep_prefix=False, keep_number=False)
+        new_text = (
+            f"{old_text.rstrip()}\n\n"
+            f"<noinclude>\n[[{month_cat}|{key}]]\n[[{status_cat}|{key}]]\n</noinclude>"
+        )
+        summary = (
+            f"Added candidate archive categories [[{month_cat}]], [[{status_cat}]]"
+        )
+        commit(old_text, new_text, self._page, summary)
+        self.reset_filtered_content()
+
+        # Create the month category if necessary
+        category_page = pywikibot.Page(_g_site, month_cat)
+        if not category_page.exists():
+            new_text = (
+                f"{{{{FPC archive category header|year={year}}}}}\n\n"
+                f"[[Category:{year} featured picture candidates| {now:%m}]]"
+            )
+            summary = "Created new candidate archive category by month"
+            commit("", new_text, category_page, summary)
+
+        # Create the status category if necessary
+        category_page = pywikibot.Page(_g_site, status_cat)
+        if not category_page.exists():
+            supercat = f"Category:{year} {self._CANDIDATE_ARCHIVE_CAT_ROOT}"
+            new_text = (
+                f"{{{{FPC archive category header|year={year}}}}}\n\n"
+                f"[[{supercat}| ]]"
+            )
+            summary = "Created new candidate archive category by status"
+            commit("", new_text, category_page, summary)
+            # Do we also need to create the supercategory?
+            category_page = pywikibot.Page(_g_site, supercat)
+            if not category_page.exists():
+                key = " -" if "delist" in supercat else " +"
+                new_text = (  # Here we must omit the status parameter.
+                    f"{{{{FPC archive category header|year={year}}}}}\n\n"
+                    f"[[Category:{year} featured picture candidates|{key}]]"
+                )
+                summary = "Created new candidate archive supercategory by status"
+                commit("", new_text, category_page, summary)
 
     def check_gallery(self) -> None:
         """Check if the gallery link is valid and report any problems.
@@ -2777,6 +2866,7 @@ class DelistCandidate(Candidate):
     _TYPE = "Del"
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
+    _CANDIDATE_ARCHIVE_CAT_ROOT = "featured picture delist candidates"
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
     _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
     _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
