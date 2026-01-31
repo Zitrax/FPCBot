@@ -1157,7 +1157,7 @@ class Candidate(abc.ABC):
         please test that with is_done() and rules_of_fifth_day().
         NB: This method cannot properly handle nominations with alternatives.
         """
-        if self.is_withdrawn():
+        if self.was_cancelled():
             return False
         self.count_votes()
         return self._pro >= 7 and (self._pro >= 2 * self._con)
