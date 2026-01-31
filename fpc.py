@@ -1555,7 +1555,7 @@ class Candidate(abc.ABC):
         )
         return (log_page, part_no, log_text)
 
-    def move_to_log(self, reason: str | None = None) -> None:
+    def move_to_log(self, status: str) -> None:
         """Move the nomination from the candidate list to the log.
 
         This is the last step of the parking procedure for FP candidates
@@ -1565,7 +1565,7 @@ class Candidate(abc.ABC):
         and adds it to the log for the current month.
 
         Args:
-            reason: A keyword for the reason (optional).
+            status: A keyword for the final status, like 'featured'.
         """
         subpage_name = self._page.title()
 
@@ -1600,8 +1600,7 @@ class Candidate(abc.ABC):
                     f"{{{{{subpage_name}}}}}"
                 )
             job = "Added" if old_log_text else "Started new log page, added"
-            why = f" ({reason})" if reason else ""
-            summary = f"{job} [[{subpage_name}]]{why}"
+            summary = f"{job} [[{subpage_name}]] ({status})"
             commit(old_log_text, new_log_text, log_page, summary)
 
         # Remove nomination from the list of current nominations
@@ -1616,7 +1615,7 @@ class Candidate(abc.ABC):
                 "candidate not found in list."
             )
         else:
-            summary = f"Removed [[{subpage_name}]]{why}"
+            summary = f"Removed [[{subpage_name}]] ({status})"
             commit(old_cand_text, new_cand_text, candidates_list_page, summary)
 
     def check_gallery(self) -> None:
