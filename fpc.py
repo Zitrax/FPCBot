@@ -363,9 +363,13 @@ KEEP_VOTE_REGEX: Final[re.Pattern] = re.compile(
 WITHDRAWN_REGEX: Final[re.Pattern] = re.compile(
     r"\{\{\s*[Ww](?:ithdrawn?|dn)\s*(\|.*?)?\}\}"
 )
-# Does the nomination contain a {{FPX}} or {{FPD}} template?
-FPX_FPD_REGEX: Final[re.Pattern] = re.compile(
-    r"\{\{\s*FP[XD]\s*(\|.*?)?\}\}"
+# Does the nomination contain a {{FPX}} template?
+FPX_REGEX: Final[re.Pattern] = re.compile(
+    r"\{\{\s*[Ff]PX\s*(\|.*?)?\}\}"
+)
+# Does the nomination contain a {{FPD}} template?
+FPD_REGEX: Final[re.Pattern] = re.compile(
+    r"\{\{\s*[Ff]PD\s*(\|.*?)?\}\}"
 )
 # Does the nomination contain subheadings = subsections?
 SECTION_REGEX: Final[re.Pattern] = re.compile(
@@ -617,7 +621,7 @@ class Candidate(abc.ABC):
                 f"De:{self.days_since_last_edit():02d} "
                 f"Se:{self.section_count():02d} "
                 f"Im:{self.image_count():02d} "
-                f"W:{y_n(self.is_withdrawn() or self.is_fpx())} "
+                f"W:{y_n(bool(self.was_cancelled()))} "
                 f"S:{'?' if self.is_ignored() else y_n(self.is_passed())} "
                 f"({self.status_string()})"
             )
@@ -859,13 +863,38 @@ class Candidate(abc.ABC):
         return WITHDRAWN_REGEX.search(self.filtered_content()) is not None
 
     def is_fpx(self) -> bool:
-        """Find out if the nomination is marked with {{FPX}} or {{FPD}}.
+        """Find out if the nomination is marked with {{FPX}}.
 
-        Users can mark a nomination as hopeless with the {{FPX}} template
-        or deny a nomination (because the nominator has exceeded the limit
-        for simultaneous nominations) with the {{FPD}} template.
+        Users can mark a nomination as hopeless with the {{FPX}} template.
         """
-        return FPX_FPD_REGEX.search(self.filtered_content()) is not None
+        return FPX_REGEX.search(self.filtered_content()) is not None
+
+    def is_fpd(self) -> bool:
+        """Find out if the nomination is marked with {{FPD}}.
+
+        Users can deny a nomination (because the nominator has exceeded
+        the limit for simultaneous nominations) with the {{FPD}} template.
+        """
+        return FPD_REGEX.search(self.filtered_content()) is not None
+
+    def was_cancelled(self, uppercase: bool = False) -> str | Literal[False]:
+        """Find out if the nomination has been withdrawn, FPXed or FPDed.
+
+        Args:
+            uppercase: Should the return value start with an uppercase letter
+                if it is a string?
+
+        Returns:
+            A short string which denotes that the nomination has been
+            withdrawn, FPXed or FPDed; or False if this is not the case.
+        """
+        if self.is_withdrawn():
+            return "Withdrawn" if uppercase else "withdrawn"
+        if self.is_fpx():
+            return "FPXed"
+        if self.is_fpd():
+            return "FPDed"
+        return False
 
     def rules_of_fifth_day(self) -> bool:
         """Find out if the rules of the 5th day apply to this nomination.
@@ -913,9 +942,8 @@ class Candidate(abc.ABC):
 
         # Close a withdrawn or FPXed/FPDed nomination if at least one full day
         # has passed since the last edit
-        if (withdrawn := self.is_withdrawn()) or self.is_fpx():
+        if reason := self.was_cancelled():
             old_enough = self.days_since_last_edit() > 0
-            reason = "withdrawn" if withdrawn else "FPXed/FPDed"
             action = "closing" if old_enough else "but waiting a day"
             out(f"{cut_title}: {reason}, {action}")
             if old_enough:
@@ -1071,10 +1099,8 @@ class Candidate(abc.ABC):
         """Return a short string describing the status of the candidate."""
         if reviewed := self.is_reviewed():
             return reviewed
-        if self.is_withdrawn():
-            return "Withdrawn"
-        if self.is_fpx():
-            return "FPXed/FPDed"
+        if cancelled := self.was_cancelled(uppercase=True):
+            return cancelled
         if self.is_ignored():
             return "Ignored"
         if self.is_done() or self.rules_of_fifth_day():
@@ -1224,11 +1250,8 @@ class Candidate(abc.ABC):
         and to find possibly incorrect old results.
         """
         # Check status and get old result(s)
-        if self.is_withdrawn():
-            out(f"{self.cut_title()}: (ignoring, was withdrawn)")
-            return
-        if self.is_fpx():
-            out(f"{self.cut_title()}: (ignoring, was FPXed/FPDed)")
+        if cancelled := self.was_cancelled():
+            out(f"{self.cut_title()}: (ignoring, was {cancelled})")
             return
         if self.image_count() > 1:
             out(f"{self.cut_title()}: (ignoring, contains alternatives)")
@@ -1665,11 +1688,8 @@ class Candidate(abc.ABC):
             return
 
         # Withdrawn/FPXed/FPDed nominations are handled by close()
-        if self.is_withdrawn():
-            out(f"{cut_title}: (ignoring, was withdrawn)")
-            return
-        if self.is_fpx():
-            out(f"{cut_title}: (ignoring, was FPXed/FPDed)")
+        if cancelled := self.was_cancelled():
+            out(f"{cut_title}: (ignoring, was {cancelled})")
             return
 
         # Look for verified results
