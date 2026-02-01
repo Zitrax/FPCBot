@@ -523,7 +523,7 @@ class Candidate(abc.ABC):
     # (these are the values for a normal FP nomination,
     # subclasses must adapt them as needed)
     # Three-letter code of the nomination type for -info:
-    _TYPE: ClassVar[str] = "FPC"
+    _TYPE: ClassVar[str] = "New"
     # Keyword for the title etc. of a successful nomination:
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
     # Keyword for the title etc. of a failed nomination:
