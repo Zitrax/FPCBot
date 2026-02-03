@@ -529,7 +529,7 @@ class Candidate(abc.ABC):
     # Keyword for the title etc. of a failed nomination:
     _FAIL_KEYWORD: ClassVar[str] = "not featured"
     # Basic component of the candidate archive category name
-    _CANDIDATE_ARCHIVE_CAT_ROOT: ClassVar[str] = "new featured picture candidates"
+    _ARCHIVE_CAT_NAME_BASE: ClassVar[str] = "candidates for featured picture status"
     # Compiled regex to find positive votes in the nomination:
     _PRO_VOTE_REGEX: ClassVar[re.Pattern] = SUPPORT_VOTE_REGEX
     # Compiled regex to find negative votes in the nomination:
@@ -1109,7 +1109,7 @@ class Candidate(abc.ABC):
             case _:
                 # Don't change the keyword, just check it to catch bugs
                 assert status in {"withdrawn", "FPXed", "FPDed"}
-        return f"Category:{year} {status} {self._CANDIDATE_ARCHIVE_CAT_ROOT}"
+        return f"Category:{year} {status} {self._ARCHIVE_CAT_NAME_BASE}"
 
     def days_old(self) -> int:
         """Return the number of days since this nomination was created."""
@@ -1697,7 +1697,7 @@ class Candidate(abc.ABC):
         # Create the status category if necessary
         category_page = pywikibot.Page(_g_site, status_cat)
         if not category_page.exists():
-            supercat = f"Category:{year} {self._CANDIDATE_ARCHIVE_CAT_ROOT}"
+            supercat = f"Category:{year} {self._ARCHIVE_CAT_NAME_BASE}"
             new_text = f"{header_tmpl}\n\n[[{supercat}| ]]"
             summary = "Created new candidate archive category for the status"
             commit("", new_text, category_page, summary)
@@ -2879,7 +2879,7 @@ class DelistCandidate(Candidate):
     _TYPE = "Del"
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
-    _CANDIDATE_ARCHIVE_CAT_ROOT = "featured picture delisting candidates"
+    _ARCHIVE_CAT_NAME_BASE = "candidates for delisting from featured picture status"
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
     _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
     _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
