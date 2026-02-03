@@ -2579,7 +2579,15 @@ class FPCandidate(Candidate):
         else:
             # The page does not exist yet (new month) or is empty,
             # so create its contents from scratch.
-            old_text = f"== {month} {year} ==\n<gallery>\n</gallery>"
+            # Add the category with a sort key and in <noinclude>
+            # because archive pages are sometimes included by other pages
+            # which should not appear in the archive category.
+            old_text = (
+                f"== {month} {year} ==\n"
+                "<noinclude>[[Category:Featured picture candidate "
+                f"chronological archives| {year} {now:%m}]]</noinclude>\n"
+                "<gallery>\n</gallery>"
+            )
             count = 1
             job = "Started new chronological archive page, added"
 
