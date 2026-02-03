@@ -191,7 +191,7 @@ NEUTRAL_TEMPLATES: Final[tuple[str, ...]] = (
 )
 DELIST_TEMPLATES: Final[tuple[str, ...]] = (
     "[Dd]elist",
-    # There seem to be no internationalized delist versions.
+    # There are no translated versions of this template.
     # Don't add {{Remove}} or {{Del}}, they are for deletion discussions.
 )
 KEEP_TEMPLATES: Final[tuple[str, ...]] = (
@@ -512,7 +512,7 @@ class ThreadCheckCandidate(threading.Thread):
 
 
 class Candidate(abc.ABC):
-    """A featured picture candidate (nomination).
+    """A featured picture candidate (nomination)
 
     This abstract base class bundles all common attributes and methods.
     All individual candidates (nominations) are represented by instances
@@ -1817,7 +1817,7 @@ class Candidate(abc.ABC):
 
 
 class FPCandidate(Candidate):
-    """A featured picture candidate.
+    """A candidate (nomination) for featured picture status
 
     Each instance of this class represents a featured picture nomination;
     the class is used both for single-file and set nominations.
@@ -2862,7 +2862,7 @@ class FPCandidate(Candidate):
 
 
 class DelistCandidate(Candidate):
-    """A delisting candidate.
+    """A candidate (nomination) for delisting from featured picture status
 
     Each instance of this class represents a delisting nomination.
     NB: The class handles only the delisting of individual FPs,
@@ -2874,7 +2874,7 @@ class DelistCandidate(Candidate):
     _TYPE = "Del"
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
-    _CANDIDATE_ARCHIVE_CAT_ROOT = "featured picture delist candidates"
+    _CANDIDATE_ARCHIVE_CAT_ROOT = "featured picture delisting candidates"
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
     _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
     _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
@@ -2939,9 +2939,9 @@ class DelistCandidate(Candidate):
         """Check if the gallery link is valid and report any problems.
 
         The method overrides the abstract method from the superclass,
-        implementing it for Delist candidates.
+        implementing it for delisting candidates.
         """
-        out(f"{self.cut_title()}: OK - delist candidate, doesn't need a gallery link")
+        out(f"{self.cut_title()}: OK - delisting candidate, doesn't need a gallery link")
 
     def handle_passed_candidate(self, results: tuple[str, ...]) -> None:
         """Handle the parking procedure for a passed delisting candidate.
@@ -3143,7 +3143,7 @@ class DelistCandidate(Candidate):
     ) -> None:
         """Mark the image on a chronological archive page as delisted."""
         page_name = page.title()
-        out(f"Adding delist note to '{page_name}'...")
+        out(f"Adding 'delisted' note to '{page_name}'...")
         try:
             old_text = page.get(get_redirect=False)
         except pywikibot.exceptions.PageRelatedError as exc:
