@@ -1077,10 +1077,10 @@ class Candidate(abc.ABC):
 
     def status_string(self) -> str:
         """Return a short string describing the status of the candidate."""
-        if reviewed := self.is_reviewed():
-            return reviewed
         if cancelled := self.was_cancelled(uppercase=True):
             return cancelled
+        if reviewed := self.is_reviewed():
+            return reviewed
         if self.is_ignored():
             return "Ignored"
         if self.is_done() or self.rules_of_fifth_day():
