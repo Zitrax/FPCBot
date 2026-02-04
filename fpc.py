@@ -1088,8 +1088,12 @@ class Candidate(abc.ABC):
             return text.capitalize()
         return "Active"
 
-    def _candidate_archive_status_category(self, year: int, status: str) -> str:
-        """Return the name of the candidate archive category by status.
+    def _candidate_archive_status_cats(
+        self,
+        year: int,
+        status: str,
+    ) -> tuple[str, str]:
+        """Return the names of the candidate archive categories by status.
 
         Args:
             year: The current year.
@@ -1098,8 +1102,10 @@ class Candidate(abc.ABC):
                 'FPXed', 'FPDed'.
 
         Returns:
-            The complete name of the candidate archive category by status
-            for this nomination.
+            A tuple, containing:
+            [0] The complete name of the candidate archive category by status
+                for this nomination.
+            [1] The name of the status supercategory for that category.
         """
         match status:
             case "featured" | "delisted":
@@ -1107,9 +1113,13 @@ class Candidate(abc.ABC):
             case "not featured" | "not delisted":
                 status = "unsuccessful"
             case _:
-                # Don't change the keyword, just check it to catch bugs
+                # Don't change the keyword, just check it to catch bugs:
                 assert status in {"withdrawn", "FPXed", "FPDed"}
-        return f"Category:{year} {status} {self._ARCHIVE_CAT_NAME_BASE}"
+        superstat = f"{status[0].upper()}{status[1:]}"  # Capitalize only 1st letter.
+        return (
+            f"Category:{year} {status} {self._ARCHIVE_CAT_NAME_BASE}",
+            f"Category:{superstat} {self._ARCHIVE_CAT_NAME_BASE}",
+        )
 
     def days_old(self) -> int:
         """Return the number of days since this nomination was created."""
@@ -1664,7 +1674,7 @@ class Candidate(abc.ABC):
                 "archive category is already present."
             )
             return
-        status_cat = self._candidate_archive_status_category(year, status)
+        status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
         key = self.subpage_name(keep_prefix=False, keep_number=False)
         new_text = (
             f"{old_text.rstrip()}\n\n"
@@ -1680,12 +1690,12 @@ class Candidate(abc.ABC):
         header_tmpl = f"{{{{FPC archive category header|year={year}}}}}"
         category_page = pywikibot.Page(_g_site, month_cat)
         if not category_page.exists():
-            supercat = f"Category:{year} featured picture candidates"
-            new_text = f"{header_tmpl}\n\n[[{supercat}| {now:%m}]]"
+            year_supercat = f"Category:{year} featured picture candidates"
+            new_text = f"{header_tmpl}\n\n[[{year_supercat}| {now:%m}]]"
             summary = "Created new candidate archive category for the month"
             commit("", new_text, category_page, summary)
             # Do we also need to create the supercategory for the year?
-            category_page = pywikibot.Page(_g_site, supercat)
+            category_page = pywikibot.Page(_g_site, year_supercat)
             if not category_page.exists():
                 new_text = (
                     f"{header_tmpl}\n\n"
@@ -1697,20 +1707,25 @@ class Candidate(abc.ABC):
         # Create the status category if necessary
         category_page = pywikibot.Page(_g_site, status_cat)
         if not category_page.exists():
-            supercat = f"Category:{year} {self._ARCHIVE_CAT_NAME_BASE}"
-            new_text = f"{header_tmpl}\n\n[[{supercat}| ]]"
+            type_supercat = f"Category:{year} {self._ARCHIVE_CAT_NAME_BASE}"
+            new_text = (
+                f"{header_tmpl}\n\n"
+                f"[[{type_supercat}| ]]\n[[{status_supercat}| {year}]]"
+            )
             summary = "Created new candidate archive category for the status"
             commit("", new_text, category_page, summary)
             # Do we also need to create the supercategory for the type?
-            category_page = pywikibot.Page(_g_site, supercat)
+            category_page = pywikibot.Page(_g_site, type_supercat)
             if not category_page.exists():
-                key = " -" if "delist" in supercat else " +"
+                key = " -" if "delist" in type_supercat else " +"
                 new_text = (
                     f"{header_tmpl}\n\n"
                     f"[[Category:{year} featured picture candidates|{key}]]"
                 )
                 summary = "Created new candidate archive category for the type"
                 commit("", new_text, category_page, summary)
+            # We don't need to create the supercategory for the status
+            # because it is the same for all years and does already exist.
 
     def check_gallery(self) -> None:
         """Check if the gallery link is valid and report any problems.
