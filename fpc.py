@@ -536,8 +536,6 @@ class Candidate(abc.ABC):
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
     # Keyword for the title etc. of a failed nomination:
     _FAIL_KEYWORD: ClassVar[str] = "not featured"
-    # Basic component of the candidate archive category name
-    _ARCHIVE_CAT_NAME_BASE: ClassVar[str] = "candidates for featured picture status"
     # Compiled regex to find positive votes in the nomination:
     _PRO_VOTE_REGEX: ClassVar[re.Pattern] = SUPPORT_VOTE_REGEX
     # Compiled regex to find negative votes in the nomination:
@@ -1061,6 +1059,14 @@ class Candidate(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    def _archive_cat_name_base(self) -> str:
+        """Return the basic component of a candidate archive category name.
+
+        Abstract method, must be implemented by the subclasses.
+        """
+        pass
+
     def creation_time(self) -> datetime.datetime:
         """Return the time at which the nomination subpage was created.
 
@@ -1132,9 +1138,10 @@ class Candidate(abc.ABC):
                 # Don't change the keyword, just check it to catch bugs:
                 assert status in {"withdrawn", "FPXed", "FPDed"}
         superstat = f"{status[0].upper()}{status[1:]}"  # Capitalize only 1st letter.
+        cat_name_base = self._archive_cat_name_base()
         return (
-            f"Category:{year} {status} {self._ARCHIVE_CAT_NAME_BASE}",
-            f"Category:{superstat} {self._ARCHIVE_CAT_NAME_BASE}",
+            f"Category:{year} {status} {cat_name_base}",
+            f"Category:{superstat} {cat_name_base}",
         )
 
     def days_old(self) -> int:
@@ -1723,7 +1730,7 @@ class Candidate(abc.ABC):
         # Create the status category if necessary
         category_page = pywikibot.Page(_g_site, status_cat)
         if not category_page.exists():
-            type_supercat = f"Category:{year} {self._ARCHIVE_CAT_NAME_BASE}"
+            type_supercat = f"Category:{year} {self._archive_cat_name_base()}"
             new_text = (
                 f"{header_tmpl}\n\n"
                 f"[[{type_supercat}| ]]\n[[{status_supercat}| {year}]]"
@@ -1733,7 +1740,10 @@ class Candidate(abc.ABC):
             # Do we also need to create the supercategory for the type?
             category_page = pywikibot.Page(_g_site, type_supercat)
             if not category_page.exists():
-                key = " -" if "delist" in type_supercat else " +"
+                key = (
+                    " /" if "replacing" in type_supercat
+                    else (" -" if "delist" in type_supercat else " +")
+                )
                 new_text = (
                     f"{header_tmpl}\n\n"
                     f"[[Category:{year} featured picture candidates|{key}]]"
@@ -1921,6 +1931,15 @@ class FPCandidate(Candidate):
             f"featured: {yes_no(self.is_passed())}, "
             f"5th day: {yes_no(fifth_day)})"
         )
+
+    def _archive_cat_name_base(self) -> str:
+        """Return the basic component of a candidate archive category name.
+
+        Overrides the abstract method from the superclass, implementing it
+        for FP candidates.
+        """
+        # In this class the result doesn't depend on the particular candidate.
+        return "candidates for featured picture status"
 
     def _check_gallery_link(self) -> None:
         """Check if the gallery link is valid and report any problems.
@@ -2918,7 +2937,6 @@ class DelistCandidate(Candidate):
     # Adapt values for the needs of this class:
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
-    _ARCHIVE_CAT_NAME_BASE = "candidates for delisting from featured picture status"
     _PRO_VOTE_REGEX = DELIST_VOTE_REGEX
     _CONTRA_VOTE_REGEX = KEEP_VOTE_REGEX
     _NEUTRAL_VOTE_REGEX = NEUTRAL_VOTE_REGEX
@@ -2997,6 +3015,18 @@ class DelistCandidate(Candidate):
             f"({self._pro} delist, {self._con} keep, {self._neu} neutral, "
             f"delisted: {yes_no(self.is_passed())}, "
             f"5th day: {yes_no(fifth_day)})"
+        )
+
+    def _archive_cat_name_base(self) -> str:
+        """Return the basic component of a candidate archive category name.
+
+        Overrides the abstract method from the superclass, implementing it
+        for delisting candidates.
+        """
+        return (
+            "candidates for delisting and replacing featured pictures"
+            if self.is_delist_and_replace()
+            else "candidates for delisting from featured picture status"
         )
 
     def _check_gallery_link(self) -> None:
