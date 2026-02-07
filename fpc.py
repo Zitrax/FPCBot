@@ -194,6 +194,13 @@ DELIST_TEMPLATES: Final[tuple[str, ...]] = (
     # There are no translated versions of this template.
     # Don't add {{Remove}} or {{Del}}, they are for deletion discussions.
 )
+DELIST_AND_REPLACE_TEMPLATES: Final[tuple[str, ...]] = (
+    "[Dd]elistandreplace",
+    "[Dd]elist[ _]and[ _][Rr]eplace",
+    "[Dd]ar",
+    "[Dd]&R",
+    # There are no translated versions.
+)
 KEEP_TEMPLATES: Final[tuple[str, ...]] = (
     "[Kk]eep",
     "[Kk]",
@@ -354,6 +361,9 @@ NEUTRAL_VOTE_REGEX: Final[re.Pattern] = re.compile(
 )
 DELIST_VOTE_REGEX: Final[re.Pattern] = re.compile(
     VOTING_TEMPLATE_MODEL % "|".join(DELIST_TEMPLATES)
+)
+DELIST_AND_REPLACE_VOTE_REGEX: Final[re.Pattern] = re.compile(
+    VOTING_TEMPLATE_MODEL % "|".join(DELIST_AND_REPLACE_TEMPLATES)
 )
 KEEP_VOTE_REGEX: Final[re.Pattern] = re.compile(
     VOTING_TEMPLATE_MODEL % "|".join(KEEP_TEMPLATES)
@@ -522,8 +532,6 @@ class Candidate(abc.ABC):
     # Define class constants
     # (these are the values for a normal FP nomination,
     # subclasses must adapt them as needed)
-    # Three-letter code of the nomination type for -info:
-    _TYPE: ClassVar[str] = "New"
     # Keyword for the title etc. of a successful nomination:
     _SUCCESS_KEYWORD: ClassVar[str] = "featured"
     # Keyword for the title etc. of a failed nomination:
@@ -607,7 +615,7 @@ class Candidate(abc.ABC):
             self.count_votes()
             out(
                 f"{self.cut_title()}: "
-                f"{self._TYPE} "
+                f"{self._type_code()} "
                 f"P:{self._pro:02d} "
                 f"C:{self._con:02d} "
                 f"N:{self._neu:02d} "
@@ -1024,6 +1032,14 @@ class Candidate(abc.ABC):
             return text
         # Add the keyword to the heading
         return text.replace(heading, f"{heading}, {keyword}", 1)
+
+    @abc.abstractmethod
+    def _type_code(self) -> str:
+        """Return a three-letter code of the nomination type for '-info'.
+
+        Abstract method, must be implemented by the subclasses.
+        """
+        pass
 
     @abc.abstractmethod
     def get_result_string(self) -> str:
@@ -1851,6 +1867,15 @@ class FPCandidate(Candidate):
 
     # No __init__():
     # the class just uses the initializer of the superclass.
+
+    def _type_code(self) -> str:
+        """Return a three-letter code of the nomination type for '-info'.
+
+        Overrides the abstract method from the superclass, implementing it
+        for FP candidates.
+        """
+        # In this class the result doesn't depend on the particular candidate.
+        return "New"
 
     def get_result_string(self) -> str:
         """Return the results template to be added when closing a nomination.
@@ -2891,7 +2916,6 @@ class DelistCandidate(Candidate):
 
     # Define class constants
     # Adapt values for the needs of this class:
-    _TYPE = "Del"
     _SUCCESS_KEYWORD = "delisted"
     _FAIL_KEYWORD = "not delisted"
     _ARCHIVE_CAT_NAME_BASE = "candidates for delisting from featured picture status"
@@ -2909,13 +2933,33 @@ class DelistCandidate(Candidate):
     # No __init__():
     # the class just uses the initializer of the superclass.
 
+    def is_delist_and_replace(self) -> bool:
+        """Find out whether this is a delist-and-replace nomination or not."""
+        # Check two criteria because sometimes people use unusual formatting
+        # (e.g. a <gallery> element) for D&R nominations.  There could be
+        # false-positive results, but these are better that false-negative ones
+        # because D&R nominations are rare, so false-positive results will
+        # certainly be noticed, unlike false-negative ones.
+        return (
+            self.image_count() > 1
+            or bool(DELIST_AND_REPLACE_VOTE_REGEX.search(self.filtered_content()))
+        )
+
+    def _type_code(self) -> str:
+        """Return a three-letter code of the nomination type for '-info'.
+
+        Overrides the abstract method from the superclass, implementing it
+        for delisting candidates.
+        """
+        return "D&R" if self.is_delist_and_replace() else "Del"
+
     def get_result_string(self) -> str:
         """Return the results template to be added when closing a nomination.
 
         Overrides the abstract method from the superclass, implementing it
         for delisting candidates.
         """
-        if self.image_count() > 1:
+        if self.is_delist_and_replace():
             # A delist-and-replace or other special nomination
             return (
                 "{{FPC-delist-results-unreviewed"
@@ -2940,7 +2984,7 @@ class DelistCandidate(Candidate):
         Overrides the abstract method from the superclass, implementing it
         for delisting candidates.
         """
-        if self.image_count() > 1:
+        if self.is_delist_and_replace():
             # A delist-and-replace or other special nomination
             return (
                 "Closing for review - looks like a delist-and-replace "
@@ -2972,7 +3016,7 @@ class DelistCandidate(Candidate):
         and removes FP categories from the image description page(s),
         marks entries in the chronological archives as delisted, etc.
         """
-        if self.image_count() > 1:
+        if self.is_delist_and_replace():
             # Support for delist-and-replace nominations is not implemented.
             ask_for_help(
                 f"The nomination [[{self._page.title()}]] looks like "
