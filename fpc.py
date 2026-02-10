@@ -1713,19 +1713,26 @@ class Candidate(abc.ABC):
         header_tmpl = f"{{{{FPC archive category header|year={year}}}}}"
         category_page = pywikibot.Page(_g_site, month_cat)
         if not category_page.exists():
-            year_supercat = f"Category:{year} featured picture candidates"
-            new_text = f"{header_tmpl}\n\n[[{year_supercat}| {now:%m}]]"
+            month_supercat = f"Category:{year} featured picture candidates by month"
+            new_text = f"{header_tmpl}\n\n[[{month_supercat}| {now:%m}]]"
             summary = "Created new candidate archive category for the month"
             commit("", new_text, category_page, summary)
-            # Do we also need to create the supercategory for the year?
-            category_page = pywikibot.Page(_g_site, year_supercat)
+            # Do we also need to create the 'by month' supercategory?
+            category_page = pywikibot.Page(_g_site, month_supercat)
             if not category_page.exists():
-                new_text = (
-                    f"{header_tmpl}\n\n"
-                    f"[[Category:Featured picture candidates by year| {year}]]"
-                )
-                summary = "Created new candidate archive category for the year"
+                year_supercat = f"Category:{year} featured picture candidates"
+                new_text = f"{header_tmpl}\n\n[[{year_supercat}| Month]]"
+                summary = "Created new candidate archive category 'by month'"
                 commit("", new_text, category_page, summary)
+                # Do we also need to create the supercategory for the year?
+                category_page = pywikibot.Page(_g_site, year_supercat)
+                if not category_page.exists():
+                    new_text = (
+                        f"{header_tmpl}\n\n"
+                        f"[[Category:Featured picture candidates by year| {year}]]"
+                    )
+                    summary = "Created new candidate archive category for the year"
+                    commit("", new_text, category_page, summary)
 
         # Create the status category if necessary
         category_page = pywikibot.Page(_g_site, status_cat)
