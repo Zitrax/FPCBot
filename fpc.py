@@ -1144,6 +1144,56 @@ class Candidate(abc.ABC):
             f"Category:{superstat} {cat_name_base}",
         )
 
+    def _candidate_archive_subject(
+        self,
+        gallery_link: str | None = None,
+    ) -> tuple[str, str]:
+        """Return subject keyword for candidate archive categories by subject.
+
+        The subject keywords of these categories are based on the first part
+        of the gallery link, like 'Animals' or 'Natural phenomena'.
+        Therefore the categories also correspond to the sections of our list
+        of recent FPs which is also used on the FP landing page.
+        We just replace some subject names for grammatical reasons
+        (all subjects must go with 'FPC of ...'), and we split the giant
+        'Places' subject in order to separate at least architecture and
+        landscape photography (they are independent genres of photography).
+
+        Args:
+            gallery_link: The gallery link from the nomination,
+                if already known.  Pass an empty string for delisting
+                nominations (they don't use a gallery link).
+
+        Returns:
+            A tuple, containing:
+            [0] The subject as simple keyword, like 'plants'.
+            [1] A subject phrase like 'of plants' for use in category names.
+                We need a separate value for this because the phrase for
+                a missing subject does not work well with 'of'.
+        """
+        if gallery_link is None:
+            gallery_link = self.find_gallery_of_file()
+        if gallery_link == "":  # Delisting nomination, or link not found.
+            # For such nominations we use a maintenance category:
+            return ("without subject", "without subject")
+        result = re.search(r"^(.*?)(?:[/#](.*?)(?:[/#]|$)|$)", gallery_link)
+        assert result is not None  # Regex matches always, help typecheckers.
+        basic_gallery = result.group(1).strip().lower()  # Level case variants
+        match basic_gallery:
+            case "historical":
+                subject = "historical images"
+            case "places":
+                match result.group(2).strip().lower():
+                    case "architecture" | "interiors":
+                        subject = "architecture"
+                    case "natural":
+                        subject = "natural scenes"
+                    case _:  # Including that group 2 is None = no match
+                        subject = "places"
+            case _:
+                subject = basic_gallery
+        return (subject, f"of {subject}")
+
     def days_old(self) -> int:
         """Return the number of days since this nomination was created."""
         if self._days_old != -1:
@@ -1613,7 +1663,7 @@ class Candidate(abc.ABC):
         )
         return (log_page, part_no, log_text)
 
-    def move_to_log(self, status: str) -> None:
+    def move_to_log(self, status: str, gallery_link: str | None = None) -> None:
         """Move the nomination from the candidate list to the log.
 
         This is the last step of the parking procedure for FP candidates
@@ -1625,12 +1675,15 @@ class Candidate(abc.ABC):
 
         Args:
             status: A keyword for the final status, like 'featured'.
+            gallery_link: The gallery link from the nomination,
+                if already known.  Pass an empty string for delisting
+                nominations (they don't use a gallery link).
         """
         subpage_name = self._page.title()
         now = datetime.datetime.now(datetime.UTC)
 
         # Add candidate archive categories to the nomination subpage
-        self._add_archive_categories(status, now)
+        self._add_archive_categories(status, now, gallery_link)
 
         # Append nomination to the current log page
         try:
@@ -1680,12 +1733,20 @@ class Candidate(abc.ABC):
             summary = f"Removed [[{subpage_name}]] ({status})"
             commit(old_cand_text, new_cand_text, candidates_list_page, summary)
 
-    def _add_archive_categories(self, status: str, now: datetime.datetime) -> None:
+    def _add_archive_categories(
+        self,
+        status: str,
+        now: datetime.datetime,
+        gallery_link: str | None = None,
+    ) -> None:
         """Add candidate archive categories to the nomination subpage.
 
         Args:
             status: A keyword for the final status, like 'featured'.
             now: The current date and time.
+            gallery_link: The gallery link from the nomination,
+                if already known.  Pass an empty string for delisting
+                nominations (they don't use a gallery link).
         """
         # Add archive categories to nomination subpage
         old_text = self._page.get(get_redirect=False)
@@ -1698,13 +1759,18 @@ class Candidate(abc.ABC):
             )
             return
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
+        subject, of_subject = self._candidate_archive_subject(gallery_link)
+        subject_cat = f"Category:{year} featured picture candidates {of_subject}"
         key = self.subpage_name(keep_prefix=False, keep_number=False)
         new_text = (
             f"{old_text.rstrip()}\n\n"
-            f"<noinclude>\n[[{month_cat}|{key}]]\n[[{status_cat}|{key}]]\n</noinclude>"
+            "<noinclude>\n"
+            f"[[{month_cat}|{key}]]\n[[{status_cat}|{key}]]\n[[{subject_cat}|{key}]]\n"
+            "</noinclude>"
         )
         summary = (
-            f"Added candidate archive categories [[{month_cat}]], [[{status_cat}]]"
+            "Added candidate archive categories "
+            f"[[{month_cat}]], [[{status_cat}]], [[{subject_cat}]]"
         )
         commit(old_text, new_text, self._page, summary)
         self.reset_filtered_content()
@@ -1740,7 +1806,8 @@ class Candidate(abc.ABC):
             type_supercat = f"Category:{year} {self._archive_cat_name_base()}"
             new_text = (
                 f"{header_tmpl}\n\n"
-                f"[[{type_supercat}| ]]\n[[{status_supercat}| {year}]]"
+                f"[[{type_supercat}| ]]\n"
+                f"[[{status_supercat}| {year}]]"
             )
             summary = "Created new candidate archive category for the status"
             commit("", new_text, category_page, summary)
@@ -1759,6 +1826,39 @@ class Candidate(abc.ABC):
                 commit("", new_text, category_page, summary)
             # We don't need to create the supercategory for the status
             # because it is the same for all years and does already exist.
+
+        # Create the subject category if necessary
+        category_page = pywikibot.Page(_g_site, subject_cat)
+        if not category_page.exists():
+            subject_supercat = f"Category:Featured picture candidates {of_subject}"
+            year_supercat = f"Category:{year} featured picture candidates by subject"
+            key = f"{subject[0].upper()}{subject[1:]}"  # Capitalize only 1st letter.
+            new_text = (
+                f"{header_tmpl}\n\n"
+                f"[[{year_supercat}|{key}]]\n"
+                f"[[{subject_supercat}| {year}]]"
+            )
+            summary = "Created new candidate archive category for the subject"
+            commit("", new_text, category_page, summary)
+            # Do we also need to create the 'by subject' supercategory for the year?
+            category_page = pywikibot.Page(_g_site, year_supercat)
+            if not category_page.exists():
+                new_text = (
+                    f"{header_tmpl}\n\n"
+                    f"[[Category:{year} featured picture candidates| Subject]]"
+                )
+                summary = "Created new candidate archive category 'by subject'"
+                commit("", new_text, category_page, summary)
+            # Do we also need to create the supercategory for the subject?
+            category_page = pywikibot.Page(_g_site, subject_supercat)
+            if not category_page.exists():
+                new_text = (
+                    "{{FPC archive category header}}\n\n"
+                    f"[[Category:Featured picture candidates by subject|{key}]]"
+                )
+                summary = "Created new candidate archive category for the subject"
+                commit("", new_text, category_page, summary)
+            # We don't need to create the base category, it is always the same.
 
     def check_gallery(self) -> None:
         """Check if the gallery link is valid and report any problems.
@@ -2048,7 +2148,7 @@ class FPCandidate(Candidate):
         self.add_to_current_month(files)
         self.notify_nominator(files)
         self.notify_uploader_and_creator(files)
-        self.move_to_log(self._SUCCESS_KEYWORD)
+        self.move_to_log(self._SUCCESS_KEYWORD, gallery_page)
 
     def add_to_featured_list(self, section_name: str, files: list[str]) -> None:
         """Add the new featured picture to the list of recent FPs.
@@ -3071,7 +3171,7 @@ class DelistCandidate(Candidate):
         self.remove_from_gallery_pages(files, results)
         self.remove_assessments(files)
         self.remove_assessment_from_media_info(files)
-        self.move_to_log(self._SUCCESS_KEYWORD)
+        self.move_to_log(self._SUCCESS_KEYWORD, "")  # No gallery link here.
 
     def remove_from_featured_list(self, files: list[str]) -> None:
         """Remove the delisted FP(s) from the list of recent FPs.
