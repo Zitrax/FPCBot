@@ -1944,7 +1944,7 @@ class Candidate(abc.ABC):
 
         # We should now have a candidate with verified result that we can park
         verified_result = results[0]
-        success = verified_result[3]
+        success = verified_result[3].lower()
         if success in {"yes", "no"}:
             # If the keyword has not yet been added to the heading, add it now
             old_text = self._page.get(get_redirect=False)
