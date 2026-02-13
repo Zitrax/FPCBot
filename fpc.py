@@ -1166,16 +1166,16 @@ class Candidate(abc.ABC):
 
         Returns:
             A tuple, containing:
-            [0] The subject as simple keyword, like 'plants'.
-            [1] A subject phrase like 'of plants' for use in category names.
-                We need a separate value for this because the phrase for
-                a missing subject does not work well with 'of'.
+            [0] A phrase describing the subject (like 'of plants') for use
+                in category names.  We return a phrase (not just the subject)
+                because sometimes we must vary the grammatical construction.
+            [1] A sort key for the category.
         """
         if gallery_link is None:
             gallery_link = self.find_gallery_of_file()
         if gallery_link == "":  # Delisting nomination, or link not found.
             # For such nominations we use a maintenance category:
-            return ("without subject", "without subject")
+            return ("without subject", "!Without")
         result = re.search(r"^(.*?)(?:[/#](.*?)(?:[/#]|$)|$)", gallery_link)
         assert result is not None  # Regex matches always, help typecheckers.
         basic_gallery = result.group(1).strip().lower()  # Level case variants
@@ -1192,7 +1192,7 @@ class Candidate(abc.ABC):
                         subject = "places"
             case _:
                 subject = basic_gallery
-        return (subject, f"of {subject}")
+        return (f"of {subject}", f"{subject[0].upper()}{subject[1:]}")
 
     def days_old(self) -> int:
         """Return the number of days since this nomination was created."""
@@ -1759,8 +1759,8 @@ class Candidate(abc.ABC):
             )
             return
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
-        subject, of_subject = self._candidate_archive_subject(gallery_link)
-        subject_cat = f"Category:{year} featured picture candidates {of_subject}"
+        subj_phrase, subj_key = self._candidate_archive_subject(gallery_link)
+        subject_cat = f"Category:{year} featured picture candidates {subj_phrase}"
         key = self.subpage_name(keep_prefix=False, keep_number=False)
         new_text = (
             f"{old_text.rstrip()}\n\n"
@@ -1830,12 +1830,11 @@ class Candidate(abc.ABC):
         # Create the subject category if necessary
         category_page = pywikibot.Page(_g_site, subject_cat)
         if not category_page.exists():
-            subject_supercat = f"Category:Featured picture candidates {of_subject}"
+            subject_supercat = f"Category:Featured picture candidates {subj_phrase}"
             year_supercat = f"Category:{year} featured picture candidates by subject"
-            key = f"{subject[0].upper()}{subject[1:]}"  # Capitalize only 1st letter.
             new_text = (
                 f"{header_tmpl}\n\n"
-                f"[[{year_supercat}|{key}]]\n"
+                f"[[{year_supercat}|{subj_key}]]\n"
                 f"[[{subject_supercat}| {year}]]"
             )
             summary = "Created new candidate archive category for the subject"
@@ -1854,7 +1853,7 @@ class Candidate(abc.ABC):
             if not category_page.exists():
                 new_text = (
                     "{{FPC archive category header}}\n\n"
-                    f"[[Category:Featured picture candidates by subject|{key}]]"
+                    f"[[Category:Featured picture candidates by subject|{subj_key}]]"
                 )
                 summary = "Created new candidate archive category for the subject"
                 commit("", new_text, category_page, summary)
