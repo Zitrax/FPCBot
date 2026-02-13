@@ -1148,7 +1148,7 @@ class Candidate(abc.ABC):
         self,
         gallery_link: str | None = None,
     ) -> tuple[str, str]:
-        """Return subject keyword for candidate archive categories by subject.
+        """Return the subject for candidate archive categories by subject.
 
         The subject keywords of these categories are based on the first part
         of the gallery link, like 'Animals' or 'Natural phenomena'.
@@ -1788,7 +1788,7 @@ class Candidate(abc.ABC):
             if not category_page.exists():
                 year_supercat = f"Category:{year} featured picture candidates"
                 new_text = f"{header_with_year}\n\n[[{year_supercat}| Month]]"
-                summary = "Created new candidate archive category 'by month'"
+                summary = "Created new candidate archive supercategory 'by month'"
                 commit("", new_text, category_page, summary)
                 # Do we also need to create the supercategory for the year?
                 category_page = pywikibot.Page(_g_site, year_supercat)
@@ -1797,7 +1797,7 @@ class Candidate(abc.ABC):
                         f"{header_with_year}\n\n"
                         f"[[Category:Featured picture candidates by year| {year}]]"
                     )
-                    summary = "Created new candidate archive category for the year"
+                    summary = "Created new candidate archive supercategory for the year"
                     commit("", new_text, category_page, summary)
 
         # Create the status category if necessary
@@ -1822,7 +1822,7 @@ class Candidate(abc.ABC):
                     f"{header_with_year}\n\n"
                     f"[[Category:{year} featured picture candidates|{key}]]"
                 )
-                summary = "Created new candidate archive category for the type"
+                summary = "Created new candidate archive supercategory for the type"
                 commit("", new_text, category_page, summary)
             # We don't need to create the supercategory for the status
             # because it is the same for all years and does already exist.
@@ -1857,7 +1857,7 @@ class Candidate(abc.ABC):
                     f"{header_with_year}\n\n"  # Don't add maintenance param here!
                     f"[[Category:{year} featured picture candidates| Subject]]"
                 )
-                summary = "Created new candidate archive category 'by subject'"
+                summary = "Created new candidate archive supercategory 'by subject'"
                 commit("", new_text, category_page, summary)
             # Do we also need to create the supercategory for the subject?
             category_page = pywikibot.Page(_g_site, subject_supercat)
@@ -1866,7 +1866,7 @@ class Candidate(abc.ABC):
                     f"{header_without_year}\n\n"
                     f"[[Category:Featured picture candidates by subject|{subj_key}]]"
                 )
-                summary = "Created new candidate archive category for the subject"
+                summary = "Created new candidate archive supercategory for the subject"
                 commit("", new_text, category_page, summary)
             # We don't need to create the base category, it is always the same.
 
