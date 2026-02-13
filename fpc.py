@@ -1832,8 +1832,19 @@ class Candidate(abc.ABC):
         if not category_page.exists():
             subject_supercat = f"Category:Featured picture candidates {subj_phrase}"
             year_supercat = f"Category:{year} featured picture candidates by subject"
+            if subj_key[0] == "!":
+                # These are maintenance categories, add a special param to the header
+                header_with_year_and_param = (
+                    f"{{{{FPC archive category header|year={year}|maintenance=true}}}}"
+                )
+                header_without_year = (
+                    "{{FPC archive category header|maintenance=true}}"
+                )
+            else:
+                header_with_year_and_param = header_with_year
+                header_without_year = "{{FPC archive category header}}"
             new_text = (
-                f"{header_with_year}\n\n"
+                f"{header_with_year_and_param}\n\n"
                 f"[[{year_supercat}|{subj_key}]]\n"
                 f"[[{subject_supercat}| {year}]]"
             )
@@ -1843,7 +1854,7 @@ class Candidate(abc.ABC):
             category_page = pywikibot.Page(_g_site, year_supercat)
             if not category_page.exists():
                 new_text = (
-                    f"{header_with_year}\n\n"
+                    f"{header_with_year}\n\n"  # Don't add maintenance param here!
                     f"[[Category:{year} featured picture candidates| Subject]]"
                 )
                 summary = "Created new candidate archive category 'by subject'"
@@ -1852,7 +1863,7 @@ class Candidate(abc.ABC):
             category_page = pywikibot.Page(_g_site, subject_supercat)
             if not category_page.exists():
                 new_text = (  # Here we need the header template without year:
-                    "{{FPC archive category header}}\n\n"
+                    f"{header_without_year}\n\n"
                     f"[[Category:Featured picture candidates by subject|{subj_key}]]"
                 )
                 summary = "Created new candidate archive category for the subject"
