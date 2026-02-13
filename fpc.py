@@ -1776,25 +1776,25 @@ class Candidate(abc.ABC):
         self.reset_filtered_content()
 
         # Create the month category if necessary
-        header_tmpl = f"{{{{FPC archive category header|year={year}}}}}"
+        header_with_year = f"{{{{FPC archive category header|year={year}}}}}"
         category_page = pywikibot.Page(_g_site, month_cat)
         if not category_page.exists():
             month_supercat = f"Category:{year} featured picture candidates by month"
-            new_text = f"{header_tmpl}\n\n[[{month_supercat}| {now:%m}]]"
+            new_text = f"{header_with_year}\n\n[[{month_supercat}| {now:%m}]]"
             summary = "Created new candidate archive category for the month"
             commit("", new_text, category_page, summary)
             # Do we also need to create the 'by month' supercategory?
             category_page = pywikibot.Page(_g_site, month_supercat)
             if not category_page.exists():
                 year_supercat = f"Category:{year} featured picture candidates"
-                new_text = f"{header_tmpl}\n\n[[{year_supercat}| Month]]"
+                new_text = f"{header_with_year}\n\n[[{year_supercat}| Month]]"
                 summary = "Created new candidate archive category 'by month'"
                 commit("", new_text, category_page, summary)
                 # Do we also need to create the supercategory for the year?
                 category_page = pywikibot.Page(_g_site, year_supercat)
                 if not category_page.exists():
                     new_text = (
-                        f"{header_tmpl}\n\n"
+                        f"{header_with_year}\n\n"
                         f"[[Category:Featured picture candidates by year| {year}]]"
                     )
                     summary = "Created new candidate archive category for the year"
@@ -1805,7 +1805,7 @@ class Candidate(abc.ABC):
         if not category_page.exists():
             type_supercat = f"Category:{year} {self._archive_cat_name_base()}"
             new_text = (
-                f"{header_tmpl}\n\n"
+                f"{header_with_year}\n\n"
                 f"[[{type_supercat}| ]]\n"
                 f"[[{status_supercat}| {year}]]"
             )
@@ -1819,7 +1819,7 @@ class Candidate(abc.ABC):
                     else (" -" if "delist" in type_supercat else " +")
                 )
                 new_text = (
-                    f"{header_tmpl}\n\n"
+                    f"{header_with_year}\n\n"
                     f"[[Category:{year} featured picture candidates|{key}]]"
                 )
                 summary = "Created new candidate archive category for the type"
@@ -1833,7 +1833,7 @@ class Candidate(abc.ABC):
             subject_supercat = f"Category:Featured picture candidates {subj_phrase}"
             year_supercat = f"Category:{year} featured picture candidates by subject"
             new_text = (
-                f"{header_tmpl}\n\n"
+                f"{header_with_year}\n\n"
                 f"[[{year_supercat}|{subj_key}]]\n"
                 f"[[{subject_supercat}| {year}]]"
             )
@@ -1843,7 +1843,7 @@ class Candidate(abc.ABC):
             category_page = pywikibot.Page(_g_site, year_supercat)
             if not category_page.exists():
                 new_text = (
-                    f"{header_tmpl}\n\n"
+                    f"{header_with_year}\n\n"
                     f"[[Category:{year} featured picture candidates| Subject]]"
                 )
                 summary = "Created new candidate archive category 'by subject'"
@@ -1851,7 +1851,7 @@ class Candidate(abc.ABC):
             # Do we also need to create the supercategory for the subject?
             category_page = pywikibot.Page(_g_site, subject_supercat)
             if not category_page.exists():
-                new_text = (
+                new_text = (  # Here we need the header template without year:
                     "{{FPC archive category header}}\n\n"
                     f"[[Category:Featured picture candidates by subject|{subj_key}]]"
                 )
