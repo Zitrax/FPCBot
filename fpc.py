@@ -1765,7 +1765,8 @@ class Candidate(abc.ABC):
         new_text = (
             f"{old_text.rstrip()}\n\n"
             "<noinclude>\n"
-            f"[[{month_cat}|{key}]]\n[[{status_cat}|{key}]]\n[[{subject_cat}|{key}]]\n"
+            f"{{{{DEFAULTSORT:{key}}}}}\n"
+            f"[[{month_cat}]]\n[[{status_cat}]]\n[[{subject_cat}]]\n"
             "</noinclude>"
         )
         summary = (
