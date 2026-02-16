@@ -1776,100 +1776,161 @@ class Candidate(abc.ABC):
         commit(old_text, new_text, self._page, summary)
         self.reset_filtered_content()
 
-        # Create the month category if necessary
-        header_with_year = f"{{{{FPC archive category header|year={year}}}}}"
+        # Create the candidate archive categories if necessary
+        self._create_month_and_year_categories(now, month_cat)
+        self._create_type_and_status_categories(year, status_cat, status_supercat)
+        self._create_subject_categories(year, subject_cat, subj_phrase, subj_key)
+
+    @staticmethod
+    def _create_month_and_year_categories(
+        now: datetime.datetime,
+        month_cat: str,
+    ) -> None:
+        """Create candidate archive categories for month and year, if necessary.
+
+        Args:
+            now: The current date and time.
+            month_cat: The name of the archive category for the current month.
+        """
+        # Create the category for the current month if necessary
         category_page = pywikibot.Page(_g_site, month_cat)
-        if not category_page.exists():
-            month_supercat = f"Category:{year} featured picture candidates by month"
-            new_text = f"{header_with_year}\n\n[[{month_supercat}| {now:%m}]]"
-            summary = "Created new candidate archive category for the month"
-            commit("", new_text, category_page, summary)
-            # Do we also need to create the 'by month' supercategory?
-            category_page = pywikibot.Page(_g_site, month_supercat)
-            if not category_page.exists():
-                year_supercat = f"Category:{year} featured picture candidates"
-                new_text = f"{header_with_year}\n\n[[{year_supercat}| Month]]"
-                summary = "Created new candidate archive supercategory 'by month'"
-                commit("", new_text, category_page, summary)
-                # Do we also need to create the supercategory for the year?
-                category_page = pywikibot.Page(_g_site, year_supercat)
-                if not category_page.exists():
-                    new_text = (
-                        f"{header_with_year}\n\n"
-                        f"[[Category:Featured picture candidates by year| {year}]]"
-                    )
-                    summary = "Created new candidate archive supercategory for the year"
-                    commit("", new_text, category_page, summary)
+        if category_page.exists():
+            # This means the following categories exist, too, so we can just ...
+            return
+        year = now.year
+        header = f"{{{{FPC archive category header|year={year}}}}}"
+        month_supercat = f"Category:{year} featured picture candidates by month"
+        new_text = f"{header}\n\n[[{month_supercat}| {now:%m}]]"
+        summary = "Created new candidate archive category for the month"
+        commit("", new_text, category_page, summary)
 
-        # Create the status category if necessary
-        category_page = pywikibot.Page(_g_site, status_cat)
+        # Do we also need to create the 'by month' supercategory?
+        category_page = pywikibot.Page(_g_site, month_supercat)
         if not category_page.exists():
-            type_supercat = f"Category:{year} {self._archive_cat_name_base()}"
-            new_text = (
-                f"{header_with_year}\n\n"
-                f"[[{type_supercat}| ]]\n"
-                f"[[{status_supercat}| {year}]]"
-            )
-            summary = "Created new candidate archive category for the status"
+            year_supercat = f"Category:{year} featured picture candidates"
+            new_text = f"{header}\n\n[[{year_supercat}| Month]]"
+            summary = "Created new candidate archive supercategory 'by month'"
             commit("", new_text, category_page, summary)
-            # Do we also need to create the supercategory for the type?
-            category_page = pywikibot.Page(_g_site, type_supercat)
-            if not category_page.exists():
-                key = (
-                    " /" if "replacing" in type_supercat
-                    else (" -" if "delist" in type_supercat else " +")
-                )
-                new_text = (
-                    f"{header_with_year}\n\n"
-                    f"[[Category:{year} featured picture candidates|{key}]]"
-                )
-                summary = "Created new candidate archive supercategory for the type"
-                commit("", new_text, category_page, summary)
-            # We don't need to create the supercategory for the status
-            # because it is the same for all years and does already exist.
 
-        # Create the subject category if necessary
-        category_page = pywikibot.Page(_g_site, subject_cat)
-        if not category_page.exists():
-            subject_supercat = f"Category:Featured picture candidates {subj_phrase}"
-            year_supercat = f"Category:{year} featured picture candidates by subject"
-            if subj_key[0] == "!":
-                # These are maintenance categories, add a special param to the header
-                header_with_year_and_param = (
-                    f"{{{{FPC archive category header|year={year}|maintenance=yes}}}}"
-                )
-                header_without_year = (
-                    "{{FPC archive category header|maintenance=yes}}"
-                )
-            else:
-                header_with_year_and_param = header_with_year
-                header_without_year = "{{FPC archive category header}}"
-            new_text = (
-                f"{header_with_year_and_param}\n\n"
-                f"[[{year_supercat}|{subj_key}]]\n"
-                f"[[{subject_supercat}| {year}]]"
-            )
-            summary = "Created new candidate archive category for the subject"
-            commit("", new_text, category_page, summary)
-            # Do we also need to create the 'by subject' supercategory for the year?
+            # Do we also need to create the supercategory for the year?
             category_page = pywikibot.Page(_g_site, year_supercat)
             if not category_page.exists():
                 new_text = (
-                    f"{header_with_year}\n\n"  # Don't add maintenance param here!
-                    f"[[Category:{year} featured picture candidates| Subject]]"
+                    f"{header}\n\n"
+                    f"[[Category:Featured picture candidates by year| {year}]]"
                 )
-                summary = "Created new candidate archive supercategory 'by subject'"
+                summary = "Created new candidate archive supercategory for the year"
                 commit("", new_text, category_page, summary)
-            # Do we also need to create the supercategory for the subject?
-            category_page = pywikibot.Page(_g_site, subject_supercat)
-            if not category_page.exists():
-                new_text = (  # Here we need the header template without year:
-                    f"{header_without_year}\n\n"
-                    f"[[Category:Featured picture candidates by subject|{subj_key}]]"
-                )
-                summary = "Created new candidate archive supercategory for the subject"
-                commit("", new_text, category_page, summary)
-            # We don't need to create the base category, it is always the same.
+
+    def _create_type_and_status_categories(
+        self,
+        year: int,
+        status_category: str,
+        status_supercat: str,
+    ) -> None:
+        """Create candidate archive categories for type and status, if necessary.
+
+        Args:
+            year: The current year.
+            status_category: Name of the category for nominations from the current
+                year which have the same type and status as this nomination.
+            status_supercat: Name of the supercategory for all nominations
+                with that type and status.
+        """
+        # Create the status category if necessary
+        category_page = pywikibot.Page(_g_site, status_category)
+        if category_page.exists():
+            # This means the following category exists, too, so we can just ...
+            return
+        header = f"{{{{FPC archive category header|year={year}}}}}"
+        type_supercat = f"Category:{year} {self._archive_cat_name_base()}"
+        new_text = (
+            f"{header}\n\n"
+            f"[[{type_supercat}| ]]\n"
+            f"[[{status_supercat}| {year}]]"
+        )
+        summary = "Created new candidate archive category for the status"
+        commit("", new_text, category_page, summary)
+
+        # Do we also need to create the supercategory for the type?
+        category_page = pywikibot.Page(_g_site, type_supercat)
+        if not category_page.exists():
+            key = (
+                " /" if "replacing" in type_supercat
+                else (" -" if "delist" in type_supercat else " +")
+            )
+            new_text = (
+                f"{header}\n\n"
+                f"[[Category:{year} featured picture candidates|{key}]]"
+            )
+            summary = "Created new candidate archive supercategory for the type"
+            commit("", new_text, category_page, summary)
+        # We don't need to create the supercategory for the status
+        # because it is the same for all years and does already exist.
+
+    @staticmethod
+    def _create_subject_categories(
+        year: int,
+        subject_category: str,
+        subject_phrase: str,
+        subject_key: str,
+    ) -> None:
+        """Create candidate archive categories for the subject, if necessary.
+
+        Args:
+            year: The current year.
+            subject_category: Name of the category for nominations from the current
+                year which have the same subject as this nomination.
+            subject_phrase: A phrase describing the subject (like 'of plants')
+                for use in category names.
+            subject_key: A sort key for the categories.
+        """
+        # Create the subject category if necessary
+        category_page = pywikibot.Page(_g_site, subject_category)
+        if category_page.exists():
+            # This means the following categories exist, too, so we can just ...
+            return
+        header_with_year = f"{{{{FPC archive category header|year={year}}}}}"
+        is_maintenance = subject_key[0] == "!"
+        header = (  # Maintenance categories add a special param to the header:
+            f"{{{{FPC archive category header|year={year}|maintenance=yes}}}}"
+            if is_maintenance
+            else header_with_year
+        )
+        subject_supercat = f"Category:Featured picture candidates {subject_phrase}"
+        year_supercat = f"Category:{year} featured picture candidates by subject"
+        new_text = (
+            f"{header}\n\n"
+            f"[[{year_supercat}|{subject_key}]]\n"
+            f"[[{subject_supercat}| {year}]]"
+        )
+        summary = "Created new candidate archive category for the subject"
+        commit("", new_text, category_page, summary)
+
+        # Do we also need to create the 'by subject' supercategory for the year?
+        category_page = pywikibot.Page(_g_site, year_supercat)
+        if not category_page.exists():
+            new_text = (
+                f"{header_with_year}\n\n"  # Don't add maintenance param here!
+                f"[[Category:{year} featured picture candidates| Subject]]"
+            )
+            summary = "Created new candidate archive supercategory 'by subject'"
+            commit("", new_text, category_page, summary)
+
+        # Do we also need to create the supercategory for the subject?
+        category_page = pywikibot.Page(_g_site, subject_supercat)
+        if not category_page.exists():
+            header = (  # Here we need the header template without year:
+                "{{FPC archive category header|maintenance=yes}}" if is_maintenance
+                else "{{FPC archive category header}}"
+            )
+            new_text = (
+                f"{header}\n\n"
+                f"[[Category:Featured picture candidates by subject|{subject_key}]]"
+            )
+            summary = "Created new candidate archive supercategory for the subject"
+            commit("", new_text, category_page, summary)
+        # We don't need to create the base category, it is always the same.
 
     def check_gallery(self) -> None:
         """Check if the gallery link is valid and report any problems.
