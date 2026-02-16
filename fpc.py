@@ -1836,10 +1836,10 @@ class Candidate(abc.ABC):
             if subj_key[0] == "!":
                 # These are maintenance categories, add a special param to the header
                 header_with_year_and_param = (
-                    f"{{{{FPC archive category header|year={year}|maintenance=true}}}}"
+                    f"{{{{FPC archive category header|year={year}|maintenance=yes}}}}"
                 )
                 header_without_year = (
-                    "{{FPC archive category header|maintenance=true}}"
+                    "{{FPC archive category header|maintenance=yes}}"
                 )
             else:
                 header_with_year_and_param = header_with_year
