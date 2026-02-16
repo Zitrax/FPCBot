@@ -51,6 +51,7 @@ import signal
 import datetime
 import time
 import re
+import unicodedata
 import urllib.parse
 import threading
 import traceback
@@ -419,6 +420,14 @@ TOPICAL_FP_CATEGORY_REGEX: Final[re.Pattern] = re.compile(
     r"|(?:[a-z -]+)?photo(?:graphs|graphy|s).*?"
     r"|(?:diagrams|maps).*?"
     r")\]\] *\n?"
+)
+
+
+# Other data
+
+# Some frequent auxiliary character translations for sort keys
+AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
+    {"Æ": "AE", "Œ": "OE", "æ": "ae", "œ": "oe", "ß": "ss"}
 )
 
 
@@ -1761,7 +1770,9 @@ class Candidate(abc.ABC):
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
         subj_phrase, subj_key = self._candidate_archive_subject(gallery_link)
         subject_cat = f"Category:{year} featured picture candidates {subj_phrase}"
-        key = self.subpage_name(keep_prefix=False, keep_number=False)
+        key = name_to_sort_key(
+            self.subpage_name(keep_prefix=False, keep_number=False)
+        )
         new_text = (
             f"{old_text.rstrip()}\n\n"
             "<noinclude>\n"
@@ -4179,6 +4190,29 @@ def build_log_page_name(month_name: str, year: int, part: int) -> str:
         e.g. 'Commons:Featured picture candidates/Log/January 2025-1'.
     """
     return f"{CAND_LOG_PREFIX}{month_name} {year}-{part}"
+
+
+def name_to_sort_key(name: str) -> str:
+    """Convert a page or nomination base name to a sort key.
+
+    It is more or less impossible to sort arbitrary strings in a way which
+    is satisfying for all languages and styles at the same time, because
+    languages have very different rules for collation etc.
+    This function is just a compromise: it is simple enough to be practical
+    and at least allows for better sorting of many pages; e.g., it makes sure
+    that we sort 'Château.jpg' before 'Chur.jpg' and not after it.
+    It removes accents and diacritics, then it translates a few carefully
+    selected compound characters acc. to their most common interpretation
+    for sorting.
+    """
+    try:
+        result = unicodedata.normalize("NFKD", name.strip())
+        result = "".join(
+            char for char in result if not unicodedata.combining(char)
+        )
+    except UnicodeError:
+        return name
+    return result.translate(AUXILIARY_SORT_KEY_TRSL_TABLE)
 
 
 def format_exception(exc: Exception) -> str:
