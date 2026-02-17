@@ -1185,22 +1185,21 @@ class Candidate(abc.ABC):
         if gallery_link == "":  # Delisting nomination, or link not found.
             # For such nominations we use a maintenance category:
             return ("without subject", "!Without")
-        result = re.search(r"^(.*?)(?:[/#](.*?)(?:[/#]|$)|$)", gallery_link)
-        assert result is not None  # Regex matches always, help typecheckers.
-        basic_gallery = result.group(1).strip().lower()  # Level case variants
-        match basic_gallery:
+        gallery_link = re.sub(r"#.+", "", gallery_link).lower()
+        link_parts = re.split(r"\s*/\s*", gallery_link)
+        match link_parts[0]:
             case "historical":
                 subject = "historical images"
-            case "places":
-                match result.group(2).strip().lower():
+            case "places" if len(link_parts) > 1:
+                match link_parts[1]:
                     case "architecture" | "interiors":
                         subject = "architecture"
                     case "natural":
                         subject = "natural scenes"
-                    case _:  # Including that group 2 is None = no match
+                    case _:
                         subject = "places"
-            case _:
-                subject = basic_gallery
+            case _:  # Including 'places' without further specification
+                subject = link_parts[0]
         return (f"of {subject}", f"{subject[0].upper()}{subject[1:]}")
 
     def days_old(self) -> int:
