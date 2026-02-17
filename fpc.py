@@ -1192,10 +1192,17 @@ class Candidate(abc.ABC):
                 subject = "historical images"
             case "places" if len(link_parts) > 1:
                 match link_parts[1]:
-                    case "architecture" | "interiors":
+                    case "architecture":
+                        if "cityscapes" in gallery_link:
+                            subject = "cityscapes and settlements"
+                        else:
+                            subject = "architecture"
+                    case "interiors":
                         subject = "architecture"
                     case "natural":
                         subject = "natural scenes"
+                    case "settlements":
+                        subject = "cityscapes and settlements"
                     case _:
                         subject = "places"
             case _:  # Including 'places' without further specification
