@@ -1205,7 +1205,13 @@ class Candidate(abc.ABC):
                         subject = "cityscapes and settlements"
                     case _:
                         subject = "places"
-            case _:  # Including 'places' without further specification
+            case "objects" if len(link_parts) > 1:
+                match link_parts[1]:
+                    case "vehicles":
+                        subject = "vehicles"
+                    case _:
+                        subject = "objects"
+            case _:  # Including 'places' and 'objects' without specification
                 subject = link_parts[0]
         return (f"of {subject}", f"{subject[0].upper()}{subject[1:]}")
 
