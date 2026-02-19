@@ -1618,7 +1618,7 @@ class Candidate(abc.ABC):
                         f"from [[{build_log_page_name(month, year, 1)}]] "
                         f"up to [[{next_page_name}]]. "
                         "''Something is rotten in the state of Commons'', "
-                        f"or in the code of the bot."
+                        "or in the code of the bot."
                     )
             # Implict else: create a new log for the new month, part 1.
 
@@ -1639,7 +1639,7 @@ class Candidate(abc.ABC):
                 error(f"Log page '{log_page_name}' was moved, redirect is invalid.")
                 raise CouldNotAddDataError(
                     f"The log page [[{log_page_name}]] has been renamed, "
-                    f"but the bot could not resolve the redirect: "
+                    "but the bot could not resolve the redirect: "
                     f"{format_exception(exc)}."
                 ) from exc
             out(f"Resolved redirect: '{log_page_name}' -> '{log_page.title()}'")
@@ -3351,7 +3351,7 @@ class DelistCandidate(Candidate):
                 ask_for_help(
                     "The bot tried to remove the delisted featured picture "
                     f"[[:{filename}]] from the gallery pages, but it seems "
-                    f"the file page does not exist. Please check "
+                    "the file page does not exist. Please check "
                     "whether it has been renamed or deleted, and remove it "
                     "from all featured picture gallery pages."
                 )
@@ -3395,7 +3395,7 @@ class DelistCandidate(Candidate):
             ask_for_help(
                 f"The bot could not read the gallery page [[{page_name}]]: "
                 f"{format_exception(exc)}. Please check that page "
-                f"and remove the following delisted featured picture(s):\n"
+                "and remove the following delisted featured picture(s):\n"
                 f"{formatted}\n"
             )
             return
@@ -3496,7 +3496,7 @@ class DelistCandidate(Candidate):
             except pywikibot.exceptions.PageRelatedError as exc:
                 error(f"Error - can't read '{filename}': {exc}")
                 ask_for_help(
-                    f"The bot could not read the delisted featured picture "
+                    "The bot could not read the delisted featured picture "
                     f"[[:{filename}]]: {format_exception(exc)}. "
                     + CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS.format(
                         subpage=subpage_name
