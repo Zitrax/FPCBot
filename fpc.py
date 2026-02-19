@@ -1187,11 +1187,13 @@ class Candidate(abc.ABC):
             return ("without subject", "!Without")
         gallery_link = re.sub(r"#.+", "", gallery_link).lower()
         link_parts = re.split(r"\s*/\s*", gallery_link)
-        match link_parts[0]:
+        basic_gallery = link_parts[0]
+        next_part = link_parts[1] if len(link_parts) > 1 else ""
+        match basic_gallery:
             case "historical":
                 subject = "historical images"
-            case "places" if len(link_parts) > 1:
-                match link_parts[1]:
+            case "places":
+                match next_part:
                     case "architecture":
                         if "cityscapes" in gallery_link:
                             subject = "cityscapes and settlements"
@@ -1205,10 +1207,10 @@ class Candidate(abc.ABC):
                         subject = "cityscapes and settlements"
                     case _:
                         subject = "places"
-            case "objects" if len(link_parts) > 1:
-                subject = "vehicles" if (link_parts[1] == "vehicles") else "objects"
-            case _:  # Including 'places' and 'objects' without specification
-                subject = link_parts[0]
+            case "objects":
+                subject = "vehicles" if next_part == "vehicles" else "objects"
+            case _:
+                subject = basic_gallery
         return (f"of {subject}", f"{subject[0].upper()}{subject[1:]}")
 
     def days_old(self) -> int:
