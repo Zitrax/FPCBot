@@ -1780,19 +1780,23 @@ class Candidate(abc.ABC):
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
         subj_phrase, subj_key = self._candidate_archive_subject(gallery_link)
         subject_cat = f"Category:{year} featured picture candidates {subj_phrase}"
-        key = name_to_sort_key(
-            self.subpage_name(keep_prefix=False, keep_number=False)
-        )
+        categories = [month_cat, status_cat, subject_cat]  # Also defines order
+        if self.is_set():
+            set_cat = f"Category:{year} featured picture set nominations"
+            categories.append(set_cat)
+        else:
+            set_cat = ""
+        key = name_to_sort_key(self.subpage_name(keep_prefix=False, keep_number=False))
         new_text = (
             f"{old_text.rstrip()}\n\n"
             "<noinclude>\n"
             f"{{{{DEFAULTSORT:{key}}}}}\n"
-            f"[[{month_cat}]]\n[[{status_cat}]]\n[[{subject_cat}]]\n"
-            "</noinclude>"
+            + "".join(f"[[{cat}]]\n" for cat in categories)
+            + "</noinclude>"
         )
         summary = (
             "Added candidate archive categories "
-            f"[[{month_cat}]], [[{status_cat}]], [[{subject_cat}]]"
+            + ", ".join(f"[[{cat}]]" for cat in categories)
         )
         commit(old_text, new_text, self._page, summary)
         self.reset_filtered_content()
@@ -1801,6 +1805,8 @@ class Candidate(abc.ABC):
         self._create_month_and_year_categories(now, month_cat)
         self._create_type_and_status_categories(year, status_cat, status_supercat)
         self._create_subject_categories(year, subject_cat, subj_phrase, subj_key)
+        if set_cat:
+            self._create_set_category(year, set_cat)
 
     @staticmethod
     def _create_month_and_year_categories(
@@ -1952,6 +1958,28 @@ class Candidate(abc.ABC):
             summary = "Created new candidate archive supercategory for the subject"
             commit("", new_text, category_page, summary)
         # We don't need to create the base category, it is always the same.
+
+    @staticmethod
+    def _create_set_category(year: int, set_category: str) -> None:
+        """Create candidate archive category for set nominations, if necessary.
+
+        Args:
+            year: The current year.
+            set_category: The name of the candidate archive category
+                for set nominations from the current year.
+        """
+        category_page = pywikibot.Page(_g_site, set_category)
+        if category_page.exists():
+            return
+        new_text = (
+            f"{{{{FPC archive category header|year={year}}}}}\n\n"
+            f"[[Category:{year} featured picture candidates| >]]\n"
+            f"[[Category:Featured picture set nominations| {year}]]"
+        )
+        summary = "Created new candidate archive category for set nominations"
+        commit("", new_text, category_page, summary)
+        # We don't need to create the supercategories -- the year category
+        # is created elsewhere, the set category is always the same.
 
     def check_gallery(self) -> None:
         """Check if the gallery link is valid and report any problems.
