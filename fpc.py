@@ -378,9 +378,9 @@ WITHDRAWN_FPX_FPD_REGEX: Final[re.Pattern] = re.compile(
 SECTION_REGEX: Final[re.Pattern] = re.compile(
     r"^={1,4}.+={1,4}\s*$", flags=re.MULTILINE
 )
-# Count the number of displayed images
+# Find or count displayed images
 IMAGES_REGEX: Final[re.Pattern] = re.compile(
-    r"(\[\[((?:[Ff]ile|[Ii]mage):[^|]+).*?\]\])"
+    r"(\[\[((?:[Ff]ile|[Ii]mage):[^|\]]+).*?\]\])"
 )
 # Look for a size specification in the image link
 IMAGE_SIZE_REGEX: Final[re.Pattern] = re.compile(r"\|.*?(\d+)\s*px")
