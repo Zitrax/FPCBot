@@ -380,6 +380,9 @@ SECTION_REGEX: Final[re.Pattern] = re.compile(
 )
 # Find or count displayed images
 IMAGES_REGEX: Final[re.Pattern] = re.compile(
+    # Because Mediawiki page names can't contain '|', '[', ']', etc.,
+    # capturing group 2 stops at the end of the actual image filename,
+    # regardless whether there is a '|...' or not.
     r"(\[\[((?:[Ff]ile|[Ii]mage):[^|\]]+).*?\]\])"
 )
 # Look for a size specification in the image link
@@ -1307,16 +1310,12 @@ class Candidate(abc.ABC):
         """
         if self._image_count is not None:
             return self._image_count
-        images = IMAGES_REGEX.findall(self.filtered_content())
-        count = len(images)
-        if count >= 2:
-            # We have several images, check if some of them are marked
-            # as thumbnails or are too small to be counted
+        self._image_count = 0
+        if images := IMAGES_REGEX.findall(self.filtered_content()):
             for image_link, _ in images:
-                if is_just_thumbnail(image_link):
-                    count -= 1
-        self._image_count = count
-        return count
+                if not is_just_thumbnail(image_link):
+                    self._image_count += 1
+        return self._image_count
 
     def existing_results(self) -> list[tuple[str, ...]]:
         """Search and parse verified (reviewed) results template(s).
