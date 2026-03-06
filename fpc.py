@@ -339,11 +339,11 @@ VERIFIED_DELIST_RESULT_REGEX: Final[re.Pattern] = re.compile(
 COUNTED_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
     r"\{\{\s*FPC-results-unreviewed.*?\}\}"
 )
-DELIST_COUNTED_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
-    r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
-)
 REVIEWED_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
     r"\{\{\s*FPC-results-reviewed.*?\}\}"
+)
+DELIST_COUNTED_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
+    r"\{\{\s*FPC-delist-results-unreviewed.*?\}\}"
 )
 DELIST_REVIEWED_TEMPLATE_REGEX: Final[re.Pattern] = re.compile(
     r"\{\{\s*FPC-delist-results-reviewed.*?\}\}"
