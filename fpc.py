@@ -493,8 +493,8 @@ class CandidateTypesToProcess(NamedTuple):
         """
         if re.search(r"/ *[Rr]emoval */", subpage_name):
             return DelistCandidate if self.delist else None
-        else:
-            return FPCandidate if self.fp else None
+        # Default:
+        return FPCandidate if self.fp else None
 
     def describe(self) -> str:
         """Summarize the types of candidates we want to process."""
@@ -846,14 +846,12 @@ class Candidate(abc.ABC):
 
     def find_gallery_of_file(self) -> str:
         """Find and polish the gallery link in the nomination subpage."""
-        match = re.search(
+        if match := re.search(
             r"Gallery[^\n]+?\[\[[Cc]ommons: ?[Ff]eatured[_ ]pictures ?\/([^\n\]]+)",
             self.filtered_content(),
-        )
-        if match is not None:
+        ):
             return clean_gallery_link(match.group(1))
-        else:
-            return ""
+        return ""
 
     def count_votes(self) -> None:
         """Count all votes in this nomination."""
@@ -4338,9 +4336,8 @@ def find_template_pos(
         if ns == -1:
             if not lvl:
                 return slice(match.start(0), ne + 2)
-            else:
-                lvl -= 1
-                cp = ne + 2
+            lvl -= 1
+            cp = ne + 2
 
         elif not lvl and ne < ns:
             return slice(match.start(0), ne + 2)
