@@ -32,10 +32,10 @@ Options:
 -dry            Do not commit any edits, just print them.
 -threads        Use threads to speed things up
                 (must be used with '-auto' and/or '-dry').
--fpc            Process featured picture candidates (if neither '-fpc'
-                nor '-delist' is used all candidates are processed).
--delist         Process delisting candidates (if neither '-fpc'
-                nor '-delist' is used all candidates are processed).
+-fpc            Process candidates for featured picture status.
+-delist         Process candidates for delisting from featured picture status
+                (if neither '-fpc' nor '-delist' is used,
+                all candidates are processed).
 -notime         Avoid displaying timestamps in log output.
 -match pattern  Only operate on nominations matching this pattern.
 """
