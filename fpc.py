@@ -4510,7 +4510,8 @@ def commit(
 
     # Decide whether to save the changes
     if _confirm_changes(page_name, summary):
-        page.put(new_text, summary=summary, watch=None, minor=False)
+        page.text = new_text
+        page.save(summary=summary, watch=None, minor=False, bot=True)
     else:
         out(f"Changes to '{page_name}' ignored.")
 
