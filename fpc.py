@@ -2058,7 +2058,7 @@ class Candidate(abc.ABC):
             old_text = self._page.get(get_redirect=False)
             new_text = self.fix_heading(old_text, success)
             if new_text != old_text:
-                commit(old_text, new_text, self._page, "Fixed header")
+                commit(old_text, new_text, self._page, "Fixed heading", minor=True)
                 self.reset_filtered_content()
             # Park the candidate
             if success == "yes":
@@ -4486,6 +4486,7 @@ def commit(
     new_text: str,
     page: pywikibot.Page,
     summary: str,
+    minor: bool = False,
 ) -> None:
     """Commit the new text of the page.
 
@@ -4497,6 +4498,7 @@ def commit(
         new_text: New text of the page to be submitted.
         page: Pywikibot Page object for the concerned page on Commons.
         summary: The edit summary for the page history.
+        minor (optional): Is this a minor edit?
     """
     # Show the diff
     page_name = page.title()
@@ -4511,7 +4513,7 @@ def commit(
     # Decide whether to save the changes
     if _confirm_changes(page_name, summary):
         page.text = new_text
-        page.save(summary=summary, watch=None, minor=False, bot=True)
+        page.save(summary=summary, watch=None, minor=minor, bot=True)
     else:
         out(f"Changes to '{page_name}' ignored.")
 
