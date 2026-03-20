@@ -270,6 +270,13 @@ CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS: Final[str] = (
     "and add or update the <code>com-nom</code> parameter "
     "with the value <code>{subpage}</code>."
 )
+PLEASE_ADD_FP_ASSESSMENT_CLAIM: Final[str] = (
+    "Please add the claim [[:wikidata:Special:EntityPage/P6731|"
+    "Commons quality assessment (P6731)]]: "
+    "[[:wikidata:Special:EntityPage/Q63348049|"
+    "Wikimedia Commons featured picture (Q63348049)]] "
+    "to the Structured data of {files}."
+)
 
 
 # Regular expressions
@@ -2661,10 +2668,17 @@ class FPCandidate(Candidate):
             # Commit the new text
             try:
                 commit(old_text, new_text, page, "FP promotion")
-            except pywikibot.exceptions.LockedPageError:
+            except pywikibot.exceptions.PageSaveRelatedError as exc:
                 error(
-                    f"Error - image '{filename}' is locked, "
-                    "can't add/update {{Assessments}}."
+                    f"Error - can't save '{filename}', "
+                    f"can't add/update {{{{Assessments}}}}: {exc}"
+                )
+                ask_for_help(
+                    "The bot cannot add or update the {{tl|Assessments}} "
+                    f"template for the featured picture [[:{filename}]] "
+                    "because there was an error saving the page: "
+                    f"{format_exception(exc)}. "
+                    "Please add or update the {{tl|Assessments}} manually."
                 )
 
     def add_assessment_to_media_info(self, files: list[str]) -> None:
@@ -2708,11 +2722,7 @@ class FPCandidate(Candidate):
                 "to the Structured data of one or more new FP(s) because "
                 "creating and connecting a Pywikibot <code>Site</code> object "
                 f"for Wikidata has failed: {format_exception(exc)}. "
-                "Please add the claim [[:wikidata:Special:EntityPage/P6731|"
-                "Commons quality assessment (P6731)]]: "
-                "[[:wikidata:Special:EntityPage/Q63348049|"
-                "Wikimedia Commons featured picture (Q63348049)]] "
-                f"to the Structured data of {file_links}."
+                + PLEASE_ADD_FP_ASSESSMENT_CLAIM.format(files=file_links)
             )
             return
         fp_claim_data = {
@@ -2798,8 +2808,16 @@ class FPCandidate(Candidate):
                 )
                 try:
                     commit_media_info_changes(filename, media_info, [], [fp_claim])
-                except pywikibot.exceptions.LockedPageError:
-                    error(f"Error - '{filename}' is locked.")
+                except pywikibot.exceptions.PageSaveRelatedError as exc:
+                    error(f"Error - can't save changes to '{filename}': {exc}")
+                    file_link = f"[[:{filename}]]"
+                    ask_for_help(
+                        "The bot could not add a featured picture assessment "
+                        f"claim to the Structured data of {file_link} "
+                        "because there was an error saving that page: "
+                        f"{format_exception(exc)}. "
+                        + PLEASE_ADD_FP_ASSESSMENT_CLAIM.format(files=file_link)
+                    )
 
     def add_to_current_month(self, files: list[str]) -> None:
         """Add the candidate to the chronological archive of featured pictures.
@@ -2998,6 +3016,10 @@ class FPCandidate(Candidate):
             commit(old_text, new_text, talk_page, summary)
         except pywikibot.exceptions.LockedPageError:
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
+        except pywikibot.exceptions.PageSaveRelatedError:
+            # Any other error during saving; e.g., that a talk page disallows
+            # bot edits by using the {{Bots}} template
+            warn(f"Can't save user talk page '{talk_link}', {ignoring}")
 
     def notify_uploader_and_creator(self, files: list[str]) -> None:
         """Notify the uploader and (optionally) the creator of the new FP(s).
@@ -3147,6 +3169,11 @@ class FPCandidate(Candidate):
             commit(old_text, new_text, talk_page, summary)
         except pywikibot.exceptions.LockedPageError:
             warn(f"The user talk page '{talk_link}' is locked, {ignoring}")
+            ignored_pages.add(talk_link)
+        except pywikibot.exceptions.PageSaveRelatedError:
+            # Any other error during saving; e.g., that a talk page disallows
+            # bot edits by using the {{Bots}} template
+            warn(f"Can't save user talk page '{talk_link}', {ignoring}")
             ignored_pages.add(talk_link)
 
 
@@ -3561,15 +3588,16 @@ class DelistCandidate(Candidate):
             summary = f"Delisted per [[{self._page.title()}]]"
             try:
                 commit(old_text, new_text, image_page, summary)
-            except pywikibot.exceptions.LockedPageError:
+            except pywikibot.exceptions.PageSaveRelatedError as exc:
                 error(
-                    f"Error - '{filename}' is locked, can't update "
-                    "{{Assessments}} template."
+                    f"Error - can't save '{filename}', "
+                    f"can't update {{{{Assessments}}}} template: {exc}"
                 )
                 ask_for_help(
                     "The bot cannot update the {{tl|Assessments}} template "
                     f"for the delisted featured picture [[:{filename}]] "
-                    "because that page is locked. "
+                    "because saving changes to that page has failed: "
+                    f"{format_exception(exc)}. "
                     + CHECK_DELISTED_FP_AND_UPDATE_ASSESSMENTS.format(
                         subpage=subpage_name
                     )
@@ -3622,12 +3650,15 @@ class DelistCandidate(Candidate):
                     commit_media_info_changes(
                         filename, media_info, claims_to_remove, []
                     )
-                except pywikibot.exceptions.LockedPageError:
-                    error(f"Error - '{filename}' is locked, can't remove FP claim.")
+                except pywikibot.exceptions.PageSaveRelatedError as exc:
+                    error(
+                        f"Error - saving '{filename}' failed, "
+                        f"can't remove FP claim: {exc}")
                     ask_for_help(
                         "The bot tried to remove the featured picture "
                         "assessment claim from the delisted featured picture "
-                        f"[[:{filename}]], but the file page is locked. "
+                        f"[[:{filename}]], but saving changes to that page "
+                        f"has failed: {format_exception(exc)}. "
                         "Please remove the assessment claim manually."
                     )
             else:
@@ -4005,13 +4036,15 @@ def check_candidates(
                 "the bot found that a page contains an unexpected redirect: "
                 f"{format_exception(exc)}. {SERIOUS_PROBLEM_CHECK_PAGE}"
             )
-        except pywikibot.exceptions.LockedPageError as exc:
-            error(f"Error - page is locked: '{exc}'")
+        except pywikibot.exceptions.PageSaveRelatedError as exc:
+            error(f"Error - can't save page: '{exc}'")
             ask_for_help(
                 f"During the processing of [[{candidate.page.title()}]], "
-                "the bot could not save changes to the text of a page "
-                f"because that page is locked: {format_exception(exc)}. "
-                f"{SERIOUS_PROBLEM_CHECK_PAGE}"
+                "the bot could not save changes to the text of a page: "
+                f"{format_exception(exc)}. This can be harmless, but also "
+                "a serious error. Please check that page. If the issue "
+                "with the page does not get fixed, you may need to process "
+                "that nomination manually."
             )
         # These exceptions just stop the candidate, continue with the next one.
         if _g_abort:
