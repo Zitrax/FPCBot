@@ -4479,7 +4479,8 @@ def ask_for_help(message: str) -> None:
     )
     try:
         commit(old_text, new_text, talk_page, "Added request for help")
-    except pywikibot.exceptions.Error as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # Catch any exceptions to avoid circular exceptions
         error(f"Error - could not add post to FPC talk page: {exc}")
 
 
