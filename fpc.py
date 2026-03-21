@@ -4467,8 +4467,9 @@ def ask_for_help(message: str) -> None:
     talk_page = pywikibot.Page(_g_site, FP_TALK_PAGE_NAME)
     try:
         old_text = talk_page.get()
-    except pywikibot.exceptions.PageRelatedError:
-        error(f"Error - could not read FPC talk page '{FP_TALK_PAGE_NAME}'.")
+    except pywikibot.exceptions.PageRelatedError as exc:
+        error(f"Error - could not read FPC talk page: {exc}")
+        return
     if message in old_text:
         return  # Don't post the same message twice.
     new_text = old_text.rstrip() + (
@@ -4476,7 +4477,10 @@ def ask_for_help(message: str) -> None:
         f"[[File:Robot icon.svg|64px|left|link={USER_NAMESPACE}{BOT_NAME}]]\n"
         f"{message} Thank you! / ~~~~"
     )
-    commit(old_text, new_text, talk_page, "Added request for help")
+    try:
+        commit(old_text, new_text, talk_page, "Added request for help")
+    except pywikibot.exceptions.Error as exc:
+        error(f"Error - could not add post to FPC talk page: {exc}")
 
 
 def _confirm_changes(page_name: str, summary: str | None = None) -> bool:
