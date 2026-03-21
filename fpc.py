@@ -4289,6 +4289,16 @@ def format_exception(exc: Exception) -> str:
     # therefore we remove any trailing period to allow us to integrate
     # the message nicely into a full sentence.
     message = str(exc).strip().rstrip(".")
+    # Some messages contain a NL which breaks our formatting with ''...''
+    message = message.replace("\n", " ")
+    # We need to escape quoted template names with {{tl|...}}
+    message = message.replace("{{", "{{tl|")
+    message = re.sub(
+        r"\{\{tl\|\s*(t|t[0-9]|tl[a-z]*)\s*\|",
+        r"{{\1|",
+        message,
+        flags=re.IGNORECASE,
+    )
     name = type(exc).__name__
     return f"''{message}'' (<code>{name}</code>)"
 
