@@ -4291,11 +4291,13 @@ def format_exception(exc: Exception) -> str:
     message = str(exc).strip().rstrip(".")
     # Some messages contain a NL which breaks our formatting with ''...''
     message = message.replace("\n", " ")
-    # We need to escape quoted template names with {{tl|...}}
-    message = message.replace("{{", "{{tl|")
+    # Link to files instead of displaying them
+    message = re.sub(r"\[\[ *(?:[Ff]ile|[Ii]mage) *: *", "[[:File:", message)
+    # Escape quoted template names with {{tl|...}},
+    # except the template-linking templates {{tl}}, {{t}}, {{t0}}, etc.
     message = re.sub(
-        r"\{\{tl\|\s*(t|t[0-9]|tl[a-z]*)\s*\|",
-        r"{{\1|",
+        r"\{\{\s*(?!(?:t[0-9]?|tl[a-z]*)\s*\|)",
+        r"{{tl|",
         message,
         flags=re.IGNORECASE,
     )
