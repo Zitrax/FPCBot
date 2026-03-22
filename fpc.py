@@ -4477,7 +4477,8 @@ def ask_for_help(message: str) -> None:
     talk_page = pywikibot.Page(_g_site, FP_TALK_PAGE_NAME)
     try:
         old_text = talk_page.get()
-    except pywikibot.exceptions.PageRelatedError as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # Catch any exceptions to avoid circular exceptions
         error(f"Error - could not read FPC talk page: {exc}")
         return
     if message in old_text:
