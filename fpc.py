@@ -435,9 +435,20 @@ TOPICAL_FP_CATEGORY_REGEX: Final[re.Pattern] = re.compile(
 
 # Other data
 
-# Some frequent auxiliary character translations for sort keys
 AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
+    # Some frequent auxiliary character translations for sort keys
     {"Æ": "AE", "Œ": "OE", "æ": "ae", "œ": "oe", "ß": "ss"}
+)
+OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
+    # When we want to find the matching candidate archive category by subject,
+    # the gallery 'Objects/Architectural elements' is very difficult --
+    # most entries clearly belong to architecture (e.g. the ceilings),
+    # others are traditionally sorted under 'Objects', e.g. stained-glass
+    # windows, some are mixed (e.g., most FPs of doors and windows belong
+    # to architecture, but some show details of wood carving etc.).
+    # We do our best by analyzing the section, if present.
+    r"(?:fences|floors|ground|ornaments|railings|stained[ _-]glass)",
+    re.IGNORECASE,
 )
 
 
@@ -1172,12 +1183,15 @@ class Candidate(abc.ABC):
         Therefore the categories also correspond to the sections of our list
         of recent FPs which is also used on the FP landing page.
         We just replace some subject names for grammatical reasons
-        (all subjects must go with 'FPC of ...'), and we split the giant
+        (all subjects must go with 'FPC of ...'), we split the giant
         'Places' subject in order to separate at least architecture and
-        landscape photography (they are independent genres of photography).
+        landscape photography (they are independent genres of photography),
+        and we separate 'vehicles' and 'architectural elements', too.
+        The 'architectural elements' are split further because some sections
+        belong to architecture, some rather to other objects.
 
         Args:
-            gallery_link: The gallery link from the nomination,
+            gallery_link: The gallery link from the nomination (incl. section),
                 if already known.  Pass an empty string for delisting
                 nominations (they don't use a gallery link).
 
@@ -1193,7 +1207,9 @@ class Candidate(abc.ABC):
         if gallery_link == "":  # Delisting nomination, or link not found.
             # For such nominations we use a maintenance category:
             return ("without subject", "!Without")
-        gallery_link = re.sub(r"#.+", "", gallery_link).lower()
+        # From here on we handle the link as lowercase to ignore case variants
+        gallery_link = gallery_link.lower()
+        gallery_link, section = split_gallery_link(gallery_link)
         link_parts = re.split(r"\s*/\s*", gallery_link)
         basic_gallery = link_parts[0]
         next_part = link_parts[1] if len(link_parts) > 1 else ""
@@ -1216,7 +1232,16 @@ class Candidate(abc.ABC):
                     case _:
                         subject = "places"
             case "objects":
-                subject = "vehicles" if next_part == "vehicles" else "objects"
+                match next_part:
+                    case "architectural elements":
+                        if OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX.search(section):
+                            subject = "objects"
+                        else:
+                            subject = "architecture"
+                    case "vehicles":
+                        subject = "vehicles"
+                    case _:
+                        subject = "objects"
             case _:
                 subject = basic_gallery
         return (f"of {subject}", f"{subject[0].upper()}{subject[1:]}")
@@ -1698,7 +1723,7 @@ class Candidate(abc.ABC):
 
         Args:
             status: A keyword for the final status, like 'featured'.
-            gallery_link: The gallery link from the nomination,
+            gallery_link: The gallery link from the nomination (incl. section),
                 if already known.  Pass an empty string for delisting
                 nominations (they don't use a gallery link).
         """
@@ -1767,7 +1792,7 @@ class Candidate(abc.ABC):
         Args:
             status: A keyword for the final status, like 'featured'.
             now: The current date and time.
-            gallery_link: The gallery link from the nomination,
+            gallery_link: The gallery link from the nomination (incl. section),
                 if already known.  Pass an empty string for delisting
                 nominations (they don't use a gallery link).
         """
@@ -1778,7 +1803,7 @@ class Candidate(abc.ABC):
         if month_cat in old_text:
             out(
                 f"Skipping _add_archive_categories() for '{self._page.title()}', "
-                "archive category is already present."
+                "archive categories already present."
             )
             return
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
@@ -2273,7 +2298,7 @@ class FPCandidate(Candidate):
         self.add_to_current_month(files)
         self.notify_nominator(files)
         self.notify_uploader_and_creator(files)
-        self.move_to_log(self._SUCCESS_KEYWORD, gallery_page)
+        self.move_to_log(self._SUCCESS_KEYWORD, full_gallery_link)
 
     def add_to_featured_list(self, section_name: str, files: list[str]) -> None:
         """Add the new featured picture to the list of recent FPs.
