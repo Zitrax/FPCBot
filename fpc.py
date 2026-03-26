@@ -448,7 +448,7 @@ OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
     # to architecture, but some show details of wood carving etc.).
     # We do our best by analyzing the section, if present.
     r"(?:fences|floors|ground|ornaments|railings|stained[ _-]glass)",
-    re.IGNORECASE,
+    flags=re.IGNORECASE,
 )
 
 
@@ -1911,16 +1911,27 @@ class Candidate(abc.ABC):
         # Do we also need to create the supercategory for the type?
         category_page = pywikibot.Page(_g_site, type_supercat)
         if not category_page.exists():
+            by_type_supercat = f"Category:{year} featured picture candidates by type"
             key = (
                 " /" if "replacing" in type_supercat
                 else (" -" if "delist" in type_supercat else " +")
             )
             new_text = (
                 f"{header}\n\n"
-                f"[[Category:{year} featured picture candidates|{key}]]"
+                f"[[{by_type_supercat}|{key}]]"
             )
             summary = "Created new candidate archive supercategory for the type"
             commit("", new_text, category_page, summary)
+
+            # Do we also need to create a 'by type' supercategory?
+            category_page = pywikibot.Page(_g_site, by_type_supercat)
+            if not category_page.exists():
+                new_text = (
+                    f"{header}\n\n"
+                    f"[[Category:{year} featured picture candidates| Type]]"
+                )
+                summary = "Created new candidate archive supercategory 'by type'"
+                commit("", new_text, category_page, summary)
         # We don't need to create the supercategory for the status
         # because it is the same for all years and does already exist.
 
@@ -2002,7 +2013,7 @@ class Candidate(abc.ABC):
             return
         new_text = (
             f"{{{{FPC archive category header|year={year}}}}}\n\n"
-            f"[[Category:{year} featured picture candidates| >]]\n"
+            f"[[Category:{year} featured picture candidates by type| >]]\n"
             f"[[Category:Featured picture set nominations| {year}]]"
         )
         summary = "Created new candidate archive category for set nominations"
