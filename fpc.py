@@ -2305,7 +2305,7 @@ class FPCandidate(Candidate):
         self.add_to_featured_list(basic_gallery, files)
         self.add_to_gallery_page(gallery_page, section, files)
         self.add_assessments(files)
-        self.add_assessment_to_media_info(files)
+        # ! self.add_assessment_to_media_info(files)  # Disabled 2026-04-01
         self.add_to_current_month(files)
         self.notify_nominator(files)
         self.notify_uploader_and_creator(files)
@@ -3351,7 +3351,7 @@ class DelistCandidate(Candidate):
         self.remove_from_featured_list(files)
         self.remove_from_gallery_pages(files, results)
         self.remove_assessments(files)
-        self.remove_assessment_from_media_info(files)
+        # ! self.remove_assessment_from_media_info(files)  # Disabled 2026-04-01
         self.move_to_log(self._SUCCESS_KEYWORD, "")  # No gallery link here.
 
     def remove_from_featured_list(self, files: list[str]) -> None:
