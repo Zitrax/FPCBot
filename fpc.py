@@ -437,7 +437,14 @@ TOPICAL_FP_CATEGORY_REGEX: Final[re.Pattern] = re.compile(
 
 AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
     # Some frequent auxiliary character translations for sort keys
-    {"Æ": "AE", "æ": "ae", "Œ": "OE", "œ": "oe", "Ø": "O", "ø": "o", "ß": "ss"}
+    {
+        "Æ": "AE", "æ": "ae",
+        "Œ": "OE", "œ": "oe",
+        "Đ": "D", "đ": "d",  # U+0110, != U+00D0 (eth)
+        "Ł": "L", "ł": "l",
+        "Ø": "O", "ø": "o",
+        "ß": "ss",
+    }
 )
 RUN_OF_WHITESPACE_REGEX: Final[re.Pattern] = re.compile(r"\s+")
 OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
