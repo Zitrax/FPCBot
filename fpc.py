@@ -439,6 +439,7 @@ AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
     # Some frequent auxiliary character translations for sort keys
     {"Æ": "AE", "Œ": "OE", "æ": "ae", "œ": "oe", "ß": "ss"}
 )
+RUN_OF_WHITESPACE_REGEX: Final[re.Pattern] = re.compile(r"\s+")
 OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
     # When we want to find the matching candidate archive category by subject,
     # the gallery 'Objects/Architectural elements' is very difficult --
@@ -4305,9 +4306,10 @@ def name_to_sort_key(name: str) -> str:
     This function is just a compromise: it is simple enough to be practical
     and at least allows for better sorting of many pages; e.g., it makes sure
     that we sort 'Château.jpg' before 'Chur.jpg' and not after it.
-    It removes accents and diacritics, then it translates a few carefully
+
+    The function removes accents and diacritics; it translates some carefully
     selected compound characters acc. to their most common interpretation
-    for sorting.
+    for sorting; and unifies all (runs of) whitespace chars to simple spaces.
     """
     try:
         result = unicodedata.normalize("NFKD", name.strip())
@@ -4316,7 +4318,9 @@ def name_to_sort_key(name: str) -> str:
         )
     except UnicodeError:
         return name
-    return result.translate(AUXILIARY_SORT_KEY_TRSL_TABLE)
+    result = result.translate(AUXILIARY_SORT_KEY_TRSL_TABLE)
+    result = RUN_OF_WHITESPACE_REGEX.sub(" ", result)
+    return result.strip()
 
 
 def format_exception(exc: Exception) -> str:
