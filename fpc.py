@@ -2238,7 +2238,10 @@ class FPCandidate(Candidate):
         except pywikibot.exceptions.NoPageError:
             warn(f"{cut_title}: Gallery page '{full_page_name}' does not exist.")
             return
-        except pywikibot.exceptions.PageRelatedError as exc:
+        except (
+            pywikibot.exceptions.PageRelatedError,
+            pywikibot.exceptions.InvalidTitleError,
+        ) as exc:
             warn(f"{cut_title}: Can't read gallery page '{full_page_name}': {exc}")
             return
         # Search for the section to which we have to add the new FP(s)
@@ -2430,7 +2433,10 @@ class FPCandidate(Candidate):
                 f"{PLEASE_CHECK_GALLERY_AND_SORT_FPS}"
             )
             return
-        except pywikibot.exceptions.PageRelatedError as exc:
+        except (
+            pywikibot.exceptions.PageRelatedError,
+            pywikibot.exceptions.InvalidTitleError,
+        ) as exc:
             error(f"Error - can't read gallery page '{full_page_name}': {exc}")
             ask_for_help(
                 f"The bot could not read the gallery page [[{full_page_name}]] "
