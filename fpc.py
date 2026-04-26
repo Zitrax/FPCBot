@@ -2577,9 +2577,13 @@ class FPCandidate(Candidate):
                     "is not a valid target because it is not followed "
                     "immediately by an associated "
                     "<code><nowiki><gallery></nowiki></code> element. "
-                    "Perhaps this is a superordinate heading and the "
-                    "image should be added to one of its subsections; "
-                    f"but to which one? {unsorted_hint}"
+                    "Perhaps this is a superordinate heading and the image "
+                    "should be added to one of its subsections; "
+                    "but to which one? Or there is a special gallery page "
+                    "for featured pictures of that subject and the section "
+                    "is just a cross reference; in this case the entry "
+                    "for the new featured picture must be moved to "
+                    f"the special gallery page. \u2013 {unsorted_hint}"
                 )
             return warning
 
