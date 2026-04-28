@@ -447,6 +447,27 @@ AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
     }
 )
 RUN_OF_WHITESPACE_REGEX: Final[re.Pattern] = re.compile(r"\s+")
+REMOVE_FROM_SORT_KEY_REGEX: Final[re.Pattern] = re.compile(
+    # Common punctuation marks etc. which should be removed from the sort key.
+    r"['\"`´„“”‚‘’«»‹›\u00AD\u200B\u200C\u200D]+"
+)
+REPLACE_BY_SPACE_IN_SORT_KEY_REGEX: Final[re.Pattern] = re.compile(
+    # Common punctuation marks which should be replaced by a simple space
+    # in the sort key because they usually have separating character.
+    r"[,:;?!\-()/+*^~¿¡–—…·•†\u00A0\u037E\u0387]+"
+)
+REMOVE_FROM_START_OF_SORT_KEY_REGEX: Final[re.Pattern] = re.compile(
+    # Characters which should be removed completely only from the beginning
+    # of the sort key, in any count and order, including any whitespace
+    # before/between/after them.  Here we also remove '.'.
+    r"^[\s.]+"
+)
+REMOVE_SPACE_BEFORE_INTERPT_REGEX: Final[re.Pattern] = re.compile(
+    # Remove some irritating spaces before remaining punctuation marks.
+    # Because this regex should be used only *after* the preceding ones,
+    # we handle only the remaining punctuation mark '.'.
+    r" (?=\.[^.])"
+)
 OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
     # When we want to find the matching candidate archive category by subject,
     # the gallery 'Objects/Architectural elements' is very difficult --
@@ -4322,11 +4343,14 @@ def name_to_sort_key(name: str) -> str:
     languages have very different rules for collation etc.
     This function is just a compromise: it is simple enough to be practical
     and at least allows for better sorting of many pages; e.g., it makes sure
-    that we sort 'Château.jpg' before 'Chur.jpg' and not after it.
+    that we sort 'Château.jpg' before 'Chur.jpg' and not after it,
+    and sort '"All right".jpg' under 'A', not under '"'.
 
     The function removes accents and diacritics; it translates some carefully
     selected compound characters acc. to their most common interpretation
-    for sorting; and unifies all (runs of) whitespace chars to simple spaces.
+    for sorting; it removes common punctuation marks which are usually
+    not taken into account when sorting items, or replaces them by spaces;
+    and unifies all (runs of) whitespace chars to simple spaces.
     """
     try:
         result = unicodedata.normalize("NFKD", name.strip())
@@ -4336,7 +4360,11 @@ def name_to_sort_key(name: str) -> str:
     except UnicodeError:
         return name
     result = result.translate(AUXILIARY_SORT_KEY_TRSL_TABLE)
+    result = REMOVE_FROM_SORT_KEY_REGEX.sub("", result)
+    result = REPLACE_BY_SPACE_IN_SORT_KEY_REGEX.sub(" ", result)
+    result = REMOVE_FROM_START_OF_SORT_KEY_REGEX.sub("", result, count=1)
     result = RUN_OF_WHITESPACE_REGEX.sub(" ", result)
+    result = REMOVE_SPACE_BEFORE_INTERPT_REGEX.sub(r"", result)
     return result.strip()
 
 
