@@ -1836,8 +1836,8 @@ class Candidate(abc.ABC):
             )
             return
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
-        subj_phrase, subj_key = self._candidate_archive_subject(gallery_link)
-        subject_cat = f"Category:{year} featured picture candidates {subj_phrase}"
+        subject_phrase, subject_key = self._candidate_archive_subject(gallery_link)
+        subject_cat = f"Category:{year} featured picture candidates {subject_phrase}"
         categories = [month_cat, status_cat, subject_cat]  # Also defines order
         if self.is_set():
             set_cat = f"Category:{year} featured picture set nominations"
@@ -1862,7 +1862,7 @@ class Candidate(abc.ABC):
         # Create the candidate archive categories if necessary
         self._create_month_and_year_categories(now, month_cat)
         self._create_type_and_status_categories(year, status_cat, status_supercat)
-        self._create_subject_categories(year, subject_cat, subj_phrase, subj_key)
+        self._create_subject_categories(year, subject_cat, subject_phrase, subject_key)
         if set_cat:
             self._create_set_category(year, set_cat)
 
