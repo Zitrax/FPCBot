@@ -433,7 +433,44 @@ TOPICAL_FP_CATEGORY_REGEX: Final[re.Pattern] = re.compile(
 )
 
 
-# Other data
+# Dealing with gallery links
+
+VALID_BASIC_GALLERY_LINKS: Final[set[str]] = {
+    # Valid first elements of gallery links
+    # All entries have been converted to lowercase to ignore case variants.
+    # Keep this list in sync with the actual FP gallery pages!
+    "animals",
+    # "animated",  # Deprecated, must not be used for new nominations.
+    "astronomy",
+    "food and drink",
+    "fungi",
+    "historical",
+    "natural phenomena",
+    "non-photographic media",
+    "objects",
+    "other lifeforms",
+    "people",
+    "photo techniques",
+    "places",
+    "plants",
+    # "sets",  # Deprecated, must not be used for new nominations.
+    "space exploration",
+    "sports",
+}
+OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
+    # When we want to find the matching candidate archive category by subject,
+    # the gallery 'Objects/Architectural elements' is very difficult --
+    # most entries clearly belong to architecture (e.g. the ceilings),
+    # others are traditionally sorted under 'Objects', e.g. stained-glass
+    # windows, some are mixed (e.g., most FPs of doors and windows belong
+    # to architecture, but some show details of wood carving etc.).
+    # We do our best by analyzing the section, if present.
+    r"(?:fences|floors|ground|ornaments|railings|stained[ _-]glass)",
+    flags=re.IGNORECASE,
+)
+
+
+# Creating sort keys for use with candidate archive categories
 
 AUXILIARY_SORT_KEY_TRSL_TABLE: Final[dict[int, str]] = str.maketrans(
     # Some frequent auxiliary character translations for sort keys
@@ -467,17 +504,6 @@ REMOVE_SPACE_BEFORE_INTERPT_REGEX: Final[re.Pattern] = re.compile(
     # Because this regex should be used only *after* the preceding ones,
     # we handle only the remaining punctuation mark '.'.
     r" (?=\.[^.])"
-)
-OBJECT_SECTS_IN_ARCH_ELEMENTS_REGEX: Final[re.Pattern] = re.compile(
-    # When we want to find the matching candidate archive category by subject,
-    # the gallery 'Objects/Architectural elements' is very difficult --
-    # most entries clearly belong to architecture (e.g. the ceilings),
-    # others are traditionally sorted under 'Objects', e.g. stained-glass
-    # windows, some are mixed (e.g., most FPs of doors and windows belong
-    # to architecture, but some show details of wood carving etc.).
-    # We do our best by analyzing the section, if present.
-    r"(?:fences|floors|ground|ornaments|railings|stained[ _-]glass)",
-    flags=re.IGNORECASE,
 )
 
 
@@ -1241,6 +1267,12 @@ class Candidate(abc.ABC):
         gallery_link, section = split_gallery_link(gallery_link)
         link_parts = re.split(r"\s*/\s*", gallery_link)
         basic_gallery = link_parts[0]
+        if basic_gallery not in VALID_BASIC_GALLERY_LINKS:
+            warn(
+                f"{self.cut_title()}: Invalid basic gallery '{basic_gallery}', "
+                "adding to 'without subject' category."
+            )
+            return ("without subject", "!Without")
         next_part = link_parts[1] if len(link_parts) > 1 else ""
         match basic_gallery:
             case "historical":
@@ -1838,6 +1870,14 @@ class Candidate(abc.ABC):
         status_cat, status_supercat = self._candidate_archive_status_cats(year, status)
         subject_phrase, subject_key = self._candidate_archive_subject(gallery_link)
         subject_cat = f"Category:{year} featured picture candidates {subject_phrase}"
+        if subject_phrase.startswith("without"):
+            ask_for_help(
+                "The bot program could not infer the subject of the nomination "
+                f"[[{self._page.title()}]], therefore it adds the nomination "
+                f"to the maintenance category [[:{subject_cat}]]. "
+                "Please replace that category by the appropriate annual archive "
+                "category for the subject of the nomination."
+            )
         categories = [month_cat, status_cat, subject_cat]  # Also defines order
         if self.is_set():
             set_cat = f"Category:{year} featured picture set nominations"
