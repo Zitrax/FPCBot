@@ -3994,6 +3994,24 @@ def _resolve_nomination_subpage_redirect(
                 f"contains an invalid redirect. {PLEASE_FIX_HINT}"
             )
             return None
+        # A nomination subpage must redirect to a whole page, never to a
+        # section.  A malformed "#REDIRECT [[Target#Section]]" yields a
+        # target that still carries the section on pywikibot versions before
+        # 9.3, which added the 'ignore_section' parameter to
+        # getRedirectTarget().  Calling Page.get() on such a target later
+        # raises an uncaught SectionError and aborts the whole bot run.
+        # Treat a redirect that points to a section as invalid instead.
+        if subpage.section():
+            error(
+                f"Error - nomination redirect '{old_name}' points to a "
+                "section, ignoring."
+            )
+            ask_for_help(
+                f"The nomination subpage [[{old_name}]] redirects to a "
+                "section of a page rather than to a page itself, "
+                f"which the bot cannot process. {PLEASE_FIX_HINT}"
+            )
+            return None
         new_name = subpage.title()
         out(f"Nomination '{old_name}' has been renamed to '{new_name}'")
         redirects.append((old_name, new_name))
