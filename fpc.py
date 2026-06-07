@@ -3986,8 +3986,11 @@ def _resolve_nomination_subpage_redirect(
         old_name = subpage.title()
         try:
             subpage = subpage.getRedirectTarget()
-        except pywikibot.exceptions.PageRelatedError:
-            # Circular or invalid redirect etc.
+        except (
+            pywikibot.exceptions.PageRelatedError,
+            pywikibot.exceptions.SectionError,
+        ):
+            # Circular or invalid redirect, redirect to invalid section, etc.
             error(f"Error - invalid nomination redirect page '{old_name}', ignoring.")
             ask_for_help(
                 f"The nomination subpage [[{old_name}]] "
