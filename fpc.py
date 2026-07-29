@@ -920,7 +920,8 @@ class Candidate(abc.ABC):
     def find_gallery_of_file(self) -> str:
         """Find and polish the gallery link in the nomination subpage."""
         if match := re.search(
-            r"Gallery[^\n]+?\[\[[Cc]ommons: ?[Ff]eatured[_ ]pictures ?\/([^\n\]]+)",
+            r"Gallery[^\n]+?\[\[ *(?:: *)?[Cc]ommons *: *"
+            r"[Ff]eatured[_ ]pictures ?\/([^\n\]]+)",
             self.filtered_content(),
         ):
             return clean_gallery_link(match.group(1))
