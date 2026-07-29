@@ -319,12 +319,12 @@ OBSOLETE_DELIST_RESULT_REGEX: Final[re.Pattern] = re.compile(
 # Look for verified results using the new, template-based format
 VERIFIED_RESULT_REGEX: Final[re.Pattern] = re.compile(
     r"""
-    \{\{\s*FPC-results-reviewed\s*\|
-    \s*support\s*=\s*(\d+)\s*\|            # (1) Support votes
-    \s*oppose\s*=\s*(\d+)\s*\|             # (2) Oppose votes
-    \s*neutral\s*=\s*(\d+)\s*\|            # (3) Neutral votes
-    \s*featured\s*=\s*(\w+)\s*\|           # (4) Featured, should be 'yes'/'no'
-    \s*gallery\s*=\s*([^|\n]*)             # (5) Gallery link (if featured)
+    \{\{\s*FPC-results-reviewed\s*
+    \|\s*support\s*=\s*(\d+)\s*            # (1) Support votes
+    \|\s*oppose\s*=\s*(\d+)\s*             # (2) Oppose votes
+    \|\s*neutral\s*=\s*(\d+)\s*            # (3) Neutral votes
+    \|\s*featured\s*=\s*(\w+)\s*           # (4) Featured, should be 'yes'/'no'
+    (?:\|\s*gallery\s*=\s*([^|\n]*))?      # (5) Gallery link (if featured)
     (?:\|\s*alternative\s*=\s*([^|\n]*))?  # (6) For candidates with alternatives:
     .*?\}\}                                #     name of the winning image
     """,
@@ -2331,13 +2331,19 @@ class FPCandidate(Candidate):
 
         # Some methods need the full gallery link with section anchor,
         # others only the gallery page name or even just the basic gallery.
-        full_gallery_link = clean_gallery_link(results[4])
-        gallery_page, section = split_gallery_link(full_gallery_link)
+        try:
+            full_gallery_link = results[4]
+        except IndexError:  # No 'gallery' parameter in results template.
+            gallery_page = ""
+        else:
+            full_gallery_link = clean_gallery_link(full_gallery_link)
+            gallery_page, section = split_gallery_link(full_gallery_link)
         if not gallery_page:
             error(f"{cut_title}: (ignoring, gallery not defined)")
             ask_for_help(
-                f"The gallery link in the nomination [[{subpage_name}]] "
-                f"is empty or broken. {PLEASE_FIX_HINT}"
+                f"The results template in the nomination [[{subpage_name}]] "
+                "contains no <code>gallery=...</code> parameter, or the link "
+                f"in that parameter is empty or broken. {PLEASE_FIX_HINT}"
             )
             return
         match = re.search(r"^(.*?)(?:/|$)", gallery_page)
@@ -2345,6 +2351,7 @@ class FPCandidate(Candidate):
         basic_gallery = match.group(1)
 
         # If there is more than one image, search for the selected alternative
+        # (we assume that the 'gallery' parameter is defined, as tested above)
         if self.image_count() > 1:
             if len(results) > 5 and results[5].strip():
                 alternative = results[5].replace("_", " ").strip()
