@@ -303,6 +303,11 @@ MIDDLE_NOMINATION_NAME_REGEX: Final[re.Pattern] = re.compile(
 FULL_FILE_PREFIX_REGEX: Final[re.Pattern] = re.compile(
     f"^{CAND_PREFIX_PATTERN}" + r".*?(?:[Ff]ile|[Ii]mage) *: *"
 )
+CONTAINS_SECTION_ANCHOR: Final[re.Pattern] = re.compile(
+    # No need to search for '&#35;', '&#x23;' etc. because they are catched
+    # by the search for '#', too.
+    r"#|&num;", flags=re.IGNORECASE
+)
 
 # Look for results using the old, text-based results format
 # which was in use until August 2009.  An example of such a line is:
@@ -3925,6 +3930,22 @@ def find_candidates(
     redirects: list[tuple[str, str]] = []
 
     for _, subpage_name in subpage_entries:
+        # Skip nomination transclusions of sections (containing '#')
+        if CONTAINS_SECTION_ANCHOR.search(subpage_name):
+            error("Error - nomination transclusion of section, ignoring.")
+            ask_for_help(
+                f"The candidate list [[{list_page_name}]] contains a transclusion "
+                "which seems to include only a section from a nomination: "
+                f"<code><nowiki>{subpage_name}</nowiki></code>. "
+                "This can cause severe problems, therefore the bot ignores "
+                "that transclusion. Please check and fix the transclusion. "
+                "Normally, it should be enough to remove the <code>#</code> "
+                "and everything behind it until the closing braces. "
+                "If the <code>#</code> is part of an HTML character entity, "
+                "please use the proper Unicode character instead, "
+                "or rename the nomination subpage to avoid the character."
+            )
+            continue
         # Skip nominations which are not of the expected type
         if not (candidate_class := which_types.candidate_class(subpage_name)):
             continue
