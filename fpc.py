@@ -2391,7 +2391,7 @@ class FPCandidate(Candidate):
         self.add_to_gallery_page(gallery_page, section, files)
         self.add_assessments(files)
         # ! self.add_assessment_to_media_info(files)  # Disabled 2026-04-01
-        self.add_to_current_month(files)
+        self.add_to_current_month(files, results)
         self.notify_nominator(files)
         self.notify_uploader_and_creator(files)
         self.move_to_log(self._SUCCESS_KEYWORD, full_gallery_link)
@@ -2947,7 +2947,11 @@ class FPCandidate(Candidate):
                         + PLEASE_ADD_FP_ASSESSMENT_CLAIM.format(files=file_link)
                     )
 
-    def add_to_current_month(self, files: list[str]) -> None:
+    def add_to_current_month(
+        self,
+        files: list[str],
+        results: tuple[str, ...],
+    ) -> None:
         """Add the candidate to the chronological archive of featured pictures.
 
         This is STEP 5 of the parking procedure for new featured pictures.
@@ -2956,22 +2960,10 @@ class FPCandidate(Candidate):
 
         Args:
             files: List with filename(s) of the featured picture or set.
+            results: Tuple containing the values of the parameters in
+                the verified results template on the nomination subpage.
         """
         filename = files[0]  # For set nominations just use the first file.
-
-        # Extract voting results
-        if match := VERIFIED_RESULT_REGEX.search(self.filtered_content()):
-            ws = match.group(1)
-            wo = match.group(2)
-            wn = match.group(3)
-        else:
-            error(f"Error - no verified result in '{self._page.title()}'.")
-            ask_for_help(
-                f"The nomination [[{self._page.title()}]] is closed, "
-                "but does not contain a valid verified result. "
-                f"{PLEASE_FIX_HINT}"
-            )
-            return
 
         # Get the chronological archive page for the current month
         now = datetime.datetime.now(datetime.UTC)
@@ -3046,7 +3038,7 @@ class FPCandidate(Candidate):
             f"{creator_hint}"
             f"uploaded by {uploader_link}, "
             f"nominated by {nominator_link},<br> "
-            f"{{{{s|{ws}}}}}, {{{{o|{wo}}}}}, {{{{n|{wn}}}}}\n"
+            f"{{{{s|{results[0]}}}}}, {{{{o|{results[1]}}}}}, {{{{n|{results[2]}}}}}\n"
             "</gallery>",
             1,
         )
