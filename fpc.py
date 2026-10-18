@@ -2392,7 +2392,7 @@ class FPCandidate(Candidate):
         self.add_assessments(files)
         # ! self.add_assessment_to_media_info(files)  # Disabled 2026-04-01
         self.add_to_current_month(files, results)
-        self.notify_nominator(files)
+        self.notify_nominator(files, results, gallery_page, section)
         self.notify_uploader_and_creator(files)
         self.move_to_log(self._SUCCESS_KEYWORD, full_gallery_link)
 
@@ -3044,7 +3044,13 @@ class FPCandidate(Candidate):
         )
         commit(old_text, new_text, page, summary)
 
-    def notify_nominator(self, files: list[str]) -> None:
+    def notify_nominator(
+        self,
+        files: list[str],
+        results: tuple[str, ...],
+        gallery_page_name: str,
+        section: str,
+    ) -> None:
         """Notify the nominator of the new FP(s).
 
         This is STEP 6 of the parking procedure for new featured pictures.
@@ -3053,6 +3059,12 @@ class FPCandidate(Candidate):
 
         Args:
             files: List with filename(s) of the featured picture or set.
+            results: Tuple containing the values of the parameters in
+                the verified results template on the nomination subpage.
+            gallery_page_name: The name of the gallery page, without the
+                leading 'Commons:Featured pictures/'.
+            section: The section anchor which denotes the target section
+                on that page (can be empty).
         """
         # Get and read nominator talk page
         talk_link = f"{USER_TALK_NAMESPACE}{self.nominator(link=False)}"
@@ -3082,13 +3094,19 @@ class FPCandidate(Candidate):
             talk_link = new_talk_link  # Update the talk page name.
 
         subpage_name = self.subpage_name(keep_prefix=True, keep_number=True)
+        other_params = (
+            f"subpage={subpage_name}"
+            f"|support={results[0]}|oppose={results[1]}|neutral={results[2]}"
+            f"|gallerypage={gallery_page_name}"
+            + (f"|gallerysection={section}" if section else "")
+        )
         if self.is_set():
             # Notifications for set nominations add a gallery to the talk page
             # and use a special template with an appropriate message.
             # Since August 2025 we use an improved version of the template.
             nomination_link = self._page.title()
             set_title = self.subpage_name(keep_prefix=False, keep_number=False)
-            template = f"{{{{FPpromotionSet2|{set_title}|subpage={subpage_name}}}}}"
+            template = f"{{{{FPpromotionSet2|{set_title}|{other_params}}}}}"
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
@@ -3114,7 +3132,7 @@ class FPCandidate(Candidate):
         else:
             # Single FP nomination
             filename = files[0]
-            template = f"{{{{FPpromotion|{filename}|subpage={subpage_name}}}}}"
+            template = f"{{{{FPpromotion|{filename}|{other_params}}}}}"
             # Check if there already is a promotion template on the talk page.
             # This can happen if the process has previously been interrupted.
             if re.search(wikipattern(template), old_text):
