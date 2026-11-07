@@ -308,6 +308,10 @@ CONTAINS_SECTION_ANCHOR: Final[re.Pattern] = re.compile(
     # by the search for '#', too.
     r"#|&num;", flags=re.IGNORECASE
 )
+# Identify translation subpages of the landing page 'Commons:Featured pictures'
+TRANSLATED_FP_LANDING_PAGE_REGEX = re.compile(
+    f"^{FP_PREFIX}" + r"[a-z]+(?:-[a-z]+)?$"
+)
 
 # Look for results using the old, text-based results format
 # which was in use until August 2009.  An example of such a line is:
@@ -3555,6 +3559,9 @@ class DelistCandidate(Candidate):
                 page_name = page.title()
                 if not page_name.startswith(FP_PREFIX):
                     # Any other page -- don't remove the image here, of course.
+                    continue
+                if TRANSLATED_FP_LANDING_PAGE_REGEX.fullmatch(page_name):
+                    # Just a translation subpage of the FP landing page
                     continue
                 if page_name.startswith(CHRONO_ARCHIVE_PREFIX):
                     # Chronological archive page: mark the image as delisted
